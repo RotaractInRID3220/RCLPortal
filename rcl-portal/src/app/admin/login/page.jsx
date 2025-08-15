@@ -25,7 +25,7 @@ const adminLogin = () => {
     const handleLogin = async () => {
       setError(null);
       if (!email || !password) {
-        setError('Username and password are required');
+        toast.error('Username and password are required');
         return;
       }
       try {
@@ -34,14 +34,14 @@ const adminLogin = () => {
         const res = await fetch(`/api/council?${params.toString()}`);
         const data = await res.json();
         if (!res.ok || !data?.authorized) {
-          setError(data?.error || 'Login failed');
+          toast.error(data?.error || 'Login failed');
           setLoading(false);
           return;
         }
         // Save user data in atom (persisted to localStorage with TTL)
         setUserDeets(data.user || null);
         toast.success('Login successful');
-        router.push('/admin');
+        router.push('/admin/dashboard');
       } catch (e) {
         setError('Network error');
         setLoading(false);
