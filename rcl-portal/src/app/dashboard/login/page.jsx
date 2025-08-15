@@ -41,7 +41,7 @@ const adminLogin = () => {
         // Save user data in atom (persisted to localStorage with TTL)
         setUserDeets(data.user || null);
         toast.success('Login successful');
-        router.push('/admin');
+        router.push('/dashboard');
       } catch (e) {
         setError('Network error');
         setLoading(false);
