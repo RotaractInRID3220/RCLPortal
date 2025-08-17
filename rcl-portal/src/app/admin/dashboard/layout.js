@@ -31,7 +31,7 @@ export default function RootLayout({ children }) {
           <div className="w-2/12 h-screen fixed">
             <AdminSideNav />
           </div>
-          <div className="w-10/12 ml-auto">
+          <div className="w-10/12 ml-auto py-16 px-10">
             <PrivateRoute>
                 {children}
                 <Toaster richColors  />

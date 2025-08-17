@@ -17,7 +17,7 @@ const page = () => {
         )
     }
   return (
-    <div className='py-10 px-10'>
+    <div>
       <h1>Admin Page</h1>
     </div>
   )
