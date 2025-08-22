@@ -1,5 +1,39 @@
 import { toast } from 'sonner';
 
+/**
+ * Creates a new sport event
+ * @param {Object} eventData - The event data
+ * @param {string} eventData.name - Event name
+ * @param {string} eventData.day - Event day (D-00, D-01, D-02, D-03)
+ * @param {string} eventData.type - Event type (individual, team)
+ * @param {string} eventData.gender - Gender type (boys, girls, mixed)
+ * @param {number} eventData.minPlayers - Minimum player count
+ * @param {number} eventData.maxPlayers - Maximum player count
+ * @param {number} eventData.reservePlayers - Reserve player count
+ * @param {Date} eventData.regClose - Registration close date
+ * @param {string} eventData.category - Event category (community, institute, both)
+ * 
+ * @example
+ * // Create single event
+ * const result = await createEvent({
+ *   name: "Football",
+ *   day: "D-01",
+ *   type: "team",
+ *   gender: "boys",
+ *   minPlayers: 11,
+ *   maxPlayers: 15,
+ *   reservePlayers: 3,
+ *   regClose: new Date(),
+ *   category: "community"
+ * });
+ * 
+ * @example
+ * // Create for both categories
+ * const result = await createEvent({...eventData, category: "both"});
+ * // Returns: { community: {...}, institute: {...} }
+ * 
+ * @returns {Promise<Object>} Success response with event data
+ */
 export const createEvent = async (eventData) => {
     if (!eventData || typeof eventData !== 'object') {
         throw new Error('Invalid event data provided');
@@ -63,3 +97,84 @@ export const createEvent = async (eventData) => {
         throw error;
     }
 };
+
+/**
+ * Fetches all sport events with optional filtering
+ * @param {Object} [filters={}] - Optional filters
+ * @param {string} [filters.category] - Filter by category (community, institute, both)
+ * @param {string} [filters.day] - Filter by event day (D-00, D-01, D-02, D-03)
+ * @param {string} [filters.type] - Filter by event type (individual, team)
+ * @param {string} [filters.gender] - Filter by gender (boys, girls, mixed)
+ * 
+ * @example
+ * // Get all events
+ * const allEvents = await getAllEvents();
+ * // Returns: { success: true, data: [...], count: 10 }
+ * 
+ * @example
+ * // Get community events only
+ * const communityEvents = await getAllEvents({ category: "community" });
+ * 
+ * @example
+ * // Get team events for boys
+ * const teamEvents = await getAllEvents({ type: "team", gender: "boys" });
+ * 
+ * @example
+ * // Multiple filters
+ * const filtered = await getAllEvents({ 
+ *   category: "institute", 
+ *   day: "D-01", 
+ *   type: "individual" 
+ * });
+ * 
+ * @returns {Promise<Object>} Response object with success, data array, and count
+ */
+export const getAllEvents = async (filters = {}) => {
+    try {
+        // Build query parameters if filters are provided
+        const params = new URLSearchParams();
+        
+        if (filters.category) {
+            params.append('category', filters.category);
+        }
+        if (filters.day) {
+            params.append('day', filters.day);
+        }
+        if (filters.type) {
+            params.append('type', filters.type);
+        }
+        if (filters.gender) {
+            params.append('gender', filters.gender);
+        }
+
+        // Build the URL with or without parameters
+        const url = params.toString() ? `/api/events?${params.toString()}` : '/api/events';
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.success) {
+            return result; // Returns { success: true, data: [...], count: number }
+        } else {
+            toast.error(result.error || 'Failed to fetch events');
+            throw new Error(result.error || 'Failed to fetch events');
+        }
+
+    } catch (error) {
+        console.error('Error fetching events:', error);
+        toast.error('Network error: Failed to fetch events');
+        throw error;
+    }
+};
+
+

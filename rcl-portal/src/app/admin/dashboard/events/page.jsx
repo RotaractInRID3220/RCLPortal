@@ -1,7 +1,7 @@
 'use client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input';
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Calendar1 } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Label } from "@/components/ui/label"
@@ -17,12 +17,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { createEvent } from '@/services/sportServices';
+import { createEvent, getAllEvents } from '@/services/sportServices';
 import { toast } from 'sonner';
+import { useAtom } from 'jotai';
+import { sportsDataAtom, sportsLoadingAtom } from '@/app/state/store';
 
 const page = () => {
-    const[addEvent, setAddEvent] = useState(true);
+    const[addEvent, setAddEvent] = useState(false);
     const [open, setOpen] = useState(false)
+
+    // Sports data from global state
+    const [sportsData, setSportsData] = useAtom(sportsDataAtom);
+    const [sportsLoading, setSportsLoading] = useAtom(sportsLoadingAtom);
 
     const [eventName, setEventName] = useState('');
     const [eventDay, setEventDay] = useState('');
@@ -33,6 +39,28 @@ const page = () => {
     const [reservePlayerCount, setReservePlayerCount] = useState('');
     const [regClose, setRegClose] = useState(undefined);
     const [eventCategory, setEventCategory] = useState('');
+
+    // Fetch all sports data when component mounts
+    const fetchAllSports = async () => {
+        try {
+            setSportsLoading(true);
+            const result = await getAllEvents();
+            if (result.success) {
+                setSportsData(result.data);
+                console.log('Sports data loaded:', result.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch sports:', error);
+            // Error toast already handled by getAllEvents service
+        } finally {
+            setSportsLoading(false);
+        }
+    };
+
+    // Load sports data when component mounts
+    useEffect(() => {
+        fetchAllSports();
+    }, []);
 
     // Validation logic
     const isFormValid = () => {
@@ -117,7 +145,7 @@ const page = () => {
         const result = await createEvent(eventData);
         console.log('Event created:', result);
         
-        // Reset form after successful creation
+        // Reset form and refresh sports data after successful creation
         if (result?.success) {
             setEventName('');
             setEventDay('');
@@ -128,6 +156,9 @@ const page = () => {
             setReservePlayerCount('');
             setRegClose(undefined);
             setEventCategory('');
+            
+            // Refresh sports data to show the new event
+            await fetchAllSports();
         }
     };
 
@@ -245,8 +276,8 @@ const page = () => {
                                     <SelectValue placeholder="Event Category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="comBased">Community Based</SelectItem>
-                                    <SelectItem value="inBased">Institute Based</SelectItem>
+                                    <SelectItem value="community">Community Based</SelectItem>
+                                    <SelectItem value="institute">Institute Based</SelectItem>
                                     <SelectItem value="both">Both</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -267,7 +298,79 @@ const page = () => {
             {/*🌟 Event list component */}
             {!addEvent && (
                 <div>
-                    <h2>Event List</h2>
+                    {sportsLoading ? (
+                        <div className="text-center py-8">
+                            <p className="text-gray-400">Loading events...</p>
+                        </div>
+                    ) : sportsData.length === 0 ? (
+                        <div className="text-center py-8">
+                            <p className="text-gray-400">No events found. Create your first event!</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-10">
+                            {/* Institute Based Events */}
+                            <div>
+                                <h3 className="text-xl font-medium text-blue-400 mb-4 flex items-center">
+                                    Institute Based Events
+                                </h3>
+                                {sportsData.filter(event => event.category === 'institute').length === 0 ? (
+                                    <div className="text-center py-6 bg-white/5 rounded-lg">
+                                        <p className="text-gray-400">No institute based events yet</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-4">
+                                        {sportsData
+                                            .filter(event => event.category === 'institute')
+                                            .map((event, index) => (
+                                                <div key={event.id || index} className="bg-white/5 rounded-lg py-5 px-5 hover:bg-white/10 cursor-pointer border-l-3 border-blue-500">
+                                                    <div className='justify-between flex'>
+                                                        <h1 className="text-xl">{event.sport_name}</h1>
+                                                        <p className="bg-cranberry/10 border border-cranberry px-4 py-1 rounded-full text-sm text-cranberry">{event.sport_day}</p>
+                                                    </div>
+                                                    <hr className="my-4"/>
+                                                    <div className="flex justify-between text-gray-400">
+                                                        <p>Type : {event.sport_type}</p>
+                                                        <p>Gender : {event.gender_type}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        }
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Community Based Events */}
+                            <div>
+                                <h3 className="text-xl font-medium text-green-400 mb-4 flex items-center">
+                                    Community Based Events
+                                </h3>
+                                {sportsData.filter(event => event.category === 'community').length === 0 ? (
+                                    <div className="text-center py-6 bg-white/5 rounded-lg">
+                                        <p className="text-gray-400">No community based events yet</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-4">
+                                        {sportsData
+                                            .filter(event => event.category === 'community')
+                                            .map((event, index) => (
+                                                <div key={event.id || index} className="bg-white/5 rounded-lg py-5 px-5 hover:bg-white/10 cursor-pointer border-l-3 border-green-500">
+                                                    <div className='justify-between flex'>
+                                                        <h1 className="text-xl">{event.sport_name}</h1>
+                                                        <p className="bg-cranberry/10 border border-cranberry px-4 py-1 rounded-full text-sm text-cranberry">{event.sport_day}</p>
+                                                    </div>
+                                                    <hr className="my-4"/>
+                                                    <div className="flex justify-between text-gray-400">
+                                                        <p>Type : {event.sport_type}</p>
+                                                        <p>Gender : {event.gender_type}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        }
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

@@ -1,7 +1,41 @@
 import { supabase } from '@/lib/supabaseClient';
 import { NextResponse } from 'next/server';
 
-// POST - Create a new event
+/**
+ * Creates a new sport event in the database
+ * @param {Request} request - HTTP request object containing event data
+ * 
+ * @example
+ * // Request body:
+ * {
+ *   "name": "Football",
+ *   "day": "D-01", 
+ *   "type": "team",
+ *   "gender": "boys",
+ *   "minPlayers": 11,
+ *   "maxPlayers": 15,
+ *   "reservePlayers": 3,
+ *   "regClose": "2025-08-25T00:00:00.000Z",
+ *   "category": "community"
+ * }
+ * 
+ * @example
+ * // Success response:
+ * {
+ *   "success": true,
+ *   "message": "Event created successfully",
+ *   "data": { id: 1, sport_name: "Football", ... }
+ * }
+ * 
+ * @example
+ * // Error response:
+ * {
+ *   "success": false,
+ *   "error": "Event name is required"
+ * }
+ * 
+ * @returns {Promise<NextResponse>} JSON response with success status and data/error
+ */
 export async function POST(request) {
     try {
         const eventData = await request.json();
@@ -55,17 +89,82 @@ export async function POST(request) {
     }
 }
 
-// GET - Fetch events (for future use)
+/**
+ * Fetches sport events from the database with optional filtering
+ * @param {Request} request - HTTP request object with optional query parameters
+ * 
+ * @example
+ * // Get all events:
+ * GET /api/events
+ * 
+ * @example
+ * // Filter by category:
+ * GET /api/events?category=community
+ * GET /api/events?category=institute
+ * 
+ * @example
+ * // Filter by multiple parameters:
+ * GET /api/events?category=community&type=team&gender=boys&day=D-01
+ * 
+ * @example
+ * // Success response:
+ * {
+ *   "success": true,
+ *   "data": [
+ *     {
+ *       "id": 1,
+ *       "sport_name": "Football",
+ *       "sport_day": "D-01",
+ *       "sport_type": "team",
+ *       "gender_type": "boys",
+ *       "category": "community",
+ *       "min_count": 11,
+ *       "max_count": 15,
+ *       "reserve_count": 3,
+ *       "registration_close": "2025-08-25T00:00:00.000Z",
+ *       "created_at": "2025-08-18T10:30:00.000Z"
+ *     }
+ *   ],
+ *   "count": 1
+ * }
+ * 
+ * @example
+ * // Error response:
+ * {
+ *   "success": false,
+ *   "error": "Failed to fetch events"
+ * }
+ * 
+ * @returns {Promise<NextResponse>} JSON response with success status and events data/error
+ */
 export async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
         const category = searchParams.get('category');
+        const sportDay = searchParams.get('day');
+        const sportType = searchParams.get('type');
+        const genderType = searchParams.get('gender');
         
         // Build query based on parameters
-        let query = supabase.from('events').select('*');
+        let query = supabase
+            .from('events')
+            .select('*');
         
+        // Add filters if parameters are provided
         if (category) {
             query = query.eq('category', category);
+        }
+        
+        if (sportDay) {
+            query = query.eq('sport_day', sportDay);
+        }
+        
+        if (sportType) {
+            query = query.eq('sport_type', sportType);
+        }
+        
+        if (genderType) {
+            query = query.eq('gender_type', genderType);
         }
         
         const { data, error } = await query;
@@ -80,7 +179,8 @@ export async function GET(request) {
 
         return NextResponse.json({
             success: true,
-            data: data
+            data: data,
+            count: data.length
         });
 
     } catch (error) {
@@ -92,83 +192,3 @@ export async function GET(request) {
     }
 }
 
-// PUT - Update event (for future use)
-export async function PUT(request) {
-    try {
-        const { id, ...updateData } = await request.json();
-        
-        if (!id) {
-            return NextResponse.json(
-                { success: false, error: 'Event ID is required' },
-                { status: 400 }
-            );
-        }
-
-        const { data, error } = await supabase
-            .from('events')
-            .update(updateData)
-            .eq('id', id)
-            .select();
-
-        if (error) {
-            console.error('Database error:', error);
-            return NextResponse.json(
-                { success: false, error: 'Failed to update event' },
-                { status: 500 }
-            );
-        }
-
-        return NextResponse.json({
-            success: true,
-            message: 'Event updated successfully',
-            data: data[0]
-        });
-
-    } catch (error) {
-        console.error('Server error:', error);
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
-    }
-}
-
-// DELETE - Delete event (for future use)
-export async function DELETE(request) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const id = searchParams.get('id');
-        
-        if (!id) {
-            return NextResponse.json(
-                { success: false, error: 'Event ID is required' },
-                { status: 400 }
-            );
-        }
-
-        const { error } = await supabase
-            .from('events')
-            .delete()
-            .eq('id', id);
-
-        if (error) {
-            console.error('Database error:', error);
-            return NextResponse.json(
-                { success: false, error: 'Failed to delete event' },
-                { status: 500 }
-            );
-        }
-
-        return NextResponse.json({
-            success: true,
-            message: 'Event deleted successfully'
-        });
-
-    } catch (error) {
-        console.error('Server error:', error);
-        return NextResponse.json(
-            { success: false, error: 'Internal server error' },
-            { status: 500 }
-        );
-    }
-}
