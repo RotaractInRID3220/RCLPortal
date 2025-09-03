@@ -207,6 +207,8 @@ const page = () => {
                                 <SelectContent>
                                     <SelectItem value="individual">Individual</SelectItem>
                                     <SelectItem value="team">Team</SelectItem>
+                                    <SelectItem value="trackIndividual">Track Individual</SelectItem>
+                                    <SelectItem value="trackTeam">Track Team</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

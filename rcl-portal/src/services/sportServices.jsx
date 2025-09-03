@@ -103,7 +103,7 @@ export const createEvent = async (eventData) => {
  * @param {Object} [filters={}] - Optional filters
  * @param {string} [filters.category] - Filter by category (community, institute, both)
  * @param {string} [filters.day] - Filter by event day (D-00, D-01, D-02, D-03)
- * @param {string} [filters.type] - Filter by event type (individual, team)
+ * @param {string|string[]} [filters.type] - Filter by event type (individual, team) - can be single string or array
  * @param {string} [filters.gender] - Filter by gender (boys, girls, mixed)
  * 
  * @example
@@ -116,15 +116,20 @@ export const createEvent = async (eventData) => {
  * const communityEvents = await getAllEvents({ category: "community" });
  * 
  * @example
- * // Get team events for boys
+ * // Get single type events
  * const teamEvents = await getAllEvents({ type: "team", gender: "boys" });
  * 
  * @example
- * // Multiple filters
+ * // Get multiple types events (NEW!)
+ * const multipleTypes = await getAllEvents({ type: ["team", "individual"] });
+ * 
+ * @example
+ * // Multiple filters with array of types
  * const filtered = await getAllEvents({ 
  *   category: "institute", 
  *   day: "D-01", 
- *   type: "individual" 
+ *   type: ["team", "individual"],
+ *   gender: "boys"
  * });
  * 
  * @returns {Promise<Object>} Response object with success, data array, and count
@@ -141,7 +146,14 @@ export const getAllEvents = async (filters = {}) => {
             params.append('day', filters.day);
         }
         if (filters.type) {
-            params.append('type', filters.type);
+            // Handle both single type and array of types
+            if (Array.isArray(filters.type)) {
+                // For multiple types, send as comma-separated string
+                params.append('type', filters.type.join(','));
+            } else {
+                // Single type as before
+                params.append('type', filters.type);
+            }
         }
         if (filters.gender) {
             params.append('gender', filters.gender);

@@ -103,8 +103,16 @@ export async function POST(request) {
  * GET /api/events?category=institute
  * 
  * @example
- * // Filter by multiple parameters:
- * GET /api/events?category=community&type=team&gender=boys&day=D-01
+ * // Filter by single type:
+ * GET /api/events?type=team
+ * 
+ * @example
+ * // Filter by multiple types (NEW!):
+ * GET /api/events?type=team,individual
+ * 
+ * @example
+ * // Filter by multiple parameters with multiple types:
+ * GET /api/events?category=community&type=team,individual&gender=boys&day=D-01
  * 
  * @example
  * // Success response:
@@ -160,7 +168,13 @@ export async function GET(request) {
         }
         
         if (sportType) {
-            query = query.eq('sport_type', sportType);
+            // Check if it's comma-separated (multiple types)
+            if (sportType.includes(',')) {
+                const types = sportType.split(',').map(type => type.trim());
+                query = query.in('sport_type', types); // Using Supabase's .in() method for multiple values
+            } else {
+                query = query.eq('sport_type', sportType); // Single type
+            }
         }
         
         if (genderType) {
