@@ -302,4 +302,36 @@ export const playerConstraintChecks = async (member, selectedSport) => {
     };
 }
 
+/**
+ * Get registrations with player and club data for admin view
+ * @param {Object} filters - Filters to apply (sport_id, club_id, etc.)
+ * @returns {Promise<Object>} Combined registration and player data
+ */
+export const getRegistrationsWithPlayerData = async (filters = null) => {
+    try {
+        let url = '/api/registrations/with-players';
+        
+        // Add filters as query parameters if provided
+        if (filters) {
+            const params = new URLSearchParams({
+                filter: JSON.stringify(filters)
+            });
+            url = `${url}?${params.toString()}`;
+        }
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch registrations with player data');
+        }
+        
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching registrations with player data:', error);
+        throw error;
+    }
+}
+
 

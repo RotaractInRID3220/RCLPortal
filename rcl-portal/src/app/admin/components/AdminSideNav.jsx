@@ -20,8 +20,11 @@ const AdminSideNav = () => {
   const navigateToClubs = () => {
     router.push("/admin/dashboard/clubs");
   };
-  const navigateToBracketX = () => {
+  const navigateToBracket = () => {
     router.push("/admin/dashboard/bracket");
+  };
+  const navigateToRegistrations = () => {
+    router.push("/admin/dashboard/registrations");
   };
 
   return (
@@ -50,9 +53,15 @@ const AdminSideNav = () => {
             </div>
             <div
               className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
-              onClick={navigateToBracketX}
+              onClick={navigateToBracket}
             >
               BRACKET
+            </div>
+            <div
+              className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
+              onClick={navigateToRegistrations}
+            >
+              REGISTRATIONS
             </div>
           </div>
         </div>

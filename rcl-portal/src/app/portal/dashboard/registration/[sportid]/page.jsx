@@ -139,6 +139,7 @@ const page = () => {
 
     // Handle player selection from combobox
     const handleSelectMember = (currentValue) => {
+        
         // Safety check for clubMembers
         if (!Array.isArray(clubMembers)) {
             console.error('clubMembers is not an array:', clubMembers);
@@ -147,13 +148,48 @@ const page = () => {
             return;
         }
         
-        // Find the selected member from clubMembers
-        const member = clubMembers.find(member => member && member.card_name === currentValue);
+        // Find the selected member from clubMembers (case-insensitive search)
+        const member = clubMembers.find(member => 
+            member && member.card_name && 
+            member.card_name.trim() === currentValue.trim()
+        );
+        console.log('Found member:', member);
+        
+        if (!member) {
+
+            // Try a more flexible search
+            const fuzzyMember = clubMembers.find(member => 
+                member && member.card_name && 
+                member.card_name.toLowerCase().trim() === currentValue.toLowerCase().trim()
+            );
+            
+            if (fuzzyMember) {
+                // Use the fuzzy found member
+                const isAlreadyRegistered = registeredPlayers.some(p => p.RMIS_ID === fuzzyMember.membership_id);
+                
+                if (!isAlreadyRegistered) {
+                    setSelectedMember(fuzzyMember);
+                    setSelectedValue(fuzzyMember.card_name);
+                } else {
+                    console.log('Member is already registered, cannot select');
+                }
+                setOpen(false);
+                return;
+            }
+            
+            setOpen(false);
+            return;
+        }
         
         // Check if member is already registered
-        if (member && !registeredPlayers.some(p => p.member?.RMIS_ID === member.membership_id)) {
+        const isAlreadyRegistered = registeredPlayers.some(p => p.RMIS_ID === member.membership_id);
+        console.log('Is already registered:', isAlreadyRegistered);
+        
+        if (!isAlreadyRegistered) {
             setSelectedMember(member);
             setSelectedValue(member.card_name);
+        } else {
+            console.log('Member is already registered, cannot select');
         }
         
         setOpen(false);
