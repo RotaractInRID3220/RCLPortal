@@ -46,7 +46,7 @@ const page = () => {
     return (
         <div>
             <div className="flex w-full justify-between items-center mb-8">
-                <h1 className="text-3xl font-semibold tracking-wide">SELECT EVENT</h1>
+                <h1 className="text-2xl font-semibold tracking-wide">SELECT AN EVENT</h1>
             </div>
 
 

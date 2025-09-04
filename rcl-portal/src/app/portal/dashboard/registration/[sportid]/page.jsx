@@ -162,38 +162,47 @@ const page = () => {
 
     
     // Register the selected player
-    const handleRegisterPlayer = () => {
-        registerPlayer(selectedMember, selectedSport, isMainPlayer)
-            .then(response => {
-                toast.success('Player registered successfully');
-                fetchRegisteredPlayers();
-                setSelectedMember(null);
-                // Handle successful registration (e.g., update UI, show message)
-            })
-            .catch(error => {
-                toast.error('Error registering player: ' + error.message);
-                // Handle registration error (e.g., show error message)
-            });
+    const handleRegisterPlayer = async () => {
+        const response = await registerPlayer(selectedMember, selectedSport, isMainPlayer, selectedSportData);
+        
+        if (response.success) {
+            toast.success('Player registered successfully');
+            fetchRegisteredPlayers();
+            setSelectedMember(null);
+            setSelectedValue(""); // Clear the selected value in the dropdown
+            // Handle successful registration (e.g., update UI, show message)
+        } else {
+            // Display the error message from the response
+            toast.error(response.error || 'Failed to register player');
+            // console.error('Registration failed:', response);
+        }
     }
 
     const registrationConstraints = () => {
+        // Base validation - no member selected
         if (!selectedMember){
             return false;
         }
 
+        // Maximum player count validation
         if (isMainPlayer) {
             // Check if the number of main players is less than the maximum allowed
             const mainPlayersCount = registeredPlayers.filter(p => p.main_player === true).length;
-            return mainPlayersCount < selectedSportData?.max_count;
+            if (mainPlayersCount >= selectedSportData?.max_count) {
+                return false;
+            }
         }
         
         if (!isMainPlayer) {
             // Check if the number of reserve players is less than the maximum allowed
             const reservePlayersCount = registeredPlayers.filter(p => p.main_player === false).length;
-            return reservePlayersCount < selectedSportData?.reserve_count;
+            if (reservePlayersCount >= selectedSportData?.reserve_count) {
+                return false;
+            }
         }
 
-        return false;
+        // All constraints passed - the full complex constraints will be checked in registerPlayer
+        return true;
     }
     
     // Open the delete dialog
@@ -393,7 +402,7 @@ const page = () => {
             <div className="bg-white/5 rounded-lg p-8 mt-10">
                 <div className='flex space-x-4 items-end mb-4'>
                     <h1 className="text-lg">Team Information</h1>
-                    <p className='text-sm text-white/30'>[Main : {registeredPlayers.filter(p => p.main_player === true).length} | Reserve : {registeredPlayers.filter(p => p.main_player === false).length}]</p>
+                    <p className='text-sm text-white/50'>[Main : {registeredPlayers.filter(p => p.main_player === true).length} {registeredPlayers.filter(p => p.main_player === true).length == selectedSportData?.max_count ? '✅' : null} | Reserve : {registeredPlayers.filter(p => p.main_player === false).length} {registeredPlayers.filter(p => p.main_player === false).length == selectedSportData?.reserve_count ? '✅' : null}]</p>
                 </div>
                 <div className="space-y-2">
                     {/* Main Players First */}

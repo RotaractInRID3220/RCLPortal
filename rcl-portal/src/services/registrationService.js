@@ -1,6 +1,23 @@
-export const registerPlayer = async (member, sport_id, isMainPlayer) => {
+import { getAllEvents } from "./sportServices";
+
+export const registerPlayer = async (member, sport_id, isMainPlayer, selectedSport) => {
     try {
-        console.log(member);
+        // First, run constraint checks
+        const constraintResults = await playerConstraintChecks(member, selectedSport);
+        
+        // If constraints are not passed, return error response with the reason
+        if (!constraintResults.allowed) {
+            console.log('Player constraint check failed:', constraintResults.reason);
+            return {
+                success: false,
+                error: constraintResults.reason || 'Player does not meet registration constraints',
+                data: constraintResults.counts
+            };
+        }
+        
+        // If constraints pass, proceed with registration
+        console.log('Player constraint checks passed, proceeding with registration');
+        
         const response = await fetch('/api/players', {
             method: 'POST',
             headers: {
@@ -12,7 +29,11 @@ export const registerPlayer = async (member, sport_id, isMainPlayer) => {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to register player');
+            return {
+                success: false,
+                error: 'Failed to register player',
+                statusCode: response.status
+            };
         }
 
         const response2 = await fetch('/api/registrations', {
@@ -28,14 +49,25 @@ export const registerPlayer = async (member, sport_id, isMainPlayer) => {
         });
 
         if (!response2.ok) {
-            throw new Error('Failed to register player');
+            return {
+                success: false,
+                error: 'Failed to register player',
+                statusCode: response2.status
+            };
         }
 
         const data = await response2.json();
-        return data;
+        return {
+            success: true,
+            data
+        };
     } catch (error) {
         console.error('Error registering player:', error);
-        throw error;
+        return {
+            success: false,
+            error: error.message || 'An unexpected error occurred',
+            isException: true
+        };
     }
 }
 
@@ -117,6 +149,157 @@ export const deleteRegistration = async (RMIS_ID, sport_id) => {
         console.error('Error deleting registration:', error);
         throw error;
     }
+}
+
+/**
+ * Gets player registrations and merges them with relevant sport details
+ * @param {string} RMIS_ID - The player's RMIS ID 
+ * @returns {Promise<Object>} Registrations with merged sport details
+ * 
+ * Example:
+ * const playerSports = await getPlayerRegistrationsWithSportDetails('CMTP12345');
+ */
+export const getPlayerRegistrationsWithSportDetails = async (RMIS_ID) => {
+    try {
+        if (!RMIS_ID) {
+            throw new Error('RMIS_ID is required');
+        }
+        
+        // Get player registrations
+        const registrationsResponse = await getRegistrations({ RMIS_ID });
+        if (!registrationsResponse.success || !Array.isArray(registrationsResponse.data)) {
+            throw new Error('Failed to fetch registrations');
+        }
+        
+        // Get all sports data
+        const sportsResponse = await getAllEvents();
+        if (!sportsResponse.success || !Array.isArray(sportsResponse.data)) {
+            throw new Error('Failed to fetch sports data');
+        }
+        
+        // Merge registrations with their corresponding sport details
+        const registrationsWithSportDetails = registrationsResponse.data.map(registration => {
+            const matchingSport = sportsResponse.data.find(sport => 
+                sport.sport_id === registration.sport_id
+            );
+            
+            return {
+                ...registration,
+                sportDetails: matchingSport ? {
+                    sport_id: matchingSport.sport_id,
+                    sport_name: matchingSport.sport_name,
+                    sport_type: matchingSport.sport_type,
+                    gender_type: matchingSport.gender_type,
+                    max_count: matchingSport.max_count,
+                    reserve_count: matchingSport.reserve_count,
+                    sport_day: matchingSport.sport_day,
+                } : null
+            };
+        }).filter(reg => reg.sportDetails !== null); // Filter out registrations with no matching sport
+        
+        return {
+            success: true,
+            data: registrationsWithSportDetails,
+            count: registrationsWithSportDetails.length
+        };
+    } catch (error) {
+        console.error('Error fetching player registrations with sport details:', error);
+        return {
+            success: false,
+            error: error.message,
+            data: []
+        };
+    }
+}
+
+/**
+ * Check player constraints for registrations
+ * @param {Object} member - The player's member information
+ * @param {Object} selectedSport - The sport to be registered for
+ * @returns {Object} Constraint check results with success flag and counts
+ */
+export const playerConstraintChecks = async (member, selectedSport) => {
+    // Use the new utility function to get registrations with sport details
+    const result = await getPlayerRegistrationsWithSportDetails(member.membership_id);
+    const registrationsWithSportDetails = result.success ? result.data : [];
+    
+    // Now registrationsWithSportDetails contains all registrations with relevant sport info
+    console.log('Player registrations with sport details:', registrationsWithSportDetails);
+
+    // Get the selected sport day
+    const selectedSportDay = selectedSport.sport_day;
+    
+    // Group registrations by sport type and day
+    const registrationCounts = {
+        // Track event counts by day
+        trackIndividual: {},
+        team: {},
+        individual: {},
+        // Combined team and individual counts per day (non-track events)
+        combinedNonTrackByDay: {},
+        // Total counts
+        totalTrackIndividual: 0,
+        totalTeam: 0,
+        totalIndividual: 0
+    };
+    
+    // Count registrations by sport type and day
+    registrationsWithSportDetails.forEach(registration => {
+        const sportType = registration.sportDetails.sport_type;
+        const sportDay = registration.sportDetails.sport_day;
+        
+        // Initialize day counter if not exists
+        if (sportType === 'trackIndividual') {
+            registrationCounts.trackIndividual[sportDay] = (registrationCounts.trackIndividual[sportDay] || 0) + 1;
+            registrationCounts.totalTrackIndividual++;
+        } else if (sportType === 'team') {
+            registrationCounts.team[sportDay] = (registrationCounts.team[sportDay] || 0) + 1;
+            registrationCounts.totalTeam++;
+            // Track combined non-track events (team + individual)
+            registrationCounts.combinedNonTrackByDay[sportDay] = (registrationCounts.combinedNonTrackByDay[sportDay] || 0) + 1;
+        } else if (sportType === 'individual') {
+            registrationCounts.individual[sportDay] = (registrationCounts.individual[sportDay] || 0) + 1;
+            registrationCounts.totalIndividual++;
+            // Track combined non-track events (team + individual)
+            registrationCounts.combinedNonTrackByDay[sportDay] = (registrationCounts.combinedNonTrackByDay[sportDay] || 0) + 1;
+        }
+    });
+    
+    // Log the counts for debugging
+    console.log('Registration counts:', registrationCounts);
+    
+    // Check constraints based on sport type
+    if (selectedSport.sport_type === 'trackIndividual') {
+        // Get count for selected day
+        const currentDayCount = registrationCounts.trackIndividual[selectedSportDay] || 0;
+        
+        // Maximum 2 trackIndividual events per day
+        if (currentDayCount >= 2) {
+            return {
+                allowed: false,
+                reason: `Player already has ${currentDayCount} track individual events on day ${selectedSportDay}. Maximum is 2.`,
+                counts: registrationCounts
+            };
+        }
+    } else if (selectedSport.sport_type === 'team' || selectedSport.sport_type === 'individual') {
+        // Check combined constraint for team and individual events
+        const combinedCount = registrationCounts.combinedNonTrackByDay[selectedSportDay] || 0;
+        
+        // Maximum 1 non-track event (team OR individual) per day
+        if (combinedCount >= 1) {
+            return {
+                allowed: false,
+                reason: `Player already has a team or individual event on day ${selectedSportDay}. Only one allowed per day.`,
+                counts: registrationCounts
+            };
+        }
+    }
+    
+    // All constraints passed
+    return {
+        allowed: true,
+        counts: registrationCounts
+    };
 }
 
 
