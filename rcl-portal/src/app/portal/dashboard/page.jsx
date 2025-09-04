@@ -1,12 +1,10 @@
 'use client'
+import { loadingAtom, userDeetsAtom } from '@/app/state/store';
 import { useAtom, useSetAtom } from 'jotai'
 import React from 'react'
-import { loadingAtom, userDeetsAtom } from '../state/store'
-
 const page = () => {
     const [useD, setUserD] = useAtom(userDeetsAtom);
     const [loading, setLoading] = useAtom(loadingAtom);
-    const setuserDeets = useSetAtom(userDeetsAtom);
 
 
     if (loading){
@@ -21,8 +19,6 @@ const page = () => {
   return (
     <div>
       <h1>Admin Page</h1>
-      <button onClick={() => setuserDeets([])}>xoxo</button>
-      {useD?.card_name}
     </div>
   )
 }

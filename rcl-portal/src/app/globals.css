@@ -127,3 +127,86 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide scrollbars utility class */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* WebKit browsers */
+}
+
+/* Show only scrollbar thumb without track background */
+.scrollbar-thumb-only {
+  scrollbar-width: thin; /* Firefox - thin scrollbar */
+  scrollbar-color: oklch(56.983% 0.21724 9.391 / 0.116) transparent; /* Firefox - thumb color, track transparent */
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar {
+  width: 6px; /* Width of scrollbar */
+  height: 6px; /* Height for horizontal scrollbar */
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-track {
+  background: transparent; /* Transparent track/background */
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3); /* Semi-transparent white thumb */
+  border-radius: 3px;
+}
+
+.scrollbar-thumb-only::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5); /* Slightly more visible on hover */
+}
+
+/* Tournament Bracket Styles */
+.custom-bracket {
+  --bracket-color: rgba(255, 255, 255, 0.2);
+  --bracket-highlight-color: rgba(255, 255, 255, 0.4);
+}
+
+.custom-bracket svg line {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 3;
+}
+
+.custom-bracket svg line:hover {
+  stroke: rgba(255, 255, 255, 0.6);
+}
+
+.custom-round {
+  margin: 0 5px;
+}
+
+@media (max-width: 768px) {
+  .custom-round {
+    margin: 0 10px;
+  }
+}
+
+/* Custom scrollbar for bracket overflow */
+.bracket-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.bracket-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.bracket-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.bracket-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.custom-bracket .bracket-round {
+  min-width: 200px;  /* Set minimum column width */
+  max-width: 250px;  /* Set maximum column width */
+}

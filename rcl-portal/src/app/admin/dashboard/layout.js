@@ -1,6 +1,7 @@
 import { Bebas_Neue, Poppins } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import PrivateRoute from "@/lib/PrivateRoute";
+import AdminSideNav from "../components/AdminSideNav";
 
 const bebas = Bebas_Neue({
   variable: "--font-bebas",
@@ -23,16 +24,23 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body
+      <div
         className={`${bebas.variable} ${poppins.variable} antialiased dark`}
       >
-        <PrivateRoute redirectTo="/dashboard/login">
-            {children}
-            <Toaster richColors  />
-        </PrivateRoute>
+        <div className="flex w-full">
+          <div className="w-2/12 h-screen fixed">
+            <AdminSideNav />
+          </div>
+          <div className="w-10/12 ml-auto py-16 px-10">
+            <PrivateRoute>
+                {children}
+                <Toaster richColors  />
+            </PrivateRoute>
+          </div>
+        </div>
 
-      </body>
-    </html>
+        <div className='w-[700px] h-[500px] fixed -top-80  left-0 right-0 m-auto bg-cranberry/75 -z-10 rounded-full blur-[20rem]'></div>
+
+      </div>
   );
 }

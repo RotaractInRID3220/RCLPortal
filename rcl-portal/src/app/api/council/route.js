@@ -6,8 +6,49 @@ export async function GET(request) {
         const { searchParams } = new URL(request.url);
         const username = searchParams.get("username");
         const password = searchParams.get("password");
+        const clubID = searchParams.get("clubID");
 
+        // Handle club members request
+        if (clubID) {
+            // Get cutoff datetime from environment variable, default to current time if not set
+            const membershipCutoffDate = process.env.NEXT_PUBLIC_MEMBERSHIP_CUTOFF_DATE || new Date().toISOString();
+            console.log('Using membership cutoff date:', membershipCutoffDate);
+            
+            const sql = 'SELECT * FROM club_membership_data WHERE club_id = ? AND status IN (1, 5) AND created_datetime <= ?';
 
+            const res = await fetch('https://info.rotaract3220.org/api/query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': process.env.NEXT_PUBLIC_DBMID_API_KEY,
+                },
+                body: JSON.stringify({
+                    sql,
+                    params: [clubID, membershipCutoffDate],
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'API Error');
+            }
+
+            const clubMembers = data.results || [];
+
+            // console.log(`Fetched ${clubMembers.length} members for club ${clubID}:`, clubMembers);
+
+            // Remove sensitive fields like m_password from all members
+            const safeMembers = clubMembers.map(({ m_password, ...safeMember }) => safeMember);
+
+            return NextResponse.json({ 
+                success: true, 
+                members: safeMembers,
+                count: safeMembers.length,
+                clubID: clubID
+            }, { status: 200 });
+        }
+
+        // Handle user authentication request (existing logic)
         if (!username) {
             return NextResponse.json({ error: "Username is required" }, { status: 400 });
         }
