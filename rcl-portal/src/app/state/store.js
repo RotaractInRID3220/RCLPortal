@@ -19,8 +19,10 @@ export const selectedSportAtom = atom(4); // Default sport ID
 
 // Clubs atoms
 export const clubsAtom = atom([]);
+export const clubMembersAtom = atom([]);
 export const clubsLoadingAtom = atom(false);
 export const clubsErrorAtom = atom(null);
+
 
 
 
@@ -37,6 +39,7 @@ export function useResetAllAtoms() {
   const setBracketData = useSetAtom(bracketDataAtom);
   const setBracketLoading = useSetAtom(bracketLoadingAtom);
   const setBracketError = useSetAtom(bracketErrorAtom);
+  const setClubMembers = useSetAtom(clubMembersAtom);
 
   return () => {
     setUserDeets(null);
@@ -51,5 +54,6 @@ export function useResetAllAtoms() {
     setBracketData([]);
     setBracketLoading(false);
     setBracketError(null);
+    setClubMembers([]);
   };
 }

@@ -17,8 +17,8 @@ const page = () => {
         )
     }
   return (
-    <div className='py-10 px-10'>
-      <h1>Portal</h1>
+    <div>
+      <h1>Admin Page</h1>
     </div>
   )
 }

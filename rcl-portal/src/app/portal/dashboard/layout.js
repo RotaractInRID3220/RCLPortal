@@ -1,7 +1,7 @@
 import { Bebas_Neue, Poppins } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import PrivateRoute from "@/lib/PrivateRoute";
-import PortalSideNav from "../components/PortalSideNav";
+import PortalSideNav from "./components/PortalSideNav";
 
 const bebas = Bebas_Neue({
   variable: "--font-bebas",
@@ -31,8 +31,8 @@ export default function RootLayout({ children }) {
           <div className="w-2/12 h-screen fixed">
             <PortalSideNav />
           </div>
-          <div className="w-10/12 ml-auto">
-            <PrivateRoute redirectTo="/portal/login">
+          <div className="w-10/12 ml-auto py-16 px-10">
+            <PrivateRoute>
                 {children}
                 <Toaster richColors  />
             </PrivateRoute>
