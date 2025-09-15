@@ -26,6 +26,10 @@ const AdminSideNav = () => {
   const navigateToRegistrations = () => {
     router.push("/admin/dashboard/registrations");
   };
+  
+  const navigateToPayments = () => {
+    router.push("/admin/dashboard/payments");
+  };
 
   return (
     <div
@@ -62,6 +66,12 @@ const AdminSideNav = () => {
               onClick={navigateToRegistrations}
             >
               REGISTRATIONS
+            </div>
+            <div
+              className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
+              onClick={navigateToPayments}
+            >
+              PAYMENTS
             </div>
           </div>
         </div>
