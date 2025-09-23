@@ -34,6 +34,9 @@ const MatchCard = ({ match }) => {
 
   // Format match title
   const getMatchTitle = () => {
+    if (match.matchId) {
+      return `#${match.matchId}`;
+    }
     if (match.id) {
       return `Game ${match.id.padStart(2, "0")}`;
     }
@@ -75,13 +78,18 @@ const MatchCard = ({ match }) => {
       </div>
 
       {/* Optional: Show match status or time */}
-      {match.state === "SCHEDULED" && (
+      {match.state === "SCHEDULED" && match.startTime && (
         <div className="mt-2 text-xs text-white/60 text-center">
           {new Date(match.startTime).toLocaleDateString()} at{" "}
           {new Date(match.startTime).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })}
+        </div>
+      )}
+      {match.state === "SCHEDULED" && !match.startTime && (
+        <div className="mt-2 text-xs text-white/60 text-center">
+          Time TBD
         </div>
       )}
     </div>

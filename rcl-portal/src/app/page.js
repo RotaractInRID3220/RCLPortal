@@ -13,8 +13,9 @@ export default function Home() {
 
 
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-        xx
+    <div className="mt-20 flex space-x-10 items-center justify-center">
+        <a href="/admin/dashboard" className="bg-cranberry/80 hover:bg-cranberry w-96 py-4 cursor-pointer items-center text-center justify-center rounded-lg">Admin portal</a>
+        <a href="/portal/dashboard" className="bg-cranberry/80 hover:bg-cranberry w-96 py-4 cursor-pointer items-center text-center justify-center rounded-lg">Council portal</a>
     </div>
   );
 }

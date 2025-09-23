@@ -1,6 +1,37 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { NextResponse } from 'next/server';
 
+export async function GET(request) {
+    const { searchParams } = new URL(request.url);
+    const club_id = searchParams.get('club_id');
+
+    if (!club_id) {
+        return NextResponse.json({ error: 'club_id is required' }, { status: 400 });
+    }
+
+    try {
+        // Get count of players for the club
+        const { count, error } = await supabase
+            .from('players')
+            .select('*', { count: 'exact', head: true })
+            .eq('club_id', club_id);
+
+        if (error) {
+            console.error('Error counting players:', error);
+            return NextResponse.json({ error: 'Failed to count players' }, { status: 500 });
+        }
+
+        return NextResponse.json({ 
+            success: true, 
+            count: count || 0 
+        });
+
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
+
 export async function POST(request) {
     const requestData = await request.json();
     const { member } = requestData;

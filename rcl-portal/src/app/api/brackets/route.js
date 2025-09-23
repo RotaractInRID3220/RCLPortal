@@ -23,9 +23,9 @@ export async function GET(request) {
         match_order,
         parent_match1_id,
         parent_match2_id,
+        start_time,
         team1:teams!matches_team1_id_fkey (
           team_id,
-          seed_number,
           club:clubs (
             club_id,
             club_name
@@ -33,7 +33,6 @@ export async function GET(request) {
         ),
         team2:teams!matches_team2_id_fkey (
           team_id,
-          seed_number,
           club:clubs (
             club_id,
             club_name
@@ -85,7 +84,8 @@ function transformToBracketFormat(matches) {
     
     acc[roundName].push({
       id: match.match_id,
-      date: new Date().toDateString(), // You can add match_date to your DB later
+      date: match.start_time ? new Date(match.start_time).toLocaleString() : 'TBD',
+      matchId: match.match_id,
       teams: [
         { 
           name: match.team1?.club?.club_name || 'TBD',

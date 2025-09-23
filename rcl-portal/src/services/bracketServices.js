@@ -98,7 +98,8 @@ class BracketService {
       
       acc[roundName].push({
         id: match.match_id,
-        date: new Date().toDateString(),
+        date: match.start_time ? new Date(match.start_time).toLocaleString() : 'TBD',
+        matchId: match.match_id,
         teams: [
           { 
             name: match.team1?.club?.club_name || 'TBD',
