@@ -23,12 +23,19 @@ const AdminSideNav = () => {
   const navigateToBracket = () => {
     router.push("/admin/dashboard/bracket");
   };
+  const navigateToLeaderboard = () => {
+    router.push("/admin/dashboard/leaderboard");
+  };
   const navigateToRegistrations = () => {
     router.push("/admin/dashboard/registrations");
   };
   
   const navigateToPayments = () => {
     router.push("/admin/dashboard/payments");
+  };
+
+  const navigateToTeams = () => {
+    router.push("/admin/dashboard/teams");
   };
 
   return (
@@ -63,9 +70,21 @@ const AdminSideNav = () => {
             </div>
             <div
               className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
+              onClick={navigateToLeaderboard}
+            >
+              LEADERBOARD
+            </div>
+            <div
+              className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
               onClick={navigateToRegistrations}
             >
               REGISTRATIONS
+            </div>
+            <div
+              className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
+              onClick={navigateToTeams}
+            >
+              TEAMS
             </div>
             <div
               className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"

@@ -51,6 +51,10 @@ const PortalSideNav = () => {
     router.push("/portal/dashboard/payment");
   };
 
+  const navigateToLeaderboard = () => {
+    router.push("/portal/dashboard/leaderboard");
+  };
+
   return (
     <div
       className={`${
@@ -74,6 +78,12 @@ const PortalSideNav = () => {
               onClick={navigateToPayment}
             >
               Payment
+            </div>
+            <div
+              className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
+              onClick={navigateToLeaderboard}
+            >
+              Leaderboard
             </div>
 
           </div>
