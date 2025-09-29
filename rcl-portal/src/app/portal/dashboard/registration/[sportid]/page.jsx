@@ -1,8 +1,8 @@
 'use client'
-import React, { useState, useEffect} from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams } from 'next/navigation';
 import { useAtom } from 'jotai';
-import { clubMembersAtom, sportsDataAtom, userDeetsAtom } from '@/app/state/store';
+import { clubMembersAtom, sportsDataAtom, userDeetsAtom, lastFetchTimestampAtom, isCacheValid } from '@/app/state/store';
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -38,14 +38,49 @@ import {
 } from "@/components/ui/alert-dialog";
 import { getAllEvents } from '@/services/sportServices';
 
+// Memoized PlayerRow component moved outside to avoid conditional hook usage
+const PlayerRow = React.memo(({ player, isMain, clubMembers, onDeletePlayer }) => {
+    const memberInfo = Array.isArray(clubMembers) ? 
+        clubMembers.find(member => member.membership_id === player.RMIS_ID) : null;
+    
+    return (
+        <div 
+            className={`flex justify-between items-center p-3 rounded-md ${isMain ? 'bg-cranberry/20' : 'bg-white/5'}`}
+        >
+            <div className="flex space-x-4 items-center">
+                <div className='flex space-x-4 items-center'>
+                    <p className="font-bold">{memberInfo?.card_name || 'Unknown'}</p>
+                    <p className="text-xs text-white/50">{player.RMIS_ID}</p>
+                </div>
+            </div>
+            <div className="flex space-x-4 items-center">
+                <p className="text-xs px-2 py-1 bg-white/10 rounded-full">
+                    {memberInfo?.status === 1 ? 'Active' : memberInfo?.status === 5 ? 'Prospective' : 'Unknown'}
+                </p>
+                <p className={`text-xs font-semibold px-2 py-1 rounded-full ${isMain ? 'bg-cranberry/40' : 'bg-white/20'}`}>
+                    {isMain ? 'Main' : 'Reserve'}
+                </p>
+                <Button 
+                    size="sm"
+                    className="p-1 h-auto hover:bg-red-500 bg-transparent text-white/60 hover:text-white cursor-pointer"
+                    onClick={() => onDeletePlayer(player)}
+                    title="Remove player"
+                >
+                    <Trash2 size={16} />
+                </Button>
+            </div>
+        </div>
+    );
+});
+PlayerRow.displayName = 'PlayerRow';
 
-
-const page = () => {
+const SportRegistrationPage = React.memo(() => {
     const params = useParams();
     const router = useRouter();
     const [userDeets, setUserDeets] = useAtom(userDeetsAtom);
     const [selectedSport, setSelectedSport] = useState(0);
     const [sportsData, setSportsData] = useAtom(sportsDataAtom);
+    const [lastFetchTimestamp, setLastFetchTimestamp] = useAtom(lastFetchTimestampAtom);
     const [selectedSportData, setSelectedSportData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [clubMembers, setClubMembers] = useAtom(clubMembersAtom);
@@ -62,6 +97,80 @@ const page = () => {
     const [playerToDelete, setPlayerToDelete] = useState(null);
 
 
+    // Memoized filtered club members based on sport gender and registration status
+    const availableClubMembers = useMemo(() => {
+        if (!Array.isArray(clubMembers) || !selectedSportData?.gender_type) {
+            return [];
+        }
+
+        return clubMembers.filter(member => {
+            // Check if member is already registered
+            if (Array.isArray(registeredPlayers) && 
+                registeredPlayers.some(player => player.RMIS_ID === member.membership_id)) {
+                return false;
+            }
+            
+            // Filter by gender matching sport requirements
+            const sportGender = selectedSportData.gender_type.toLowerCase();
+            return (sportGender === 'boys' && member.gender === 'M') || 
+                   (sportGender === 'girls' && member.gender === 'F') ||
+                   sportGender === 'mixed'; // Allow both for mixed sports
+        });
+    }, [clubMembers, selectedSportData?.gender_type, registeredPlayers]);
+
+    // Memoized player counts for validation and display
+    const playerCounts = useMemo(() => {
+        const mainPlayers = registeredPlayers.filter(p => p.main_player === true).length;
+        const reservePlayers = registeredPlayers.filter(p => p.main_player === false).length;
+        
+        return { 
+            mainPlayers, 
+            reservePlayers,
+            maxMain: selectedSportData?.max_count || 0,
+            maxReserve: selectedSportData?.reserve_count || 0
+        };
+    }, [registeredPlayers, selectedSportData?.max_count, selectedSportData?.reserve_count]);
+
+    // Optimized fetch functions with caching
+    const fetchAllSports = useCallback(async () => {
+        // Check cache validity first
+        if (sportsData.length > 0 && isCacheValid(lastFetchTimestamp.sports)) {
+            console.log('Using cached sports data for sport registration');
+            return sportsData;
+        }
+
+        try {
+            const result = await getAllEvents();
+            if (result.success) {
+                setSportsData(result.data);
+                setLastFetchTimestamp(prev => ({ ...prev, sports: Date.now() }));
+                return result.data;
+            }
+            return [];
+        } catch (error) {
+            console.error('Failed to fetch sports:', error);
+            return [];
+        }
+    }, [sportsData.length, lastFetchTimestamp.sports, setSportsData, setLastFetchTimestamp]);
+
+    const fetchRegisteredPlayers = useCallback(async () => {
+        try {
+            const response = await getRegistrations({ 
+                sport_id: params.sportid, 
+                club_id: userDeets.club_id 
+            });
+            if (response.success) {
+                setRegisteredPlayers(response.data);
+            } else {
+                console.error('Failed to fetch registered players:', response.error);
+                setRegisteredPlayers([]);
+            }
+        } catch (error) {
+            console.error('Error fetching registered players:', error);
+            setRegisteredPlayers([]);
+        }
+    }, [params.sportid, userDeets.club_id]);
+
     useEffect(() => {
         const initializeData = async () => {
             if (!params.sportid) {
@@ -73,24 +182,12 @@ const page = () => {
             setSelectedSport(sportId);
             setLoading(true);
 
-            // Check if we need to fetch sports data
-            if (sportsData.length === 0) {
-                try {
-                    const result = await getAllEvents();
-                    if (result.success) {
-                        setSportsData(result.data);
-                        // Find the selected sport from the newly loaded data
-                        const foundSport = result.data.find(event => event.sport_id === sportId);
-                        setSelectedSportData(foundSport);
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch sports:', error);
-                }
-            } else {
-                // Use existing sports data
-                const foundSport = sportsData.find(event => event.sport_id === sportId);
-                setSelectedSportData(foundSport);
-            }
+            // Get sports data (cached or fresh)
+            const currentSportsData = await fetchAllSports();
+            
+            // Find the selected sport
+            const foundSport = currentSportsData.find(event => event.sport_id === sportId);
+            setSelectedSportData(foundSport);
 
             // Fetch registered players
             await fetchRegisteredPlayers();
@@ -124,179 +221,102 @@ const page = () => {
         }
     }, [clubMembers, setClubMembers, selectedSportData]);
 
-    const fetchRegisteredPlayers = async () => {
-        try {
-            const response = await getRegistrations({ sport_id: params.sportid, club_id: userDeets.club_id });
-            if (response.success) {
-                setRegisteredPlayers(response.data);
-            } else {
-                console.error('Failed to fetch registered players:', response.error);
-            }
-        } catch (error) {
-            console.error('Error fetching registered players:', error);
-        }
-    };
-
-    // Handle player selection from combobox
-    const handleSelectMember = (currentValue) => {
-        
-        // Safety check for clubMembers
-        if (!Array.isArray(clubMembers)) {
-            console.error('clubMembers is not an array:', clubMembers);
+    // Optimized member selection handler
+    const handleSelectMember = useCallback((currentValue) => {
+        if (!Array.isArray(availableClubMembers)) {
+            console.error('availableClubMembers is not available');
             setSelectedValue("");
             setOpen(false);
             return;
         }
         
-        // Find the selected member from clubMembers (case-insensitive search)
-        const member = clubMembers.find(member => 
+        // Find member from available members (already filtered)
+        const member = availableClubMembers.find(member => 
             member && member.card_name && 
-            member.card_name.trim() === currentValue.trim()
+            member.card_name.trim().toLowerCase() === currentValue.trim().toLowerCase()
         );
-        console.log('Found member:', member);
         
-        if (!member) {
-
-            // Try a more flexible search
-            const fuzzyMember = clubMembers.find(member => 
-                member && member.card_name && 
-                member.card_name.toLowerCase().trim() === currentValue.toLowerCase().trim()
-            );
-            
-            if (fuzzyMember) {
-                // Use the fuzzy found member
-                const isAlreadyRegistered = registeredPlayers.some(p => p.RMIS_ID === fuzzyMember.membership_id);
-                
-                if (!isAlreadyRegistered) {
-                    setSelectedMember(fuzzyMember);
-                    setSelectedValue(fuzzyMember.card_name);
-                } else {
-                    console.log('Member is already registered, cannot select');
-                }
-                setOpen(false);
-                return;
-            }
-            
-            setOpen(false);
-            return;
-        }
-        
-        // Check if member is already registered
-        const isAlreadyRegistered = registeredPlayers.some(p => p.RMIS_ID === member.membership_id);
-        console.log('Is already registered:', isAlreadyRegistered);
-        
-        if (!isAlreadyRegistered) {
+        if (member) {
             setSelectedMember(member);
             setSelectedValue(member.card_name);
-        } else {
-            console.log('Member is already registered, cannot select');
         }
         
         setOpen(false);
-    }
+    }, [availableClubMembers]);
 
 
     
-    // Register the selected player
-    const handleRegisterPlayer = async () => {
-        const response = await registerPlayer(selectedMember, selectedSport, isMainPlayer, selectedSportData);
+    // Optimized registration handler
+    const handleRegisterPlayer = useCallback(async () => {
+        if (!selectedMember) return;
         
-        if (response.success) {
-            toast.success('Player registered successfully');
-            fetchRegisteredPlayers();
-            setSelectedMember(null);
-            setSelectedValue(""); // Clear the selected value in the dropdown
-            // Handle successful registration (e.g., update UI, show message)
-        } else {
-            // Display the error message from the response
-            toast.error(response.error || 'Failed to register player');
-            // console.error('Registration failed:', response);
+        setLoading(true);
+        try {
+            const response = await registerPlayer(selectedMember, selectedSport, isMainPlayer, selectedSportData);
+            
+            if (response.success) {
+                toast.success('Player registered successfully');
+                await fetchRegisteredPlayers();
+                setSelectedMember(null);
+                setSelectedValue("");
+            } else {
+                toast.error(response.error || 'Failed to register player');
+            }
+        } catch (error) {
+            toast.error('Error registering player');
+            console.error('Registration error:', error);
+        } finally {
+            setLoading(false);
         }
-    }
+    }, [selectedMember, selectedSport, isMainPlayer, selectedSportData, fetchRegisteredPlayers]);
 
-    const registrationConstraints = () => {
-        // Base validation - no member selected
-        if (!selectedMember){
-            return false;
-        }
+    // Memoized registration validation
+    const canRegisterPlayer = useMemo(() => {
+        if (!selectedMember) return false;
 
-        // Maximum player count validation
         if (isMainPlayer) {
-            // Check if the number of main players is less than the maximum allowed
-            const mainPlayersCount = registeredPlayers.filter(p => p.main_player === true).length;
-            if (mainPlayersCount >= selectedSportData?.max_count) {
-                return false;
-            }
+            return playerCounts.mainPlayers < playerCounts.maxMain;
+        } else {
+            return playerCounts.reservePlayers < playerCounts.maxReserve;
         }
-        
-        if (!isMainPlayer) {
-            // Check if the number of reserve players is less than the maximum allowed
-            const reservePlayersCount = registeredPlayers.filter(p => p.main_player === false).length;
-            if (reservePlayersCount >= selectedSportData?.reserve_count) {
-                return false;
-            }
-        }
-
-        // All constraints passed - the full complex constraints will be checked in registerPlayer
-        return true;
-    }
+    }, [selectedMember, isMainPlayer, playerCounts]);
     
-    // Open the delete dialog
-    const confirmDeletePlayer = (player) => {
+    // Optimized delete handlers
+    const confirmDeletePlayer = useCallback((player) => {
         setPlayerToDelete(player);
         setIsDeleteDialogOpen(true);
-    };
+    }, []);
     
-    // Delete the selected player
-    const handleDeletePlayer = () => {
+    const handleDeletePlayer = useCallback(async () => {
         if (!playerToDelete) return;
         
-        deleteRegistration(playerToDelete.RMIS_ID, playerToDelete.sport_id)
-            .then(response => {
-                toast.success('Player removed successfully');
-                fetchRegisteredPlayers();
-                setIsDeleteDialogOpen(false);
-                setPlayerToDelete(null);
-            })
-            .catch(error => {
-                toast.error('Error removing player: ' + error.message);
-                setIsDeleteDialogOpen(false);
-            });
-    }
+        try {
+            await deleteRegistration(playerToDelete.RMIS_ID, playerToDelete.sport_id);
+            toast.success('Player removed successfully');
+            await fetchRegisteredPlayers();
+            setIsDeleteDialogOpen(false);
+            setPlayerToDelete(null);
+        } catch (error) {
+            toast.error('Error removing player: ' + error.message);
+            setIsDeleteDialogOpen(false);
+        }
+    }, [playerToDelete, fetchRegisteredPlayers]);
     
-    // Handle checkbox changes with mutual exclusivity
-    const handleMainPlayerChange = (checked) => {
+    // Optimized checkbox handlers
+    const handleMainPlayerChange = useCallback(() => {
         setIsMainPlayer(true);
-    };
+    }, []);
     
-    const handleReservePlayerChange = (checked) => {
-            setIsMainPlayer(false);
-    };
+    const handleReservePlayerChange = useCallback(() => {
+        setIsMainPlayer(false);
+    }, []);
 
-    const fetchAllSports = async () => {
-            try {
-                setLoading(true);
-                const result = await getAllEvents();
-                if (result.success) {
-                    setSportsData(result.data);
-                    console.log('Sports data loaded:', result.data);
-                    
-                    // Find and set the selected sport data
-                    const sportId = params.sportid;
-                    const foundSport = result.data.find(sport => sport.sport_id === sportId);
-                    if (foundSport) {
-                        setSelectedSportData(foundSport);
-                    } else {
-                        toast.error("Sport not found");
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to fetch sports:', error);
-                // Error toast already handled by getAllEvents service
-            } finally {
-                setLoading(false);
-            }
-    };
+    // Memoized player lists to avoid conditional hook usage
+    const { mainPlayers, reservePlayers } = useMemo(() => {
+        const main = registeredPlayers.filter(player => player.main_player === true);
+        const reserve = registeredPlayers.filter(player => player.main_player === false);
+        return { mainPlayers: main, reservePlayers: reserve };
+    }, [registeredPlayers]);
 
     if (loading){
         return (
@@ -339,24 +359,10 @@ const page = () => {
                                     <CommandList className="w-full">
                                         <CommandEmpty className="py-6 text-center text-sm text-white/70">No members found.</CommandEmpty>
                                         <CommandGroup className="max-h-64 overflow-auto">
-                                            {Array.isArray(clubMembers) && clubMembers.length > 0 ? (
-                                                clubMembers
-                                                    .filter(member => {
-                                                        // First, check if member is already registered
-                                                        if (Array.isArray(registeredPlayers) && 
-                                                            registeredPlayers.some(player => player.RMIS_ID === member.membership_id)) {
-                                                            return false; // Skip already registered members
-                                                        }
-                                                        
-                                                        // Then filter members based on gender matching sport gender type
-                                                        if (!selectedSportData?.gender_type || !member?.gender) return true;
-                                                        const sportGender = selectedSportData.gender_type.toLowerCase();
-                                                        return (sportGender === 'boys' && member.gender === 'M') || 
-                                                               (sportGender === 'girls' && member.gender === 'F');
-                                                    })
-                                                    .map((member) => (
+                                            {availableClubMembers.length > 0 ? (
+                                                availableClubMembers.map((member) => (
                                                     <CommandItem
-                                                        key={member.id || member.card_name}
+                                                        key={member.id || member.membership_id}
                                                         value={member.card_name}
                                                         onSelect={handleSelectMember}
                                                         className="hover:bg-white/10 cursor-pointer"
@@ -373,7 +379,9 @@ const page = () => {
                                                     </CommandItem>
                                                 ))
                                             ) : (
-                                                <CommandItem disabled>No club members available</CommandItem>
+                                                <CommandItem disabled>
+                                                    {clubMembers.length === 0 ? 'No club members available' : 'All eligible members already registered'}
+                                                </CommandItem>
                                             )}
                                         </CommandGroup>
                                     </CommandList>
@@ -427,85 +435,44 @@ const page = () => {
                 )}
                 
                 <Button 
-                    className="bg-cranberry/10 border border-cranberry hover:bg-cranberry cursor-pointer text-white w-full"
-                    disabled={!registrationConstraints()}
-                    onClick={() => handleRegisterPlayer()}
+                    className="bg-cranberry/10 border border-cranberry hover:bg-cranberry cursor-pointer text-white w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!canRegisterPlayer || loading}
+                    onClick={handleRegisterPlayer}
                 >
-                    Register Player
+                    {loading ? 'Registering...' : 'Register Player'}
                 </Button>
             </div>
 
             <div className="bg-white/5 rounded-lg p-8 mt-10">
                 <div className='flex space-x-4 items-end mb-4'>
                     <h1 className="text-lg">Team Information</h1>
-                    <p className='text-sm text-white/50'>[Main : {registeredPlayers.filter(p => p.main_player === true).length} {registeredPlayers.filter(p => p.main_player === true).length == selectedSportData?.max_count ? '✅' : null} | Reserve : {registeredPlayers.filter(p => p.main_player === false).length} {registeredPlayers.filter(p => p.main_player === false).length == selectedSportData?.reserve_count ? '✅' : null}]</p>
+                    <p className='text-sm text-white/50'>
+                        [Main : {playerCounts.mainPlayers}/{playerCounts.maxMain} {playerCounts.mainPlayers === playerCounts.maxMain ? '✅' : ''} | 
+                        Reserve : {playerCounts.reservePlayers}/{playerCounts.maxReserve} {playerCounts.reservePlayers === playerCounts.maxReserve ? '✅' : ''}]
+                    </p>
                 </div>
                 <div className="space-y-2">
-                    {/* Main Players First */}
-                    {registeredPlayers
-                        .filter(player => player.main_player === true)
-                        .map(player => {
-                            const memberInfo = Array.isArray(clubMembers) ? 
-                                clubMembers.find(member => member.membership_id === player.RMIS_ID) : null;
-                            
-                            return (
-                                <div key={player.id} className="flex justify-between items-center p-3 bg-cranberry/20 rounded-md">
-                                    <div className="flex space-x-4 items-center">
-                                        <div className='flex space-x-4 items-center'>
-                                            <p className="font-bold">{memberInfo?.card_name || 'Unknown'}</p>
-                                            <p className="text-xs text-white/50">{player.RMIS_ID}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex space-x-4 items-center">
-                                        <p className="text-xs px-2 py-1 bg-white/10 rounded-full">
-                                            {memberInfo?.status === 1 ? 'Active' : memberInfo?.status === 5 ? 'Prospective' : 'Unknown'}
-                                        </p>
-                                        <p className="text-xs font-semibold px-2 py-1 bg-cranberry/40 rounded-full">Main</p>
-                                        <Button 
-                                            size="sm"
-                                            className="p-1 h-auto hover:bg-red-500 bg-transparent text-white/60 hover:text-white cursor-pointer"
-                                            onClick={() => confirmDeletePlayer(player)}
-                                            title="Remove player"
-                                        >
-                                            <Trash2 size={16} />
-                                        </Button>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                    {/* Main Players */}
+                    {mainPlayers.map(player => (
+                        <PlayerRow 
+                            key={`main-${player.RMIS_ID}`} 
+                            player={player} 
+                            isMain={true}
+                            clubMembers={clubMembers}
+                            onDeletePlayer={confirmDeletePlayer}
+                        />
+                    ))}
                     
-                    {/* Reserve Players Next */}
-                    {registeredPlayers
-                        .filter(player => player.main_player === false)
-                        .map(player => {
-                            const memberInfo = Array.isArray(clubMembers) ? 
-                                clubMembers.find(member => member.membership_id === player.RMIS_ID) : null;
-                            
-                            return (
-                                <div key={player.id} className="flex justify-between items-center p-3 bg-white/5 rounded-md">
-                                    <div className="flex space-x-4 items-center">
-                                        <div className='flex space-x-4 items-center'>
-                                            <p className="font-bold">{memberInfo?.card_name || 'Unknown'}</p>
-                                            <p className="text-xs text-white/50">{player.RMIS_ID}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex space-x-4 items-center">
-                                        <p className="text-xs px-2 py-1 bg-white/10 rounded-full">
-                                            {memberInfo?.status === 1 ? 'Active' : memberInfo?.status === 5 ? 'Prospective' : 'Unknown'}
-                                        </p>
-                                        <p className="text-xs font-semibold px-2 py-1 bg-white/20 rounded-full">Reserve</p>
-                                        <Button 
-                                            size="sm"
-                                            className="p-1 h-auto hover:bg-red-500 bg-transparent text-white/60 hover:text-white cursor-pointer"
-                                            onClick={() => confirmDeletePlayer(player)}
-                                            title="Remove player"
-                                        >
-                                            <Trash2 size={16} />
-                                        </Button>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                    {/* Reserve Players */}
+                    {reservePlayers.map(player => (
+                        <PlayerRow 
+                            key={`reserve-${player.RMIS_ID}`} 
+                            player={player} 
+                            isMain={false}
+                            clubMembers={clubMembers}
+                            onDeletePlayer={confirmDeletePlayer}
+                        />
+                    ))}
                 </div>
             </div>
             
@@ -536,9 +503,9 @@ const page = () => {
                 </AlertDialogContent>
             </AlertDialog>
         </div>
-    )
+    );
+});
 
+SportRegistrationPage.displayName = 'SportRegistrationPage';
 
-}
-
-export default page
+export default SportRegistrationPage

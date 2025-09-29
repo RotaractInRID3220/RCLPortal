@@ -5,6 +5,10 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const sport_id = searchParams.get('sport_id');
+    const club_id = searchParams.get('club_id');
+    const category = searchParams.get('category');
+    const limit = searchParams.get('limit');
+    const offset = searchParams.get('offset') || '0';
 
     let query = supabase
       .from('club_points')
@@ -21,9 +25,26 @@ export async function GET(request) {
       `)
       .order('points', { ascending: false });
 
-    // Filter by sport_id if provided
+    // Apply filters
     if (sport_id) {
       query = query.eq('sport_id', sport_id);
+    }
+    
+    if (club_id) {
+      query = query.eq('club_id', club_id);
+    }
+
+    // Filter by club category if provided
+    if (category) {
+      query = query.eq('clubs.category', category);
+    }
+
+    // Apply pagination if provided
+    if (limit) {
+      query = query.range(
+        parseInt(offset), 
+        parseInt(offset) + parseInt(limit) - 1
+      );
     }
 
     const { data, error } = await query;
@@ -36,9 +57,33 @@ export async function GET(request) {
       );
     }
 
+    // Get total count for pagination info
+    let totalCount = null;
+    if (limit) {
+      let countQuery = supabase
+        .from('club_points')
+        .select('point_id', { count: 'exact', head: true });
+      
+      if (sport_id) {
+        countQuery = countQuery.eq('sport_id', sport_id);
+      }
+      if (club_id) {
+        countQuery = countQuery.eq('club_id', club_id);
+      }
+      
+      const { count } = await countQuery;
+      totalCount = count;
+    }
+
     return NextResponse.json({ 
       success: true,
-      data: data || [] 
+      data: data || [],
+      pagination: limit ? {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        total: totalCount,
+        hasMore: totalCount ? (parseInt(offset) + parseInt(limit)) < totalCount : false
+      } : null
     });
   } catch (error) {
     console.error('Unexpected error:', error);

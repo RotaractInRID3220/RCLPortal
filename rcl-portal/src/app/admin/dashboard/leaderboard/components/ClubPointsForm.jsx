@@ -1,5 +1,6 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useAtom } from 'jotai'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -7,47 +8,65 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { fetchClubs } from '@/services/clubServices'
+import { addClubPoints } from '@/services/leaderboardServices'
+import { 
+  clubsDataAtom, 
+  lastFetchTimestampAtom, 
+  isCacheValid 
+} from '@/app/state/store'
 import { toast } from 'sonner'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const ClubPointsForm = ({ sport, onPointAdded }) => {
-  const [clubs, setClubs] = useState([])
-  const [filteredClubs, setFilteredClubs] = useState([])
+const ClubPointsForm = React.memo(({ sport, onPointAdded }) => {
+  const [clubsData, setClubsData] = useAtom(clubsDataAtom)
+  const [lastFetchTimestamp, setLastFetchTimestamp] = useAtom(lastFetchTimestampAtom)
   const [selectedClub, setSelectedClub] = useState('')
   const [place, setPlace] = useState('')
   const [points, setPoints] = useState('')
   const [loading, setLoading] = useState(false)
-  const [clubsLoading, setClubsLoading] = useState(true)
+  const [clubsLoading, setClubsLoading] = useState(false)
   
   // Combobox states
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState('')
 
-  useEffect(() => {
-    const loadClubs = async () => {
-      try {
-        setClubsLoading(true)
-        const clubsData = await fetchClubs()
-        setClubs(clubsData)
-        
-        // Filter clubs based on sport category
-        const filtered = clubsData.filter(club => club.category === sport.category)
-        setFilteredClubs(filtered)
-      } catch (error) {
-        console.error('Failed to fetch clubs:', error)
-        toast.error('Failed to load clubs')
-      } finally {
-        setClubsLoading(false)
-      }
-    }
+  // Memoized filtered clubs based on sport category
+  const filteredClubs = useMemo(() => {
+    if (!sport?.category || !clubsData.length) return []
+    return clubsData.filter(club => club.category === sport.category)
+  }, [clubsData, sport?.category])
 
+  // Optimized clubs loading with caching
+  const loadClubs = useCallback(async (forceRefresh = false) => {
+    try {
+      // Check cache validity
+      if (!forceRefresh && clubsData.length > 0 && isCacheValid(lastFetchTimestamp.clubs)) {
+        console.log('Using cached clubs data')
+        return
+      }
+
+      setClubsLoading(true)
+      const clubs = await fetchClubs()
+      setClubsData(clubs)
+      setLastFetchTimestamp(prev => ({ ...prev, clubs: Date.now() }))
+      console.log('Clubs data loaded and cached:', clubs.length, 'clubs')
+    } catch (error) {
+      console.error('Failed to fetch clubs:', error)
+      toast.error('Failed to load clubs')
+    } finally {
+      setClubsLoading(false)
+    }
+  }, [clubsData.length, lastFetchTimestamp.clubs, setClubsData, setLastFetchTimestamp])
+
+  useEffect(() => {
     if (sport) {
       loadClubs()
     }
-  }, [sport])
+  }, [sport, loadClubs])
 
-  const handleSubmit = async (e) => {
+  // Optimized submit handler using the new service
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault()
     
     if (!selectedClub || !place || !points) {
@@ -72,25 +91,12 @@ const ClubPointsForm = ({ sport, onPointAdded }) => {
     try {
       setLoading(true)
       
-      const response = await fetch('/api/club-points', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          club_id: selectedClub,
-          sport_id: sport.sport_id,
-          place: placeNum,
-          points: pointsNum
-        })
+      const result = await addClubPoints({
+        clubId: selectedClub,
+        sportId: sport.sport_id,
+        place: placeNum,
+        points: pointsNum
       })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to add points')
-      }
-
-      const result = await response.json()
       
       if (result.success) {
         toast.success('Points added successfully!')
@@ -112,18 +118,18 @@ const ClubPointsForm = ({ sport, onPointAdded }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedClub, place, points, sport?.sport_id, onPointAdded])
 
-  const handleClubSelect = (currentValue) => {
+  const handleClubSelect = useCallback((currentValue) => {
     setValue(currentValue === value ? '' : currentValue)
     setSelectedClub(currentValue === value ? '' : currentValue)
     setOpen(false)
-  }
+  }, [value])
 
-  const getSelectedClubName = () => {
+  const getSelectedClubName = useCallback(() => {
     const club = filteredClubs.find(c => c.club_id === value)
     return club ? club.club_name : 'Select club...'
-  }
+  }, [filteredClubs, value])
 
   if (clubsLoading) {
     return (
@@ -233,6 +239,6 @@ const ClubPointsForm = ({ sport, onPointAdded }) => {
       </form>
     </div>
   )
-}
+})
 
 export default ClubPointsForm

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { 
   AlertDialog, 
@@ -13,26 +13,29 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { Trash2 } from 'lucide-react'
+import { fetchClubPoints, deleteClubPoints } from '@/services/leaderboardServices'
 
-const LeaderboardDisplay = ({ sport, refreshKey, onPointDeleted }) => {
+const LeaderboardDisplay = React.memo(({ sport, refreshKey, onPointDeleted }) => {
   const [clubPoints, setClubPoints] = useState([])
   const [loading, setLoading] = useState(true)
   const [deleteId, setDeleteId] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
-  const fetchClubPoints = async () => {
+  // Optimized fetch function using the new service
+  const fetchClubPointsData = useCallback(async () => {
+    if (!sport?.sport_id) return
+
     try {
       setLoading(true)
-      const response = await fetch(`/api/club-points?sport_id=${sport.sport_id}`)
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch club points')
-      }
-
-      const result = await response.json()
+      const result = await fetchClubPoints({ 
+        sportId: sport.sport_id,
+        category: sport.category // Filter by sport category for better performance
+      })
       
       if (result.success) {
         setClubPoints(result.data || [])
+      } else {
+        toast.error(result.error || 'Failed to load leaderboard')
       }
     } catch (error) {
       console.error('Error fetching club points:', error)
@@ -40,41 +43,32 @@ const LeaderboardDisplay = ({ sport, refreshKey, onPointDeleted }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [sport?.sport_id, sport?.category])
 
   useEffect(() => {
-    if (sport) {
-      fetchClubPoints()
-    }
-  }, [sport, refreshKey])
+    fetchClubPointsData()
+  }, [fetchClubPointsData, refreshKey])
 
-  const handleDelete = async () => {
+  // Optimized delete handler using the new service
+  const handleDelete = useCallback(async () => {
     if (!deleteId) return
 
     try {
       setDeleting(true)
-      
-      const response = await fetch(`/api/club-points?point_id=${deleteId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to delete entry')
-      }
-
-      const result = await response.json()
+      const result = await deleteClubPoints(deleteId)
       
       if (result.success) {
         toast.success('Entry deleted successfully!')
         
         // Refresh the data
-        fetchClubPoints()
+        fetchClubPointsData()
         
         // Notify parent component
         if (onPointDeleted) {
           onPointDeleted()
         }
+      } else {
+        toast.error(result.error || 'Failed to delete entry')
       }
     } catch (error) {
       console.error('Error deleting entry:', error)
@@ -83,7 +77,40 @@ const LeaderboardDisplay = ({ sport, refreshKey, onPointDeleted }) => {
       setDeleting(false)
       setDeleteId(null)
     }
-  }
+  }, [deleteId, fetchClubPointsData, onPointDeleted])
+
+  // Memoized leaderboard row component
+  const LeaderboardRow = React.memo(({ entry, index, onDelete }) => (
+    <div 
+      key={entry.point_id} 
+      className="grid grid-cols-4 gap-4 py-3 px-4 bg-white/5 rounded-lg hover:bg-white/8 transition-colors"
+    >
+      <div className="font-medium">
+        {entry.clubs?.club_name || 'Unknown Club'}
+      </div>
+      <div className="text-center">
+        {entry.place}
+      </div>
+      <div className="text-center font-semibold text-green-400">
+        {entry.points}
+      </div>
+      <div className="text-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(entry.point_id)}
+          className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  ))
+
+  // Memoized delete handler
+  const handleDeleteClick = useCallback((pointId) => {
+    setDeleteId(pointId)
+  }, [])
 
   if (loading) {
     return (
@@ -118,30 +145,12 @@ const LeaderboardDisplay = ({ sport, refreshKey, onPointDeleted }) => {
             
             {/* Entries */}
             {clubPoints.map((entry, index) => (
-              <div 
-                key={entry.point_id} 
-                className="grid grid-cols-4 gap-4 py-3 px-4 bg-white/5 rounded-lg hover:bg-white/8 transition-colors"
-              >
-                <div className="font-medium">
-                  {entry.clubs?.club_name || 'Unknown Club'}
-                </div>
-                <div className="text-center">
-                  {entry.place}
-                </div>
-                <div className="text-center font-semibold text-green-400">
-                  {entry.points}
-                </div>
-                <div className="text-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDeleteId(entry.point_id)}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+              <LeaderboardRow 
+                key={entry.point_id}
+                entry={entry}
+                index={index}
+                onDelete={handleDeleteClick}
+              />
             ))}
             
             {/* Total Count */}
@@ -184,6 +193,6 @@ const LeaderboardDisplay = ({ sport, refreshKey, onPointDeleted }) => {
       </AlertDialog>
     </>
   )
-}
+})
 
 export default LeaderboardDisplay

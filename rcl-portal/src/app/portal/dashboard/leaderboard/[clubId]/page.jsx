@@ -1,91 +1,99 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { useAtom } from 'jotai'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import ClubDetailsDisplay from '../components/ClubDetailsDisplay'
 import { toast } from 'sonner'
+import { fetchClubDetails } from '@/services/leaderboardServices'
+import { 
+  clubPointsDataAtom, 
+  clubPointsLoadingAtom, 
+  lastFetchTimestampAtom, 
+  isCacheValid 
+} from '@/app/state/store'
 
 const page = () => {
   const params = useParams()
   const router = useRouter()
-  const [clubData, setClubData] = useState(null)
-  const [clubPoints, setClubPoints] = useState([])
-  const [totalPoints, setTotalPoints] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [clubPointsData, setClubPointsData] = useAtom(clubPointsDataAtom)
+  const [loading, setLoading] = useAtom(clubPointsLoadingAtom)
+  const [lastFetchTimestamp, setLastFetchTimestamp] = useAtom(lastFetchTimestampAtom)
+  const [clubDetailsData, setClubDetailsData] = useState(null)
 
   const clubId = params.clubId
 
-  useEffect(() => {
-    const fetchClubData = async () => {
-      if (!clubId) {
-        console.log('No clubId provided')
+  // Memoized club data extraction
+  const { clubData, clubPoints, totalPoints } = useMemo(() => {
+    if (!clubDetailsData) {
+      return { clubData: null, clubPoints: [], totalPoints: 0 }
+    }
+
+    return {
+      clubData: clubDetailsData.club,
+      clubPoints: clubDetailsData.raw_entries || [],
+      totalPoints: clubDetailsData.summary?.total_points || 0
+    }
+  }, [clubDetailsData])
+
+  // Optimized club details fetching with caching
+  const fetchClubDetailsData = useCallback(async (forceRefresh = false) => {
+    if (!clubId) {
+      console.log('No clubId provided')
+      return
+    }
+
+    try {
+      // Check cache validity
+      const cacheKey = `club_${clubId}`
+      if (!forceRefresh && clubPointsData[cacheKey] && isCacheValid(lastFetchTimestamp.clubPoints)) {
+        console.log('Using cached club details for clubId:', clubId)
+        setClubDetailsData(clubPointsData[cacheKey])
         return
       }
 
-      try {
-        setLoading(true)
-        console.log('Fetching data for clubId:', clubId)
+      setLoading(true)
+      console.log('Fetching optimized data for clubId:', clubId)
+      
+      const result = await fetchClubDetails(clubId)
+      
+      if (result.success) {
+        setClubDetailsData(result.data)
         
-        // Fetch club info and all club points
-        const [clubsResponse, pointsResponse] = await Promise.all([
-          fetch('/api/clubs'),
-          fetch('/api/club-points')
-        ])
-
-        if (!clubsResponse.ok || !pointsResponse.ok) {
-          throw new Error('Failed to fetch data')
-        }
-
-        const clubsResult = await clubsResponse.json()
-        const pointsResult = await pointsResponse.json()
-
-        console.log('Clubs data:', clubsResult.clubs)
-        console.log('Looking for club with ID:', clubId)
-
-        // Find the specific club - handle both string and number comparisons
-        const club = clubsResult.clubs?.find(c => 
-          c.club_id === clubId || 
-          c.club_id === String(clubId) || 
-          String(c.club_id) === String(clubId)
-        )
+        // Cache the result
+        setClubPointsData(prev => ({
+          ...prev,
+          [cacheKey]: result.data
+        }))
+        setLastFetchTimestamp(prev => ({ ...prev, clubPoints: Date.now() }))
         
-        console.log('Found club:', club)
-        
-        if (!club) {
-          console.error('Club not found. Available clubs:', clubsResult.clubs?.map(c => ({ id: c.club_id, name: c.club_name })))
+        console.log('Club details loaded and cached:', result.data)
+      } else {
+        if (result.error === 'Club not found') {
+          console.error('Club not found for ID:', clubId)
           toast.error('Club not found')
           router.push('/portal/dashboard/leaderboard')
           return
         }
-        setClubData(club)
-
-        // Filter points for this club and calculate total - handle type conversion
-        const clubPointsData = pointsResult.data?.filter(point => 
-          point.club_id === clubId || 
-          point.club_id === String(clubId) || 
-          String(point.club_id) === String(clubId)
-        ) || []
-        
-        console.log('Club points data:', clubPointsData)
-        setClubPoints(clubPointsData)
-        
-        const total = clubPointsData.reduce((sum, point) => sum + (point.points || 0), 0)
-        setTotalPoints(total)
-
-      } catch (error) {
-        console.error('Error fetching club data:', error)
-        toast.error('Failed to load club details')
-      } finally {
-        setLoading(false)
+        toast.error(result.error || 'Failed to load club details')
       }
+    } catch (error) {
+      console.error('Error fetching club details:', error)
+      toast.error('Failed to load club details')
+    } finally {
+      setLoading(false)
     }
+  }, [clubId, clubPointsData, lastFetchTimestamp.clubPoints, setClubPointsData, setLastFetchTimestamp, setLoading, router])
 
-    fetchClubData()
-  }, [clubId, router])
+  useEffect(() => {
+    fetchClubDetailsData()
+  }, [fetchClubDetailsData])
 
-  const handleBackToLeaderboard = () => {
+  // Rest of the component logic remains the same but uses optimized data
+  const handleBackToLeaderboard = useCallback(() => {
     router.push('/portal/dashboard/leaderboard')
-  }
+  }, [router])
+
 
   if (loading) {
     return (
