@@ -32,7 +32,7 @@ export default function RootLayout({ children }) {
             <AdminSideNav />
           </div>
           <div className="w-10/12 ml-auto py-16 px-10">
-            <PrivateRoute>
+            <PrivateRoute accessType="admin">
                 {children}
                 <Toaster richColors  />
             </PrivateRoute>

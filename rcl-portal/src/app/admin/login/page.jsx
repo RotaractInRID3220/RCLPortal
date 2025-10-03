@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAtom, useSetAtom } from 'jotai'
 import { loadingAtom, userDeetsAtom } from '@/app/state/store'
 import { toast } from 'sonner'
+import { signIn, useSession } from 'next-auth/react'
 
 const adminLogin = () => {
     const [email, setEmail] = useState('');
@@ -15,12 +16,20 @@ const adminLogin = () => {
     const router = useRouter();
     const [UserDeets,setUserDeets] = useAtom(userDeetsAtom);
     const setGlobalLoading = useSetAtom(loadingAtom);
+    const { data: session, status } = useSession()
 
     // Set global loading to false when login page renders
     useEffect(() => {
         console.log('Login page rendered, setting global loading to false');
         setGlobalLoading(false);
     }, []);
+
+    // Redirect if already logged in with admin access
+    useEffect(() => {
+        if (status !== 'loading' && session?.user?.hasAdminAccess) {
+            router.push('/admin/dashboard');
+        }
+    }, [session, status, router]);
 
     const handleLogin = async () => {
       setError(null);
@@ -30,20 +39,28 @@ const adminLogin = () => {
       }
       try {
         setLoading(true);
-        const params = new URLSearchParams({ username: email, password });
-        const res = await fetch(`/api/council?${params.toString()}`);
-        const data = await res.json();
-        if (!res.ok || !data?.authorized) {
-          toast.error(data?.error || 'Login failed');
-          setLoading(false);
-          return;
+        
+        // Use NextAuth signIn directly
+        const result = await signIn('admin-credentials', {
+          email,
+          password,
+          loginType: 'admin',
+          redirect: false
+        });
+
+        if (result?.ok) {
+          toast.success('Login successful');
+          router.push('/admin/dashboard');
+        } else if (result?.error === 'CredentialsSignin') {
+          // Generic NextAuth error - provide helpful message
+          toast.error('Invalid credentials or insufficient permissions for admin access');
+        } else {
+          toast.error(result?.error || 'Login failed');
         }
-        // Save user data in atom (persisted to localStorage with TTL)
-        setUserDeets(data.user || null);
-        toast.success('Login successful');
-        router.push('/admin/dashboard');
       } catch (e) {
-        setError('Network error');
+        console.error('Login error:', e);
+        toast.error('Network error');
+      } finally {
         setLoading(false);
       }
     };

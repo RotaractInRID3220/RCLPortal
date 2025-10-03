@@ -11,8 +11,8 @@ const PortalSideNav = () => {
   const [clubMembers, setClubMembers] = useAtom(clubMembersAtom)
   const router = useRouter();
 
-  const handleLogOut = () => {
-    userLogOut(setUserDetails);
+  const handleLogOut = async () => {
+    await userLogOut(setUserDetails);
   };
 
   useEffect(() => {

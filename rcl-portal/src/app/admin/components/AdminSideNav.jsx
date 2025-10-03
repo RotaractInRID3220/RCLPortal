@@ -10,8 +10,8 @@ const AdminSideNav = () => {
   const [userDetails, setUserDetails] = useAtom(userDeetsAtom);
   const router = useRouter();
 
-  const handleLogOut = () => {
-    userLogOut(setUserDetails);
+  const handleLogOut = async () => {
+    await userLogOut(setUserDetails);
   };
 
   const navigateToOverview = () => {
