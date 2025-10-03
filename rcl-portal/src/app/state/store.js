@@ -16,15 +16,17 @@ export const lastFetchTimestampAtom = atomWithStorage('lastFetchTimestamp', {
   sports: 0,
   clubs: 0,
   leaderboard: 0,
-  clubPoints: 0
+  clubPoints: 0,
+  adminDashboard: 0
 });
 
 // Cache duration constants (in milliseconds)
 export const CACHE_DURATION = {
-  sports: 2 * 60 * 1000,     // 5 minutes for sports data
-  clubs: 10 * 60 * 1000,    // 10 minutes for clubs data
-  leaderboard: 2 * 60 * 1000, // 2 minutes for leaderboard data (frequently updated)
-  clubPoints: 2 * 60 * 1000   // 3 minutes for club points
+  sports: 2 * 60 * 1000,          // 2 minutes for sports data
+  clubs: 10 * 60 * 1000,         // 10 minutes for clubs data
+  leaderboard: 2 * 60 * 1000,    // 2 minutes for leaderboard data (frequently updated)
+  clubPoints: 2 * 60 * 1000,     // 2 minutes for club points
+  adminDashboard: 1 * 60 * 1000  // 1 minute for admin dashboard (high priority data)
 };
 
 // Helper function to check cache validity
@@ -32,6 +34,17 @@ export const isCacheValid = (timestamp, type = 'sports') => {
   if (!timestamp) return false;
   return Date.now() - timestamp < CACHE_DURATION[type];
 };
+
+// Cache invalidation helper
+export const invalidateCacheAtom = atom(
+  null,
+  (get, set, cacheType) => {
+    set(lastFetchTimestampAtom, (prev) => ({
+      ...prev,
+      [cacheType]: 0
+    }));
+  }
+);
 
 // Matches/Games atoms
 export const matchesAtom = atom([]);
@@ -48,6 +61,47 @@ export const selectedSportAtom = atom(4); // Default sport ID
 export const clubsAtom = atom([]);
 export const clubMembersAtom = atom([]);
 export const clubsLoadingAtom = atom(false);
+
+// Admin Dashboard atoms with enhanced caching
+export const adminDashboardDataAtom = atomWithStorage('adminDashboardData', {
+  stats: {
+    totalClubs: 0,
+    totalPlayers: 0,
+    communityClubs: 0,
+    instituteClubs: 0
+  },
+  leaderboard: [],
+  pendingRequests: 0
+});
+
+// Legacy atoms (kept for backward compatibility)
+export const adminStatsAtom = atom(
+  (get) => get(adminDashboardDataAtom).stats,
+  (get, set, update) => {
+    const current = get(adminDashboardDataAtom);
+    set(adminDashboardDataAtom, { ...current, stats: update });
+  }
+);
+
+export const adminLeaderboardAtom = atom(
+  (get) => get(adminDashboardDataAtom).leaderboard,
+  (get, set, update) => {
+    const current = get(adminDashboardDataAtom);
+    set(adminDashboardDataAtom, { ...current, leaderboard: update });
+  }
+);
+
+export const pendingRequestsAtom = atom(
+  (get) => get(adminDashboardDataAtom).pendingRequests,
+  (get, set, update) => {
+    const current = get(adminDashboardDataAtom);
+    set(adminDashboardDataAtom, { ...current, pendingRequests: update });
+  }
+);
+
+export const adminStatsLoadingAtom = atom(false);
+export const adminStatsErrorAtom = atom(null);
+export const adminLeaderboardLoadingAtom = atom(false);
 export const clubsErrorAtom = atom(null);
 
 // Leaderboard data atoms with caching

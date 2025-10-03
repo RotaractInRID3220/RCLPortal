@@ -10,7 +10,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const sport_id = searchParams.get('sport_id') || '1'; // Default to sport_id 1
 
-    // Fetch matches without foreign key relationships
+    // Optimized: Fetch matches with JOINs to teams and clubs in one query
     const { data: matchesData, error: matchesError } = await supabase
       .from('matches')
       .select(`
@@ -23,7 +23,17 @@ export async function GET(request) {
         match_order,
         parent_match1_id,
         parent_match2_id,
-        start_time
+        start_time,
+        team1:team1_id (
+          team_id,
+          seed_number,
+          club:club_id (club_id, club_name)
+        ),
+        team2:team2_id (
+          team_id,
+          seed_number,
+          club:club_id (club_id, club_name)
+        )
       `)
       .eq('sport_id', sport_id)
       .order('round_id', { ascending: false })
@@ -34,55 +44,13 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Failed to fetch matches' }, { status: 500 });
     }
 
-    // Get team data separately
-    let teamsData = [];
-    if (matchesData && matchesData.length > 0) {
-      const teamIds = [...new Set(matchesData.flatMap(match => 
-        [match.team1_id, match.team2_id].filter(id => id !== null)
-      ))];
-      
-      if (teamIds.length > 0) {
-        const { data: teams, error: teamsError } = await supabase
-          .from('teams')
-          .select('team_id, club_id')
-          .in('team_id', teamIds);
-
-        if (!teamsError && teams) {
-          // Get club data separately
-          const clubIds = [...new Set(teams.map(t => t.club_id))];
-          const { data: clubs, error: clubsError } = await supabase
-            .from('clubs')
-            .select('club_id, club_name')
-            .in('club_id', clubIds);
-
-          if (!clubsError && clubs) {
-            // Combine team and club data
-            teamsData = teams.map(team => {
-              const club = clubs.find(c => c.club_id === team.club_id);
-              return {
-                ...team,
-                club: club || null
-              };
-            });
-          }
-        }
-      }
-    }
-
-    // Add team and club info to matches
-    const matchesWithTeams = matchesData.map(match => ({
-      ...match,
-      team1: match.team1_id ? teamsData.find(t => t.team_id === match.team1_id) || null : null,
-      team2: match.team2_id ? teamsData.find(t => t.team_id === match.team2_id) || null : null
-    }));
-
     // Transform data to react-brackets format
-    const bracketData = transformToBracketFormat(matchesWithTeams || []);
+    const bracketData = transformToBracketFormat(matchesData || []);
 
     return NextResponse.json({
       success: true,
       data: bracketData,
-      total_matches: matchesWithTeams?.length || 0
+      total_matches: matchesData?.length || 0
     });
 
   } catch (error) {

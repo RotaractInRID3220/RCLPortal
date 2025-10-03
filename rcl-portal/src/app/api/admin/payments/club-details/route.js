@@ -12,33 +12,36 @@ export async function GET(request) {
     try {
         const registrationFee = parseInt(process.env.NEXT_PUBLIC_REGISTRATION_FEE) || 800;
 
-        // Get player count for the club
-        const { count: playerCount, error: playersError } = await supabase
-            .from('players')
-            .select('*', { count: 'exact', head: true })
-            .eq('club_id', club_id);
+        // Use SQL aggregation to get player count and paid amount in one query
+        const [{ player_count, paid_amount }, error] = await Promise.all([
+            (async () => {
+                // Get player count
+                const { count, error } = await supabase
+                    .from('players')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('club_id', club_id);
+                return { player_count: count || 0, paid_amount: null, error };
+            })(),
+            (async () => {
+                // Get paid amount
+                const { data, error } = await supabase
+                    .from('payment_slips')
+                    .select('value')
+                    .eq('club_id', club_id)
+                    .eq('approved', true);
+                const paid_amount = data?.reduce((sum, payment) => sum + payment.value, 0) || 0;
+                return { player_count: null, paid_amount, error };
+            })()
+        ]);
 
-        if (playersError) {
-            console.error('Error counting players:', playersError);
-            return NextResponse.json({ error: 'Failed to count players' }, { status: 500 });
+        if (error?.error) {
+            console.error('Error fetching club details:', error.error);
+            return NextResponse.json({ error: 'Failed to fetch club details' }, { status: 500 });
         }
 
-        // Get approved payments for the club
-        const { data: approvedPayments, error: paymentsError } = await supabase
-            .from('payment_slips')
-            .select('value')
-            .eq('club_id', club_id)
-            .eq('approved', true);
-
-        if (paymentsError) {
-            console.error('Error fetching approved payments:', paymentsError);
-            return NextResponse.json({ error: 'Failed to fetch approved payments' }, { status: 500 });
-        }
-
-        // Calculate amounts
-        const totalPlayers = playerCount || 0;
+        const totalPlayers = player_count || 0;
         const totalAmount = totalPlayers * registrationFee;
-        const paidAmount = approvedPayments?.reduce((sum, payment) => sum + payment.value, 0) || 0;
+        const paidAmount = paid_amount || 0;
         const remainingAmount = Math.max(0, totalAmount - paidAmount);
 
         return NextResponse.json({

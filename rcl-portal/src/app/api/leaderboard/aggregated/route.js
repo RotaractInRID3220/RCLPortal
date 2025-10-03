@@ -16,116 +16,101 @@ export async function GET(request) {
     const limit = searchParams.get('limit');
     const offset = searchParams.get('offset') || '0';
 
-    // Build the aggregation query with JOIN and GROUP BY
-    let query = `
-      SELECT 
-        c.club_id,
-        c.club_name,
-        c.category,
-        COALESCE(SUM(cp.points), 0) as total_points,
-        COUNT(cp.point_id) as entries_count,
-        RANK() OVER (ORDER BY COALESCE(SUM(cp.points), 0) DESC, c.club_name ASC) as rank
-      FROM clubs c
-      LEFT JOIN club_points cp ON c.club_id = cp.club_id
-    `;
-
-    const params = [];
-    let paramIndex = 1;
-
-    // Add category filter if provided
-    if (category) {
-      query += ` WHERE c.category = $${paramIndex}`;
-      params.push(category);
-      paramIndex++;
-    }
-
-    query += `
-      GROUP BY c.club_id, c.club_name, c.category
-      ORDER BY total_points DESC, c.club_name ASC
-    `;
-
-    // Add pagination if limit is provided
-    if (limit) {
-      query += ` LIMIT $${paramIndex}`;
-      params.push(parseInt(limit));
-      paramIndex++;
-      
-      if (offset !== '0') {
-        query += ` OFFSET $${paramIndex}`;
-        params.push(parseInt(offset));
-      }
-    }
-
-    const { data, error } = await supabase.rpc('exec_sql', {
-      query,
-      params
-    });
-
-    if (error) {
-      console.error('Error fetching aggregated leaderboard:', error);
-      
-      // Fallback to individual queries if RPC fails
-      const fallbackData = await getFallbackLeaderboard(category, limit, offset);
-      return NextResponse.json({
-        success: true,
-        data: fallbackData.clubs,
-        total: fallbackData.total,
-        usedFallback: true
-      });
-    }
-
-    // Get total count for pagination
-    let totalQuery = `
-      SELECT COUNT(DISTINCT c.club_id) as total
-      FROM clubs c
-    `;
+    // Use optimized Supabase queries instead of RPC
+    const optimizedData = await getOptimizedLeaderboard(category, limit, offset);
     
-    if (category) {
-      totalQuery += ` WHERE c.category = $1`;
-    }
-
-    const { data: countData } = await supabase.rpc('exec_sql', {
-      query: totalQuery,
-      params: category ? [category] : []
-    });
-
-    const total = countData?.[0]?.total || data?.length || 0;
-
     return NextResponse.json({
       success: true,
-      data: data || [],
-      total,
+      data: optimizedData.clubs,
+      total: optimizedData.total,
       pagination: {
         limit: limit ? parseInt(limit) : null,
         offset: parseInt(offset),
-        hasMore: limit ? (parseInt(offset) + parseInt(limit)) < total : false
+        hasMore: limit ? (parseInt(offset) + parseInt(limit)) < optimizedData.total : false
       }
     });
 
   } catch (error) {
-    console.error('Unexpected error:', error);
-    
-    // Fallback on any error
-    try {
-      const fallbackData = await getFallbackLeaderboard(
-        new URL(request.url).searchParams.get('category'),
-        new URL(request.url).searchParams.get('limit'),
-        new URL(request.url).searchParams.get('offset') || '0'
-      );
-      
-      return NextResponse.json({
-        success: true,
-        data: fallbackData.clubs,
-        total: fallbackData.total,
-        usedFallback: true
-      });
-    } catch (fallbackError) {
-      console.error('Fallback also failed:', fallbackError);
-      return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
-      );
+    console.error('Error fetching aggregated leaderboard:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Optimized leaderboard fetching using Supabase queries with JOINs
+ * Replaces the problematic RPC call with efficient queries
+ */
+async function getOptimizedLeaderboard(category, limit, offset) {
+  try {
+    // First, get clubs with their total points using a single query with aggregation
+    let clubsQuery = supabase
+      .from('clubs')
+      .select(`
+        club_id,
+        club_name,
+        category,
+        club_points!left (
+          points
+        )
+      `)
+      .order('club_name', { ascending: true });
+
+    if (category) {
+      clubsQuery = clubsQuery.eq('category', category);
     }
+
+    const { data: clubsWithPoints, error: clubsError } = await clubsQuery;
+    if (clubsError) throw clubsError;
+
+    // Process and aggregate the data
+    const processedClubs = clubsWithPoints.map(club => {
+      const totalPoints = club.club_points?.reduce((sum, point) => sum + (point.points || 0), 0) || 0;
+      const entriesCount = club.club_points?.length || 0;
+
+      return {
+        club_id: club.club_id,
+        club_name: club.club_name,
+        category: club.category,
+        total_points: totalPoints,
+        entries_count: entriesCount
+      };
+    });
+
+    // Sort by total points (desc), then by name (asc)
+    processedClubs.sort((a, b) => {
+      if (b.total_points !== a.total_points) {
+        return b.total_points - a.total_points;
+      }
+      return a.club_name.localeCompare(b.club_name);
+    });
+
+    // Add ranking
+    let currentRank = 1;
+    const rankedClubs = processedClubs.map((club, index) => {
+      if (index > 0 && club.total_points !== processedClubs[index - 1].total_points) {
+        currentRank = index + 1;
+      }
+      return { ...club, rank: currentRank };
+    });
+
+    // Apply pagination
+    const total = rankedClubs.length;
+    let paginatedClubs = rankedClubs;
+    
+    if (limit) {
+      const startIndex = parseInt(offset);
+      const endIndex = startIndex + parseInt(limit);
+      paginatedClubs = rankedClubs.slice(startIndex, endIndex);
+    }
+
+    return { clubs: paginatedClubs, total };
+  } catch (error) {
+    console.error('Error in optimized leaderboard:', error);
+    // Fallback to the existing method if optimization fails
+    return getFallbackLeaderboard(category, limit, offset);
   }
 }
 

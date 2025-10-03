@@ -14,6 +14,9 @@ const AdminSideNav = () => {
     userLogOut(setUserDetails);
   };
 
+  const navigateToOverview = () => {
+    router.push("/admin/dashboard");
+  };
   const navigateToSports = () => {
     router.push("/admin/dashboard/events");
   };
@@ -49,7 +52,13 @@ const AdminSideNav = () => {
           <div className="w-full flex items-center justify-center">
             <img src="/LogoWhite.png" className="w-5/6" alt="" />
           </div>
-          <div className="w-full flex flex-col space-y-3 justify-center items-center  mt-10">
+          <div className="w-full flex flex-col space-y-3 justify-center items-center  mt-8 !text-sm">
+            <div
+              className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
+              onClick={navigateToOverview}
+            >
+              Overview
+            </div>
             <div
               className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
               onClick={navigateToSports}

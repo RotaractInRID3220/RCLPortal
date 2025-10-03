@@ -152,21 +152,23 @@ export async function GET(request) {
         const sportDay = searchParams.get('day');
         const sportType = searchParams.get('type');
         const genderType = searchParams.get('gender');
-        
+        const limit = parseInt(searchParams.get('limit')) || 20;
+        const offset = parseInt(searchParams.get('offset')) || 0;
+
         // Build query based on parameters
         let query = supabase
             .from('events')
-            .select('*');
-        
+            .select('*', { count: 'exact' });
+
         // Add filters if parameters are provided
         if (category) {
             query = query.eq('category', category);
         }
-        
+
         if (sportDay) {
             query = query.eq('sport_day', sportDay);
         }
-        
+
         if (sportType) {
             // Check if it's comma-separated (multiple types)
             if (sportType.includes(',')) {
@@ -176,13 +178,16 @@ export async function GET(request) {
                 query = query.eq('sport_type', sportType); // Single type
             }
         }
-        
+
         if (genderType) {
             query = query.eq('gender_type', genderType);
         }
-        
-        const { data, error } = await query;
-        
+
+        // Apply pagination
+        query = query.range(offset, offset + limit - 1);
+
+        const { data, error, count } = await query;
+
         if (error) {
             console.error('Database error:', error);
             return NextResponse.json(
@@ -194,7 +199,11 @@ export async function GET(request) {
         return NextResponse.json({
             success: true,
             data: data,
-            count: data.length
+            count: data.length,
+            totalCount: count || 0,
+            limit,
+            offset,
+            totalPages: limit ? Math.ceil((count || 0) / limit) : 1
         });
 
     } catch (error) {
