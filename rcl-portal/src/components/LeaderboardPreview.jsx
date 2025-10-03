@@ -32,7 +32,7 @@ export default function LeaderboardPreview({ leaderboardData = [], onCategoryCha
   const displayData = leaderboardData;
 
   return (
-    <div className="bg-black/80 border border-white/10 rounded-lg p-6 h-full">
+    <div className="bg-black/80 border border-white/10 rounded-lg p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-normal text-white">Leaderboard</h2>
         <div className="flex items-center space-x-1 text-sm">

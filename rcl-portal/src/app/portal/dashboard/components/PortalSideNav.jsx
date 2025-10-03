@@ -43,6 +43,10 @@ const PortalSideNav = () => {
     }
   };
 
+  const navigateToOverview = () => {
+    router.push("/portal/dashboard");
+  };
+
   const navigateToRegistration = () => {
     router.push("/portal/dashboard/registration");
   };
@@ -67,6 +71,12 @@ const PortalSideNav = () => {
             <img src="/LogoWhite.png" className="w-5/6" alt="" />
           </div>
           <div className="w-full flex flex-col space-y-3 justify-center items-center  mt-10">
+            <div
+              className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
+              onClick={navigateToOverview}
+            >
+              Overview
+            </div>
             <div
               className="text-center w-full bg-white/5 border py-1.5 rounded-md cursor-pointer hover:bg-white/15 transition-all"
               onClick={navigateToRegistration}

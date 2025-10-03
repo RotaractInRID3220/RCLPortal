@@ -17,7 +17,8 @@ export const lastFetchTimestampAtom = atomWithStorage('lastFetchTimestamp', {
   clubs: 0,
   leaderboard: 0,
   clubPoints: 0,
-  adminDashboard: 0
+  adminDashboard: 0,
+  portalDashboard: 0
 });
 
 // Cache duration constants (in milliseconds)
@@ -26,7 +27,8 @@ export const CACHE_DURATION = {
   clubs: 10 * 60 * 1000,         // 10 minutes for clubs data
   leaderboard: 2 * 60 * 1000,    // 2 minutes for leaderboard data (frequently updated)
   clubPoints: 2 * 60 * 1000,     // 2 minutes for club points
-  adminDashboard: 1 * 60 * 1000  // 1 minute for admin dashboard (high priority data)
+  adminDashboard: 1 * 60 * 1000, // 1 minute for admin dashboard (high priority data)
+  portalDashboard: 2 * 60 * 1000 // 2 minutes for portal dashboard (user-specific data)
 };
 
 // Helper function to check cache validity
@@ -116,6 +118,42 @@ export const leaderboardErrorAtom = atom(null);
 export const clubPointsDataAtom = atomWithStorage('clubPointsData', {});
 export const clubPointsLoadingAtom = atom(false);
 
+// Portal Dashboard atoms with enhanced caching
+export const portalDashboardDataAtom = atomWithStorage('portalDashboardData', {
+  stats: {
+    registeredEvents: 0,
+    registeredPlayers: 0,
+    totalPoints: 0,
+    clubRank: 0,
+    clubInfo: {
+      club_id: null,
+      club_name: '',
+      category: ''
+    }
+  },
+  leaderboard: []
+});
+
+export const portalStatsAtom = atom(
+  (get) => get(portalDashboardDataAtom).stats,
+  (get, set, update) => {
+    const current = get(portalDashboardDataAtom);
+    set(portalDashboardDataAtom, { ...current, stats: update });
+  }
+);
+
+export const portalLeaderboardAtom = atom(
+  (get) => get(portalDashboardDataAtom).leaderboard,
+  (get, set, update) => {
+    const current = get(portalDashboardDataAtom);
+    set(portalDashboardDataAtom, { ...current, leaderboard: update });
+  }
+);
+
+export const portalStatsLoadingAtom = atom(false);
+export const portalStatsErrorAtom = atom(null);
+export const portalLeaderboardLoadingAtom = atom(false);
+
 
 
 
@@ -141,7 +179,7 @@ export function useResetAllAtoms() {
     setSportsData([]);
     setSportsLoading(false);
     setClubsData([]);
-    setLastFetchTimestamp({ sports: 0, clubs: 0, leaderboard: 0, clubPoints: 0 });
+    setLastFetchTimestamp({ sports: 0, clubs: 0, leaderboard: 0, clubPoints: 0, adminDashboard: 0, portalDashboard: 0 });
     setMatches([]);
     setMatchesLoading(false);
     setMatchesError(null);

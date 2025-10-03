@@ -15,7 +15,7 @@ export default function AnnouncementsCard({ announcements = [] }) {
   const displayAnnouncements = announcements.length > 0 ? announcements : mockAnnouncements;
 
   return (
-    <div className="bg-cranberry/10 border border-cranberry rounded-lg max-h-[700px] min-h-[500px] overflow-y-hidden ">
+    <div className="bg-cranberry/10 border border-cranberry rounded-lg max-h-[700px] min-h-[420px] overflow-y-hidden ">
       <div className="p-6">
         <h2 className="text-xl font-normal text-cranberry text-center mb-6">Announcements</h2>
         
