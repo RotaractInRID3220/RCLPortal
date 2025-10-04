@@ -54,7 +54,7 @@ const PrivateRoute = ({
 
   if (status === 'loading') {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="flex justify-center items-center h-screen w-screen">
         <img src="/load.svg" alt="" className="w-20" />
       </div>
     )

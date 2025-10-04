@@ -16,8 +16,7 @@ export async function GET(request) {
             const { data, error } = await supabase
                 .from('players')
                 .select('*')
-                .eq('club_id', club_id)
-                .order('created_at', { ascending: false });
+                .eq('club_id', club_id);
 
             if (error) {
                 console.error('Error fetching players:', error);

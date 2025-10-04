@@ -37,9 +37,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getAllEvents } from '@/services/sportServices';
+import { APP_CONFIG } from '@/config/app.config';
 
 // Memoized PlayerRow component moved outside to avoid conditional hook usage
-const PlayerRow = React.memo(({ player, isMain, clubMembers, onDeletePlayer }) => {
+const PlayerRow = React.memo(({ player, isMain, clubMembers, onDeletePlayer, isRegistrationAllowed }) => {
     const memberInfo = Array.isArray(clubMembers) ? 
         clubMembers.find(member => member.membership_id === player.RMIS_ID) : null;
     
@@ -60,14 +61,16 @@ const PlayerRow = React.memo(({ player, isMain, clubMembers, onDeletePlayer }) =
                 <p className={`text-xs font-semibold px-2 py-1 rounded-full ${isMain ? 'bg-cranberry/40' : 'bg-white/20'}`}>
                     {isMain ? 'Main' : 'Reserve'}
                 </p>
-                <Button 
-                    size="sm"
-                    className="p-1 h-auto hover:bg-red-500 bg-transparent text-white/60 hover:text-white cursor-pointer"
-                    onClick={() => onDeletePlayer(player)}
-                    title="Remove player"
-                >
-                    <Trash2 size={16} />
-                </Button>
+                {isRegistrationAllowed && (
+                    <Button 
+                        size="sm"
+                        className="p-1 h-auto hover:bg-red-500 bg-transparent text-white/60 hover:text-white cursor-pointer"
+                        onClick={() => onDeletePlayer(player)}
+                        title="Remove player"
+                    >
+                        <Trash2 size={16} />
+                    </Button>
+                )}
             </div>
         </div>
     );
@@ -130,6 +133,13 @@ const SportRegistrationPage = React.memo(() => {
             maxReserve: selectedSportData?.reserve_count || 0
         };
     }, [registeredPlayers, selectedSportData?.max_count, selectedSportData?.reserve_count]);
+
+    // Check if registration/deletion is allowed based on deadline
+    const isRegistrationAllowed = useMemo(() => {
+        const currentDate = new Date();
+        const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
+        return currentDate <= deadlineDate;
+    }, []);
 
     // Optimized fetch functions with caching
     const fetchAllSports = useCallback(async () => {
@@ -333,115 +343,123 @@ const SportRegistrationPage = React.memo(() => {
                 <p className="bg-white/5 border border-white/80 px-4 py-1 rounded-full text-xs text-white/80">{selectedSportData?.gender_type}</p>
             </div>
 
-            
-            <div className="bg-white/5 rounded-lg p-8 ">
-                <h1 className="text-lg mb-6">Register Players</h1>
-                
-                <div className='flex w-full space-x-5'>
-                    <div className="mb-6 w-3/4">
-                        <Popover open={open} onOpenChange={setOpen} className="w-full">
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={open}
-                                    className="w-full justify-between bg-white/5 border-white/20 hover:bg-white/10 hover:text-white text-white"
-                                >
-                                    {selectedValue
-                                        ? selectedValue
-                                        : "Select a player..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-full p-0 bg-black/50 border-white/20" align="start" sideOffset={5} style={{ width: 'var(--radix-popover-trigger-width)' }}>
-                                <Command className="w-full">
-                                    <CommandInput placeholder="Search members..." className="w-full" />
-                                    <CommandList className="w-full">
-                                        <CommandEmpty className="py-6 text-center text-sm text-white/70">No members found.</CommandEmpty>
-                                        <CommandGroup className="max-h-64 overflow-auto">
-                                            {availableClubMembers.length > 0 ? (
-                                                availableClubMembers.map((member) => (
-                                                    <CommandItem
-                                                        key={member.id || member.membership_id}
-                                                        value={member.card_name}
-                                                        onSelect={handleSelectMember}
-                                                        className="hover:bg-white/10 cursor-pointer"
-                                                    >
-                                                        <CheckIcon
-                                                            className={cn(
-                                                                "mr-2 h-4 w-4",
-                                                                selectedValue === member.card_name
-                                                                    ? "opacity-100"
-                                                                    : "opacity-0"
-                                                            )}
-                                                        />
-                                                        {member.card_name}
+            {isRegistrationAllowed && (
+                <div className="bg-white/5 rounded-lg p-8 ">
+                    <h1 className="text-lg mb-6">Register Players</h1>
+                    
+                    <div className='flex w-full space-x-5'>
+                        <div className="mb-6 w-3/4">
+                            <Popover open={open} onOpenChange={setOpen} className="w-full">
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={open}
+                                        className="w-full justify-between bg-white/5 border-white/20 hover:bg-white/10 hover:text-white text-white"
+                                    >
+                                        {selectedValue
+                                            ? selectedValue
+                                            : "Select a player..."}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-full p-0 bg-black/50 border-white/20" align="start" sideOffset={5} style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                                    <Command className="w-full">
+                                        <CommandInput placeholder="Search members..." className="w-full" />
+                                        <CommandList className="w-full">
+                                            <CommandEmpty className="py-6 text-center text-sm text-white/70">No members found.</CommandEmpty>
+                                            <CommandGroup className="max-h-64 overflow-auto">
+                                                {availableClubMembers.length > 0 ? (
+                                                    availableClubMembers.map((member) => (
+                                                        <CommandItem
+                                                            key={member.id || member.membership_id}
+                                                            value={member.card_name}
+                                                            onSelect={handleSelectMember}
+                                                            className="hover:bg-white/10 cursor-pointer"
+                                                        >
+                                                            <CheckIcon
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4",
+                                                                    selectedValue === member.card_name
+                                                                        ? "opacity-100"
+                                                                        : "opacity-0"
+                                                                )}
+                                                            />
+                                                            {member.card_name}
+                                                        </CommandItem>
+                                                    ))
+                                                ) : (
+                                                    <CommandItem disabled>
+                                                        {clubMembers.length === 0 ? 'No club members available' : 'All eligible members already registered'}
                                                     </CommandItem>
-                                                ))
-                                            ) : (
-                                                <CommandItem disabled>
-                                                    {clubMembers.length === 0 ? 'No club members available' : 'All eligible members already registered'}
-                                                </CommandItem>
-                                            )}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                    <Input
-                        type="text"
-                        placeholder="RI number"
-                        value={selectedMember?.ri_number || ""}
-                        onChange={(e) => setSelectedMember({ ...selectedMember, ri_number: e.target.value })}
-                        className="border border-white/20 bg-transparent w-1/4 text-white placeholder:text-white/50"
-                    />
-                </div>
-                <div className="flex items-center space-x-6 mb-4">
-                    <div className="flex items-center space-x-2">
-                        <Checkbox 
-                            id="mainPlayer" 
-                            checked={isMainPlayer} 
-                            onCheckedChange={handleMainPlayerChange}
-                            className="border-white/50 data-[state=checked]:bg-cranberry data-[state=checked]:border-cranberry"
+                                                )}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <Input
+                            type="text"
+                            placeholder="RI number"
+                            value={selectedMember?.ri_number || ""}
+                            onChange={(e) => setSelectedMember({ ...selectedMember, ri_number: e.target.value })}
+                            className="border border-white/20 bg-transparent w-1/4 text-white placeholder:text-white/50"
                         />
-                        <label htmlFor="mainPlayer" className="text-sm text-white/80 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                            Main Player
-                        </label>
+                    </div>
+                    <div className="flex items-center space-x-6 mb-4">
+                        <div className="flex items-center space-x-2">
+                            <Checkbox 
+                                id="mainPlayer" 
+                                checked={isMainPlayer} 
+                                onCheckedChange={handleMainPlayerChange}
+                                className="border-white/50 data-[state=checked]:bg-cranberry data-[state=checked]:border-cranberry"
+                            />
+                            <label htmlFor="mainPlayer" className="text-sm text-white/80 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                Main Player
+                            </label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                            <Checkbox 
+                                id="reservePlayer" 
+                                checked={!isMainPlayer} 
+                                onCheckedChange={handleReservePlayerChange}
+                                className="border-white/50 data-[state=checked]:bg-cranberry data-[state=checked]:border-cranberry"
+                            />
+                            <label htmlFor="reservePlayer" className="text-sm text-white/80 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                Reserve Player
+                            </label>
+                        </div>
                     </div>
                     
-                    <div className="flex items-center space-x-2">
-                        <Checkbox 
-                            id="reservePlayer" 
-                            checked={!isMainPlayer} 
-                            onCheckedChange={handleReservePlayerChange}
-                            className="border-white/50 data-[state=checked]:bg-cranberry data-[state=checked]:border-cranberry"
-                        />
-                        <label htmlFor="reservePlayer" className="text-sm text-white/80 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                            Reserve Player
-                        </label>
-                    </div>
-                </div>
-                
-                {/* Player type selection */}
-                {selectedMember && (
-                    <div className="mb-6 p-4 border border-white/20 rounded-md bg-black/15 grid grid-cols-2">
-                        <h3 className="text-sm text-white/80 mb-3">Selected Player: <span className="font-semibold">{selectedMember.card_name}</span></h3>
-                        <h3 className="text-sm text-white/80 mb-3">RMIS Id: <span className="font-semibold">{selectedMember.membership_id}</span></h3>
-                        <h3 className="text-sm text-white/80 mb-3">Membership status: <span className="font-semibold">{selectedMember.status == 1 ? 'General Member' : 'Prospective Member'}</span></h3>
-                        <h3 className="text-sm text-white/80 mb-3">NIC: <span className="font-semibold">{selectedMember.nic_pp}</span></h3>
+                    {/* Player type selection */}
+                    {selectedMember && (
+                        <div className="mb-6 p-4 border border-white/20 rounded-md bg-black/15 grid grid-cols-2">
+                            <h3 className="text-sm text-white/80 mb-3">Selected Player: <span className="font-semibold">{selectedMember.card_name}</span></h3>
+                            <h3 className="text-sm text-white/80 mb-3">RMIS Id: <span className="font-semibold">{selectedMember.membership_id}</span></h3>
+                            <h3 className="text-sm text-white/80 mb-3">Membership status: <span className="font-semibold">{selectedMember.status == 1 ? 'General Member' : 'Prospective Member'}</span></h3>
+                            <h3 className="text-sm text-white/80 mb-3">NIC: <span className="font-semibold">{selectedMember.nic_pp}</span></h3>
 
-                    </div>
-                )}
-                
-                <Button 
-                    className="bg-cranberry/10 border border-cranberry hover:bg-cranberry cursor-pointer text-white w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!canRegisterPlayer || loading}
-                    onClick={handleRegisterPlayer}
-                >
-                    {loading ? 'Registering...' : 'Register Player'}
-                </Button>
-            </div>
+                        </div>
+                    )}
+                    
+                    <Button 
+                        className="bg-cranberry/10 border border-cranberry hover:bg-cranberry cursor-pointer text-white w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!canRegisterPlayer || loading}
+                        onClick={handleRegisterPlayer}
+                    >
+                        {loading ? 'Registering...' : 'Register Player'}
+                    </Button>
+                </div>
+            )}
+
+            {!isRegistrationAllowed && (
+                <div className="bg-white/5 rounded-lg p-8">
+                    <h1 className="text-lg mb-6">Registration Closed</h1>
+                    <p className="text-white/70">The registration deadline has passed. You can no longer register new players or remove existing ones.</p>
+                </div>
+            )}
 
             <div className="bg-white/5 rounded-lg p-8 mt-10">
                 <div className='flex space-x-4 items-end mb-4'>
@@ -460,6 +478,7 @@ const SportRegistrationPage = React.memo(() => {
                             isMain={true}
                             clubMembers={clubMembers}
                             onDeletePlayer={confirmDeletePlayer}
+                            isRegistrationAllowed={isRegistrationAllowed}
                         />
                     ))}
                     
@@ -471,37 +490,40 @@ const SportRegistrationPage = React.memo(() => {
                             isMain={false}
                             clubMembers={clubMembers}
                             onDeletePlayer={confirmDeletePlayer}
+                            isRegistrationAllowed={isRegistrationAllowed}
                         />
                     ))}
                 </div>
             </div>
             
             {/* Delete Confirmation Dialog */}
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent className="bg-black/80 border-white/20 text-white">
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm Removal</AlertDialogTitle>
-                        <AlertDialogDescription className="text-white/70">
-                            Are you sure you want to remove this player from the team?
-                        </AlertDialogDescription>
-                        {playerToDelete && 
-                            <div className="mt-2 p-2 bg-white/10 rounded-md">
-                                <div className="font-medium">{clubMembers?.find(m => m.membership_id === playerToDelete.RMIS_ID)?.card_name || 'Unknown player'}</div>
-                                <div className="text-sm text-white/50">{playerToDelete.RMIS_ID}</div>
-                            </div>
-                        }
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-transparent border-white/20 text-white hover:bg-white/10 cursor-pointer">Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
-                            onClick={handleDeletePlayer}
-                            className="bg-cranberry hover:bg-cranberry/80 text-white cursor-pointer"
-                        >
-                            Remove
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            {isRegistrationAllowed && (
+                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                    <AlertDialogContent className="bg-black/80 border-white/20 text-white">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm Removal</AlertDialogTitle>
+                            <AlertDialogDescription className="text-white/70">
+                                Are you sure you want to remove this player from the team?
+                            </AlertDialogDescription>
+                            {playerToDelete && 
+                                <div className="mt-2 p-2 bg-white/10 rounded-md">
+                                    <div className="font-medium">{clubMembers?.find(m => m.membership_id === playerToDelete.RMIS_ID)?.card_name || 'Unknown player'}</div>
+                                    <div className="text-sm text-white/50">{playerToDelete.RMIS_ID}</div>
+                                </div>
+                            }
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel className="bg-transparent border-white/20 text-white hover:bg-white/10 cursor-pointer">Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                                onClick={handleDeletePlayer}
+                                className="bg-cranberry hover:bg-cranberry/80 text-white cursor-pointer"
+                            >
+                                Remove
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
         </div>
     );
 });
