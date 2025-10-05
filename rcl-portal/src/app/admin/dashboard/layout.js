@@ -32,7 +32,7 @@ export default function RootLayout({ children }) {
           <div className="lg:w-2/12 lg:block hidden h-screen fixed">
             <AdminSideNav />
           </div>
-          <div className="lg:w-10/12 ml-auto lg:py-16 lg:px-10 py-5 px-3">
+          <div className="lg:w-10/12 lg:ml-auto lg:py-16 w-screen lg:px-10 py-5 px-3">
             <PrivateRoute accessType="admin">
                 <DeviceCheck>
                     {children}
