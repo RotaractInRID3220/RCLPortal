@@ -1,4 +1,12 @@
 // Service functions for user operations
-export const userLogOut = (setUserDetails) => {
-  setUserDetails(null); // Clear user data
+import { signOut } from 'next-auth/react'
+
+export const userLogOut = async (setUserDetails) => {
+  // Clear Jotai atom
+  setUserDetails(null);
+  
+  // Sign out from NextAuth
+  await signOut({ 
+    redirect: false 
+  });
 };

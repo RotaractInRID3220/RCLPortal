@@ -5,15 +5,23 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const sport_id = searchParams.get('sport_id');
+    const limit = parseInt(searchParams.get('limit')) || 20;
+    const offset = parseInt(searchParams.get('offset')) || 0;
 
-    let query = supabase.from('matches').select('*');
-    
+    let query = supabase
+      .from('matches')
+      .select('*', { count: 'exact' })
+      .order('start_time', { ascending: false });
+
     // If sport_id parameter is provided, filter by it
     if (sport_id) {
       query = query.eq('sport_id', sport_id);
     }
 
-    const { data, error } = await query;
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
 
     if (error) {
       console.error('Error fetching matches:', error);
@@ -23,9 +31,13 @@ export async function GET(request) {
       );
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       matches: data || [],
-      filtered_by_sport: sport_id || null 
+      filtered_by_sport: sport_id || null,
+      totalCount: count || 0,
+      limit,
+      offset,
+      totalPages: limit ? Math.ceil((count || 0) / limit) : 1
     });
   } catch (error) {
     console.error('Unexpected error:', error);

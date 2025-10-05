@@ -305,21 +305,42 @@ export const playerConstraintChecks = async (member, selectedSport) => {
 /**
  * Get registrations with player and club data for admin view
  * @param {Object} filters - Filters to apply (sport_id, club_id, etc.)
+ * @param {Object} pagination - Pagination options (page, limit, search) - optional for backward compatibility
  * @returns {Promise<Object>} Combined registration and player data
  */
-export const getRegistrationsWithPlayerData = async (filters = null) => {
+export const getRegistrationsWithPlayerData = async (filters = null, pagination = null) => {
     try {
         let url = '/api/registrations/with-players';
+        const params = new URLSearchParams();
         
         // Add filters as query parameters if provided
         if (filters) {
-            const params = new URLSearchParams({
-                filter: JSON.stringify(filters)
-            });
+            params.append('filter', JSON.stringify(filters));
+        }
+        
+        // Add pagination parameters if provided
+        if (pagination) {
+            if (pagination.page) {
+                params.append('page', pagination.page.toString());
+            }
+            if (pagination.limit) {
+                params.append('limit', pagination.limit.toString());
+            }
+            if (pagination.search && pagination.search.trim()) {
+                params.append('search', pagination.search.trim());
+            }
+        }
+        
+        if (params.toString()) {
             url = `${url}?${params.toString()}`;
         }
         
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            // Add cache headers for better performance on repeated requests
+            headers: {
+                'Cache-Control': 'public, max-age=30', // 30 seconds cache for frequently accessed data
+            }
+        });
         
         if (!response.ok) {
             const errorData = await response.json();

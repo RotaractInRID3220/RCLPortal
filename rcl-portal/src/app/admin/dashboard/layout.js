@@ -2,6 +2,7 @@ import { Bebas_Neue, Poppins } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import PrivateRoute from "@/lib/PrivateRoute";
 import AdminSideNav from "../components/AdminSideNav";
+import DeviceCheck from "../components/DeviceCheck";
 
 const bebas = Bebas_Neue({
   variable: "--font-bebas",
@@ -28,12 +29,14 @@ export default function RootLayout({ children }) {
         className={`${bebas.variable} ${poppins.variable} antialiased dark`}
       >
         <div className="flex w-full">
-          <div className="w-2/12 h-screen fixed">
+          <div className="lg:w-2/12 lg:block hidden h-screen fixed">
             <AdminSideNav />
           </div>
-          <div className="w-10/12 ml-auto py-16 px-10">
-            <PrivateRoute>
-                {children}
+          <div className="lg:w-10/12 lg:ml-auto lg:py-16 w-screen lg:px-10 py-5 px-3">
+            <PrivateRoute accessType="admin">
+                <DeviceCheck>
+                    {children}
+                </DeviceCheck>
                 <Toaster richColors  />
             </PrivateRoute>
           </div>

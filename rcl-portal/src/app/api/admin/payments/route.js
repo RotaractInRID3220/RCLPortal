@@ -11,37 +11,10 @@ export async function GET(request) {
     try {
         const offset = (page - 1) * limit;
 
-        // First, get all clubs for search filtering
-        let clubsToFilter = [];
-        if (search.trim()) {
-            const { data: clubs, error: clubsError } = await supabase
-                .from('clubs')
-                .select('club_id')
-                .ilike('club_name', `%${search.trim()}%`);
-            
-            if (clubsError) {
-                console.error('Error fetching clubs for search:', clubsError);
-                return NextResponse.json({ error: 'Failed to search clubs' }, { status: 500 });
-            }
-            
-            clubsToFilter = clubs?.map(c => c.club_id) || [];
-            
-            // If no clubs match the search, return empty results
-            if (clubsToFilter.length === 0) {
-                return NextResponse.json({
-                    success: true,
-                    payments: [],
-                    totalCount: 0,
-                    totalPages: 0,
-                    currentPage: page
-                });
-            }
-        }
-
-        // Build the payment slips query
+        // Build the payment slips query with JOIN to clubs and search filtering
         let query = supabase
             .from('payment_slips')
-            .select('*', { count: 'exact' });
+            .select(`*, clubs:club_id (club_id, club_name)`, { count: 'exact' });
 
         // Filter by approval status
         if (tab === 'pending') {
@@ -52,9 +25,9 @@ export async function GET(request) {
             query = query.eq('approved', false);
         }
 
-        // Apply club filter if searching
-        if (search.trim() && clubsToFilter.length > 0) {
-            query = query.in('club_id', clubsToFilter);
+        // Apply club name search filter directly in JOIN
+        if (search.trim()) {
+            query = query.ilike('clubs.club_name', `%${search.trim()}%`);
         }
 
         // Order by date (latest first) and apply pagination
@@ -69,29 +42,10 @@ export async function GET(request) {
             return NextResponse.json({ error: 'Failed to fetch payments' }, { status: 500 });
         }
 
-        // Get club names for the payments
-        const uniqueClubIds = [...new Set(payments?.map(p => p.club_id) || [])];
-        let clubsMap = {};
-        
-        if (uniqueClubIds.length > 0) {
-            const { data: clubs, error: clubsError } = await supabase
-                .from('clubs')
-                .select('club_id, club_name')
-                .in('club_id', uniqueClubIds);
-            
-            if (clubsError) {
-                console.error('Error fetching club names:', clubsError);
-            } else {
-                clubsMap = Object.fromEntries(
-                    clubs?.map(club => [club.club_id, club.club_name]) || []
-                );
-            }
-        }
-
-        // Transform the data to include club names
+        // Transform the data to include club names from JOIN
         const transformedPayments = payments?.map(payment => ({
             ...payment,
-            club_name: clubsMap[payment.club_id] || 'Unknown Club'
+            club_name: payment.clubs?.club_name || 'Unknown Club'
         })) || [];
 
         const totalPages = Math.ceil((count || 0) / limit);

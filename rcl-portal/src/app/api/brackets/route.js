@@ -1,16 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient';
 import { NextResponse } from 'next/server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const sport_id = searchParams.get('sport_id') || '1'; // Default to sport_id 1
 
-    // Fetch matches with team and club information
+    // Optimized: Fetch matches with JOINs to teams and clubs in one query
     const { data: matchesData, error: matchesError } = await supabase
       .from('matches')
       .select(`
@@ -24,19 +21,15 @@ export async function GET(request) {
         parent_match1_id,
         parent_match2_id,
         start_time,
-        team1:teams!matches_team1_id_fkey (
+        team1:team1_id (
           team_id,
-          club:clubs (
-            club_id,
-            club_name
-          )
+          seed_number,
+          club:club_id (club_id, club_name)
         ),
-        team2:teams!matches_team2_id_fkey (
+        team2:team2_id (
           team_id,
-          club:clubs (
-            club_id,
-            club_name
-          )
+          seed_number,
+          club:club_id (club_id, club_name)
         )
       `)
       .eq('sport_id', sport_id)

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, Download, Search } from 'lucide-react'
@@ -7,19 +7,20 @@ import { getRegistrationsWithPlayerData } from '@/services/registrationService'
 import RegistrationStats from './RegistrationStats'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
+import { useDebounce } from '@/hooks/useDebounce'
 
-const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
+const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterType }) => {
   const [registrations, setRegistrations] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const itemsPerPage = 8
 
-  useEffect(() => {
-    fetchRegistrations()
-  }, [event, clubId, sportId])
-
-  const fetchRegistrations = async () => {
+  const fetchRegistrations = useCallback(async (page = 1, search = '') => {
     try {
       setLoading(true)
       let filters = {}
@@ -33,9 +34,16 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
         if (sportId) filters.sport_id = parseInt(sportId)
       }
 
-      const result = await getRegistrationsWithPlayerData(filters)
+      const result = await getRegistrationsWithPlayerData(filters, {
+        page,
+        limit: itemsPerPage,
+        search
+      })
+      
       if (result.success) {
         setRegistrations(result.data || [])
+        setTotalPages(result.totalPages || 1)
+        setTotalCount(result.totalCount || result.count || 0)
       } else {
         toast.error('Failed to fetch registrations')
       }
@@ -45,39 +53,50 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [event, clubId, sportId, filterType, itemsPerPage])
 
-  // Filter registrations based on search term
-  const filteredRegistrations = useMemo(() => {
-    if (!searchTerm) return registrations
-    
-    return registrations.filter(registration => {
-      const playerName = registration.players?.name?.toLowerCase() || ''
-      const rmisId = registration.players?.RMIS_ID?.toLowerCase() || ''
-      const clubName = registration.clubs?.club_name?.toLowerCase() || ''
-      const searchLower = searchTerm.toLowerCase()
-      
-      return playerName.includes(searchLower) || 
-             rmisId.includes(searchLower) || 
-             clubName.includes(searchLower)
-    })
-  }, [registrations, searchTerm])
-
-  // Pagination
-  const totalPages = Math.ceil(filteredRegistrations.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentRegistrations = filteredRegistrations.slice(startIndex, endIndex)
-
-  // Reset to first page when search changes
+  // Fetch data when filters or search changes
   useEffect(() => {
+    fetchRegistrations(1, debouncedSearchTerm)
     setCurrentPage(1)
-  }, [searchTerm])
+  }, [fetchRegistrations, debouncedSearchTerm])
 
-  const handleExportExcel = () => {
+  // Fetch data when page changes
+  useEffect(() => {
+    if (currentPage > 1) {
+      fetchRegistrations(currentPage, debouncedSearchTerm)
+    }
+  }, [currentPage, fetchRegistrations, debouncedSearchTerm])
+
+  const handlePageChange = useCallback((newPage) => {
+    setCurrentPage(newPage)
+  }, [])
+
+  const handleExportExcel = useCallback(async () => {
     try {
-      // Prepare data for Excel
-      const excelData = filteredRegistrations.map(registration => ({
+      // Fetch all data for export without pagination
+      const filters = {}
+      if (filterType === 'sport' && event) {
+        filters.sport_id = event.sport_id
+      }
+      if (filterType === 'club') {
+        if (clubId) filters.club_id = parseInt(clubId)
+        if (sportId) filters.sport_id = parseInt(sportId)
+      }
+
+      const result = await getRegistrationsWithPlayerData(filters, {
+        page: 1,
+        limit: 10000, // Large limit for export
+        search: debouncedSearchTerm
+      })
+
+      if (!result.success) {
+        toast.error('Failed to fetch data for export')
+        return
+      }
+
+      // Prepare Excel data
+      const excelData = result.data.map(registration => ({
         'RMIS ID': registration.players?.RMIS_ID || '',
         'Player Name': registration.players?.name || '',
         'Club Name': registration.clubs?.club_name || '',
@@ -102,7 +121,7 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
       if (filterType === 'sport' && event) {
         filename = `${event.sport_name}_registrations`
       } else if (filterType === 'club' && clubId) {
-        const clubName = registrations[0]?.clubs?.club_name || clubId
+        const clubName = result.data[0]?.clubs?.club_name || clubId
         filename = `${clubName}_registrations`
       }
       filename += `_${new Date().toISOString().split('T')[0]}.xlsx`
@@ -114,9 +133,12 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
       console.error('Error exporting Excel:', error)
       toast.error('Failed to export Excel file')
     }
-  }
+  }, [filterType, event, clubId, sportId, debouncedSearchTerm])
 
-  const renderPagination = () => {
+  // Memoized pagination component
+  const PaginationControls = useMemo(() => {
+    if (totalPages <= 1) return null;
+
     const pages = []
     const maxVisiblePages = 5
     
@@ -133,7 +155,7 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
           key={i}
           variant={i === currentPage ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setCurrentPage(i)}
+          onClick={() => handlePageChange(i)}
           className={`
             ${i === currentPage 
               ? 'bg-cranberry hover:bg-cranberry/90 text-white cursor-pointer' 
@@ -151,7 +173,7 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+          onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
           className="bg-transparent border border-white/20 cursor-pointer text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-50"
         >
@@ -161,7 +183,7 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+          onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
           className="bg-transparent border border-white/20 cursor-pointer text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-50"
         >
@@ -169,7 +191,7 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
         </Button>
       </div>
     )
-  }
+  }, [totalPages, currentPage, handlePageChange])
 
   return (
     <div>
@@ -197,11 +219,11 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
         
         <Button
           onClick={handleExportExcel}
-          disabled={filteredRegistrations.length === 0}
+          disabled={totalCount === 0}
           className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 cursor-pointer"
         >
           <Download className="w-4 h-4 mr-2" />
-          Export Excel
+          Export Excel ({totalCount} records)
         </Button>
       </div>
 
@@ -212,7 +234,7 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
       ) : (
         <>
           {/* Stats */}
-          <RegistrationStats registrations={registrations} />
+          <RegistrationStats registrations={registrations} totalCount={totalCount} />
 
           {/* Search */}
           <div className="mb-6">
@@ -230,7 +252,7 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
 
           {/* Registrations List */}
           <div className="bg-white/5 border border-white/20 rounded-lg overflow-hidden">
-            {currentRegistrations.length === 0 ? (
+            {registrations.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-400">
                   {searchTerm ? 'No registrations found matching your search.' : 'No registrations found.'}
@@ -262,7 +284,7 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
-                      {currentRegistrations.map((registration, index) => (
+                      {registrations.map((registration, index) => (
                         <tr key={`${registration.RMIS_ID}-${registration.sport_id}-${index}`} className="hover:bg-white/5">
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                             {registration.players?.name || 'N/A'}
@@ -294,7 +316,12 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && renderPagination()}
+                {PaginationControls}
+                
+                {/* Results info */}
+                <div className="px-6 py-3 bg-white/5 text-sm text-white/70 text-center">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} results
+                </div>
               </>
             )}
           </div>
@@ -302,6 +329,8 @@ const RegistrationsList = ({ event, clubId, sportId, onBack, filterType }) => {
       )}
     </div>
   )
-}
+})
+
+RegistrationsList.displayName = 'RegistrationsList'
 
 export default RegistrationsList
