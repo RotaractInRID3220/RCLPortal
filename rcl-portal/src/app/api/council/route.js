@@ -11,10 +11,15 @@ export async function GET(request) {
         // Handle club members request
         if (clubID) {
             // Get cutoff datetime from environment variable, default to current time if not set
-            const membershipCutoffDate = process.env.NEXT_PUBLIC_MEMBERSHIP_CUTOFF_DATE || new Date().toISOString();
-            console.log('Using membership cutoff date:', membershipCutoffDate);
+            const cutoffDate = process.env.NEXT_PUBLIC_MEMBERSHIP_CUTOFF_DATE ? new Date(process.env.NEXT_PUBLIC_MEMBERSHIP_CUTOFF_DATE) : new Date();
             
-            const sql = 'SELECT * FROM club_membership_data WHERE club_id = ? AND status IN (1, 5) AND created_datetime <= ?';
+            // Format date to match database format: YYYY-MM-DD HH:mm:ss
+            const membershipCutoffDate = cutoffDate.toISOString().slice(0, 19).replace('T', ' ');
+            
+            console.log('Using membership cutoff date:', membershipCutoffDate);
+            console.log('Fetching members for club ID:', clubID);
+            
+            const sql = 'SELECT * FROM club_membership_data WHERE club_id = ? AND status IN (1,3, 5) AND created_datetime <= ?';
 
             const res = await fetch('https://info.rotaract3220.org/api/query', {
                 method: 'POST',
@@ -37,8 +42,11 @@ export async function GET(request) {
 
             // console.log(`Fetched ${clubMembers.length} members for club ${clubID}:`, clubMembers);
 
-            // Remove sensitive fields like m_password from all members
-            const safeMembers = clubMembers.map(({ m_password, ...safeMember }) => safeMember);
+            // Remove sensitive fields like m_password from all members and normalize status
+            const safeMembers = clubMembers.map(({ m_password, status, ...safeMember }) => ({
+                ...safeMember,
+                status: status === 3 ? 1 : status // Replace status 3 with 1
+            }));
 
             return NextResponse.json({ 
                 success: true, 
