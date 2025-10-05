@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAtom } from 'jotai'
 import { userDeetsAtom, loadingAtom } from '@/app/state/store'
+import { APP_CONFIG } from '../../../../config/app.config.js'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,7 +34,7 @@ const PaymentPage = () => {
   const [hasLoadedData, setHasLoadedData] = useState(false)
   const [cleaningPlayers, setCleaningPlayers] = useState(false)
 
-  const registrationFee = parseInt(process.env.NEXT_PUBLIC_REGISTRATION_FEE) || 800
+  const registrationFee = parseInt(APP_CONFIG.REGISTRATION_FEE) || 800
 
   useEffect(() => {
     if (userDetails?.club_id && !hasLoadedData && !dataLoading) {

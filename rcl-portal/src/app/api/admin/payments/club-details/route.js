@@ -1,5 +1,6 @@
 import { supabase } from '../../../../../lib/supabaseClient';
 import { NextResponse } from 'next/server';
+import { APP_CONFIG } from '../../../../../config/app.config.js';
 
 export async function GET(request) {
     const { searchParams } = new URL(request.url);
@@ -10,7 +11,7 @@ export async function GET(request) {
     }
 
     try {
-        const registrationFee = parseInt(process.env.NEXT_PUBLIC_REGISTRATION_FEE) || 800;
+        const registrationFee = parseInt(APP_CONFIG.REGISTRATION_FEE) || 800;
 
         // Use SQL aggregation to get player count and paid amount in one query
         const [{ player_count, paid_amount }, error] = await Promise.all([

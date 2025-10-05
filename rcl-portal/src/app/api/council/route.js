@@ -1,3 +1,5 @@
+
+import { APP_CONFIG } from '../../../config/app.config.js';
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 
@@ -10,8 +12,8 @@ export async function GET(request) {
 
         // Handle club members request
         if (clubID) {
-            // Get cutoff datetime from environment variable, default to current time if not set
-            const cutoffDate = process.env.NEXT_PUBLIC_MEMBERSHIP_CUTOFF_DATE ? new Date(process.env.NEXT_PUBLIC_MEMBERSHIP_CUTOFF_DATE) : new Date();
+            // Get cutoff datetime from app.config.js, default to current time if not set
+            const cutoffDate = APP_CONFIG.MEMBERSHIP_CUTOFF_DATE ? new Date(APP_CONFIG.MEMBERSHIP_CUTOFF_DATE) : new Date();
             
             // Format date to match database format: YYYY-MM-DD HH:mm:ss
             const membershipCutoffDate = cutoffDate.toISOString().slice(0, 19).replace('T', ' ');

@@ -41,7 +41,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Edit, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -83,6 +84,18 @@ const BracketXPage = () => {
     sport_id: selectedSport
   });
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
+
+  // Edit Match dialog state
+  const [isEditMatchDialogOpen, setIsEditMatchDialogOpen] = useState(false);
+  const [editingMatchData, setEditingMatchData] = useState(null);
+  const [editTeam1Open, setEditTeam1Open] = useState(false);
+  const [editTeam2Open, setEditTeam2Open] = useState(false);
+  const [isUpdatingMatch, setIsUpdatingMatch] = useState(false);
+
+  // Delete Match confirmation state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingMatch, setDeletingMatch] = useState(null);
+  const [isDeletingMatch, setIsDeletingMatch] = useState(false);
 
   // Set selectedSport from URL params when component mounts
   useEffect(() => {
@@ -270,9 +283,61 @@ const BracketXPage = () => {
 
       if (error) {
         console.error('Error updating scores:', error);
-        alert('Failed to update scores. Please try again.');
+        toast.error('Failed to update scores. Please try again.');
         return;
       }
+
+      // Check if match is completed and advance winner to parent matches
+      const team1Score = tempScores.team1;
+      const team2Score = tempScores.team2;
+      
+      if (team1Score > 0 && team2Score > 0 && team1Score !== team2Score) {
+        const winnerId = team1Score > team2Score ? editingMatch.teams[0]?.id : editingMatch.teams[1]?.id;
+        const winnerName = team1Score > team2Score ? editingMatch.teams[0]?.name : editingMatch.teams[1]?.name;
+        
+        if (winnerId && winnerName !== 'TBD') {
+          try {
+            // Find parent matches that reference this match
+            const { data: parentMatches, error: parentError } = await supabase
+              .from('matches')
+              .select('match_id, parent_match1_id, parent_match2_id, team1_id, team2_id')
+              .or(`parent_match1_id.eq.${editingMatch.id},parent_match2_id.eq.${editingMatch.id}`)
+              .eq('sport_id', parseInt(params.sportid));
+
+            if (!parentError && parentMatches) {
+              for (const parentMatch of parentMatches) {
+                let updateData = {};
+                
+                if (parentMatch.parent_match1_id === editingMatch.id) {
+                  // This match feeds into team1 position of parent match
+                  updateData.team1_id = winnerId;
+                } else if (parentMatch.parent_match2_id === editingMatch.id) {
+                  // This match feeds into team2 position of parent match
+                  updateData.team2_id = winnerId;
+                }
+
+                if (Object.keys(updateData).length > 0) {
+                  const { error: updateError } = await supabase
+                    .from('matches')
+                    .update(updateData)
+                    .eq('match_id', parentMatch.match_id);
+
+                  if (updateError) {
+                    console.error('Error advancing winner to parent match:', updateError);
+                  } else {
+                    console.log(`Advanced winner (Team ID: ${winnerId}) to parent match ${parentMatch.match_id}`);
+                  }
+                }
+              }
+            }
+          } catch (advanceError) {
+            console.error('Error in winner advancement logic:', advanceError);
+            // Don't show error toast for advancement failures to avoid confusing users
+          }
+        }
+      }
+
+      toast.success('Scores updated successfully!');
 
       // Close dialog and reset state
       setIsScoreDialogOpen(false);
@@ -282,7 +347,7 @@ const BracketXPage = () => {
       // Note: Real-time subscription will automatically update the UI
     } catch (error) {
       console.error('Error saving scores:', error);
-      alert('Failed to update scores. Please try again.');
+      toast.error('Failed to update scores. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -312,7 +377,7 @@ const BracketXPage = () => {
       setTeams(data.teams || []);
     } catch (error) {
       console.error('Error fetching teams:', error);
-      alert('Failed to load teams. Please try again.');
+      toast.error('Failed to load teams. Please try again.');
     } finally {
       setLoadingTeams(false);
     }
@@ -336,13 +401,14 @@ const BracketXPage = () => {
 
   const handleCreateMatch = async () => {
     // Validate required fields
-    if (!newMatch.team1_id || !newMatch.team2_id || !newMatch.round_id || !newMatch.match_order) {
-      alert('Please fill in all required fields');
+    if (newMatch.team1_id === '' || newMatch.team2_id === '' || !newMatch.round_id || !newMatch.match_order) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
-    if (newMatch.team1_id === newMatch.team2_id) {
-      alert('Please select different teams');
+    // Allow both teams to be TBD (null)
+    if (newMatch.team1_id === newMatch.team2_id && newMatch.team1_id !== null) {
+      toast.error('Please select different teams');
       return;
     }
 
@@ -364,6 +430,8 @@ const BracketXPage = () => {
       if (!response.ok) {
         throw new Error('Failed to create match');
       }
+
+      toast.success('Match created successfully!');
 
       // Close dialog and reset
       setIsAddMatchDialogOpen(false);
@@ -389,23 +457,142 @@ const BracketXPage = () => {
 
     } catch (error) {
       console.error('Error creating match:', error);
-      alert('Failed to create match. Please try again.');
+      toast.error('Failed to create match. Please try again.');
     } finally {
       setIsCreatingMatch(false);
     }
   };
 
   const isFormValid = () => {
-    return newMatch.team1_id && 
-           newMatch.team2_id && 
+    return (newMatch.team1_id !== '' && newMatch.team1_id !== undefined) && 
+           (newMatch.team2_id !== '' && newMatch.team2_id !== undefined) && 
            newMatch.round_id && 
-           newMatch.match_order &&
-           newMatch.team1_id !== newMatch.team2_id;
+           newMatch.match_order;
   };
   // END OF ADD MATCH FUNCTIONS
 
+  // EDIT MATCH FUNCTIONS
+  const handleEditMatchClick = (seed) => {
+    setEditingMatchData({
+      match_id: seed.id,
+      team1_id: seed.teams[0]?.id || null,
+      team2_id: seed.teams[1]?.id || null,
+      round_id: seed.round_id,
+      match_order: seed.match_order,
+      parent_match1_id: seed.parent_match1_id || null,
+      parent_match2_id: seed.parent_match2_id || null,
+      start_time: seed.date !== 'TBD' ? seed.date : '',
+      sport_id: parseInt(params.sportid)
+    });
+    fetchTeams();
+    setIsEditMatchDialogOpen(true);
+  };
+
+  const handleUpdateMatch = async () => {
+    if (!editingMatchData) return;
+
+    // Validate required fields
+    if (editingMatchData.team1_id === '' || editingMatchData.team2_id === '') {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (editingMatchData.team1_id === editingMatchData.team2_id) {
+      toast.error('Please select different teams');
+      return;
+    }
+
+    setIsUpdatingMatch(true);
+    try {
+      const response = await fetch('/api/games', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editingMatchData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update match');
+      }
+
+      toast.success('Match updated successfully!');
+
+      // Close dialog and reset
+      setIsEditMatchDialogOpen(false);
+      setEditingMatchData(null);
+
+      // Refresh bracket data
+      const currentSportId = parseInt(params.sportid);
+      const bracketData = await BracketService.getBracketData(currentSportId);
+      setRounds(bracketData);
+      
+      // Update tournament statistics
+      const stats = BracketService.calculateTournamentStats(bracketData);
+      setTournamentStats(stats);
+
+    } catch (error) {
+      console.error('Error updating match:', error);
+      toast.error('Failed to update match. Please try again.');
+    } finally {
+      setIsUpdatingMatch(false);
+    }
+  };
+
+  // DELETE MATCH FUNCTIONS
+  const handleDeleteMatchClick = (seed) => {
+    setDeletingMatch(seed);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingMatch) return;
+
+    setIsDeletingMatch(true);
+    try {
+      const response = await fetch(`/api/games?match_id=${deletingMatch.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete match');
+      }
+
+      toast.success('Match deleted successfully!');
+
+      // Close dialog and reset
+      setIsDeleteDialogOpen(false);
+      setDeletingMatch(null);
+
+      // Refresh bracket data
+      const currentSportId = parseInt(params.sportid);
+      const bracketData = await BracketService.getBracketData(currentSportId);
+      setRounds(bracketData);
+      
+      // Update tournament statistics
+      const stats = BracketService.calculateTournamentStats(bracketData);
+      setTournamentStats(stats);
+
+    } catch (error) {
+      console.error('Error deleting match:', error);
+      toast.error('Failed to delete match. Please try again.');
+    } finally {
+      setIsDeletingMatch(false);
+    }
+  };
+
   // Custom seed component with dark theme styling and edit functionality
   const CustomSeed = ({ seed, breakpoint, roundIndex, seedIndex }) => {
+    const handleEditClick = (e) => {
+      e.stopPropagation();
+      handleEditMatchClick(seed);
+    };
+
+    const handleDeleteClick = (e) => {
+      e.stopPropagation();
+      handleDeleteMatchClick(seed);
+    };
+
     return (
       <Seed mobileBreakpoint={breakpoint} style={{ fontSize: 12 }}>
         <SeedItem 
@@ -414,6 +601,7 @@ const BracketXPage = () => {
             border: seed.status === 'completed' ? '1px solid rgb(34, 197, 94)' : '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '8px',
             padding: '8px',
+            paddingTop: '32px', // Add top padding for buttons
             minHeight: '100px',
             maxWidth: '250px',
             minWidth: '200px',
@@ -421,9 +609,58 @@ const BracketXPage = () => {
             flexDirection: 'column',
             justifyContent: 'center',
             cursor: 'pointer',
+            position: 'relative',
           }}
           onClick={() => handleMatchClick(seed)} // COMMENT OUT THIS LINE TO DISABLE CLICK EDITING
         >
+          {/* Action buttons */}
+          <div style={{ 
+            position: 'absolute', 
+            top: '4px', 
+            right: '4px', 
+            display: 'flex', 
+            gap: '4px',
+            opacity: 0.7,
+            zIndex: 10
+          }}>
+            <button
+              onClick={handleEditClick}
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px',
+                cursor: 'pointer',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
+            >
+              <Edit size={12} />
+            </button>
+            <button
+              onClick={handleDeleteClick}
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px',
+                cursor: 'pointer',
+                color: '#ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.2)'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+
           <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{seed.matchId ? `#${seed.matchId}` : 'Match'}</span>
             <span style={{ fontSize: '10px' }}>{seed.date}</span>
@@ -620,8 +857,10 @@ const BracketXPage = () => {
                     className="w-full justify-between bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
                     disabled={loadingTeams}
                   >
-                    {newMatch.team1_id
-                      ? teams.find((team) => team.team_id.toString() === newMatch.team1_id)?.clubs?.club_name
+                    {newMatch.team1_id !== ''
+                      ? newMatch.team1_id === null 
+                        ? "TBD"
+                        : teams.find((team) => team.team_id.toString() === newMatch.team1_id)?.clubs?.club_name
                       : "Select team..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -634,6 +873,22 @@ const BracketXPage = () => {
                     />
                     <CommandEmpty className="text-gray-400">No team found.</CommandEmpty>
                     <CommandGroup className="max-h-64 overflow-auto">
+                      <CommandItem
+                        key="tbd-team1"
+                        value="TBD"
+                        onSelect={() => {
+                          setNewMatch(prev => ({ ...prev, team1_id: null }));
+                          setTeam1Open(false);
+                        }}
+                        className="text-white hover:bg-gray-700 cursor-pointer"
+                      >
+                        <Check
+                          className={`mr-2 h-4 w-4 ${
+                            newMatch.team1_id === null ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        TBD
+                      </CommandItem>
                       {teams.map((team) => (
                         <CommandItem
                           key={team.team_id}
@@ -670,8 +925,10 @@ const BracketXPage = () => {
                     className="w-full justify-between bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
                     disabled={loadingTeams}
                   >
-                    {newMatch.team2_id
-                      ? teams.find((team) => team.team_id.toString() === newMatch.team2_id)?.clubs?.club_name
+                    {newMatch.team2_id !== ''
+                      ? newMatch.team2_id === null 
+                        ? "TBD"
+                        : teams.find((team) => team.team_id.toString() === newMatch.team2_id)?.clubs?.club_name
                       : "Select team..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -684,6 +941,22 @@ const BracketXPage = () => {
                     />
                     <CommandEmpty className="text-gray-400">No team found.</CommandEmpty>
                     <CommandGroup className="max-h-64 overflow-auto">
+                      <CommandItem
+                        key="tbd-team2"
+                        value="TBD"
+                        onSelect={() => {
+                          setNewMatch(prev => ({ ...prev, team2_id: null }));
+                          setTeam2Open(false);
+                        }}
+                        className="text-white hover:bg-gray-700 cursor-pointer"
+                      >
+                        <Check
+                          className={`mr-2 h-4 w-4 ${
+                            newMatch.team2_id === null ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        TBD
+                      </CommandItem>
                       {teams.map((team) => (
                         <CommandItem
                           key={team.team_id}
@@ -788,7 +1061,7 @@ const BracketXPage = () => {
             </div>
 
             {/* Validation Messages */}
-            {newMatch.team1_id && newMatch.team2_id && newMatch.team1_id === newMatch.team2_id && (
+            {newMatch.team1_id !== '' && newMatch.team2_id !== '' && newMatch.team1_id === newMatch.team2_id && newMatch.team1_id !== null && (
               <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
                 <div className="text-red-400 text-sm">Please select different teams for Team 1 and Team 2</div>
               </div>
@@ -810,6 +1083,280 @@ const BracketXPage = () => {
               className="bg-cranberry/20 hover:bg-cranberry border cursor-pointer border-cranberry text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isCreatingMatch ? 'Creating...' : 'Create Match'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* EDIT MATCH DIALOG */}
+      <Dialog open={isEditMatchDialogOpen} onOpenChange={setIsEditMatchDialogOpen}>
+        <DialogContent className="bg-black/80 border-cranberry/40 backdrop-blur text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Edit Match</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Update match details and teams
+            </DialogDescription>
+          </DialogHeader>
+          
+          {editingMatchData && (
+            <div className="space-y-6 py-4">
+              {/* Team 1 Selection */}
+              <div className="space-y-2">
+                <Label className="text-white font-medium">Team 1</Label>
+                <Popover open={editTeam1Open} onOpenChange={setEditTeam1Open}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={editTeam1Open}
+                      className="w-full justify-between bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
+                      disabled={loadingTeams}
+                    >
+                      {editingMatchData.team1_id
+                        ? editingMatchData.team1_id === null 
+                          ? "TBD"
+                          : teams.find((team) => team.team_id.toString() === editingMatchData.team1_id)?.clubs?.club_name
+                        : "Select team..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0 bg-gray-800 border-gray-600">
+                    <Command className="bg-gray-800">
+                      <CommandInput 
+                        placeholder="Search teams..." 
+                        className="text-white"
+                      />
+                      <CommandEmpty className="text-gray-400">No team found.</CommandEmpty>
+                      <CommandGroup className="max-h-64 overflow-auto">
+                        <CommandItem
+                          key="edit-tbd-team1"
+                          value="TBD"
+                          onSelect={() => {
+                            setEditingMatchData(prev => ({ ...prev, team1_id: null }));
+                            setEditTeam1Open(false);
+                          }}
+                          className="text-white hover:bg-gray-700 cursor-pointer"
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${
+                              editingMatchData.team1_id === null ? "opacity-100" : "opacity-0"
+                            }`}
+                          />
+                          TBD
+                        </CommandItem>
+                        {teams.map((team) => (
+                          <CommandItem
+                            key={team.team_id}
+                            value={team.clubs?.club_name}
+                            onSelect={() => {
+                              setEditingMatchData(prev => ({ ...prev, team1_id: team.team_id.toString() }));
+                              setEditTeam1Open(false);
+                            }}
+                            className="text-white hover:bg-gray-700 cursor-pointer"
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                editingMatchData.team1_id === team.team_id.toString() ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {team.clubs?.club_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Team 2 Selection */}
+              <div className="space-y-2">
+                <Label className="text-white font-medium">Team 2</Label>
+                <Popover open={editTeam2Open} onOpenChange={setEditTeam2Open}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={editTeam2Open}
+                      className="w-full justify-between bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
+                      disabled={loadingTeams}
+                    >
+                      {editingMatchData.team2_id
+                        ? editingMatchData.team2_id === null 
+                          ? "TBD"
+                          : teams.find((team) => team.team_id.toString() === editingMatchData.team2_id)?.clubs?.club_name
+                        : "Select team..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0 bg-gray-800 border-gray-600">
+                    <Command className="bg-gray-800">
+                      <CommandInput 
+                        placeholder="Search teams..." 
+                        className="text-white"
+                      />
+                      <CommandEmpty className="text-gray-400">No team found.</CommandEmpty>
+                      <CommandGroup className="max-h-64 overflow-auto">
+                        <CommandItem
+                          key="edit-tbd-team2"
+                          value="TBD"
+                          onSelect={() => {
+                            setEditingMatchData(prev => ({ ...prev, team2_id: null }));
+                            setEditTeam2Open(false);
+                          }}
+                          className="text-white hover:bg-gray-700 cursor-pointer"
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${
+                              editingMatchData.team2_id === null ? "opacity-100" : "opacity-0"
+                            }`}
+                          />
+                          TBD
+                        </CommandItem>
+                        {teams.map((team) => (
+                          <CommandItem
+                            key={team.team_id}
+                            value={team.clubs?.club_name}
+                            onSelect={() => {
+                              setEditingMatchData(prev => ({ ...prev, team2_id: team.team_id.toString() }));
+                              setEditTeam2Open(false);
+                            }}
+                            className="text-white hover:bg-gray-700 cursor-pointer"
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                editingMatchData.team2_id === team.team_id.toString() ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {team.clubs?.club_name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Round Selection */}
+              <div className="space-y-2">
+                <Label className="text-white font-medium">Round</Label>
+                <Select 
+                  value={editingMatchData.round_id?.toString()} 
+                  onValueChange={(value) => setEditingMatchData(prev => ({ ...prev, round_id: value }))}
+                >
+                  <SelectTrigger className="bg-gray-800 border-gray-600 text-white focus:border-cranberry focus:ring-cranberry">
+                    <SelectValue placeholder="Select round" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-600">
+                    <SelectItem value="0" className="text-white hover:bg-gray-700">1st Round</SelectItem>
+                    <SelectItem value="1" className="text-white hover:bg-gray-700">2nd Round</SelectItem>
+                    <SelectItem value="2" className="text-white hover:bg-gray-700">Quarter Finals</SelectItem>
+                    <SelectItem value="3" className="text-white hover:bg-gray-700">Semi Finals</SelectItem>
+                    <SelectItem value="4" className="text-white hover:bg-gray-700">Consolation Finals</SelectItem>
+                    <SelectItem value="5" className="text-white hover:bg-gray-700">Finals</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Match Order */}
+              <div className="space-y-2">
+                <Label className="text-white font-medium">Match Order</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={editingMatchData.match_order}
+                  onChange={(e) => setEditingMatchData(prev => ({ ...prev, match_order: parseInt(e.target.value) || '' }))}
+                  className="bg-gray-800 border-gray-600 text-white focus:border-cranberry focus:ring-cranberry"
+                  placeholder="Enter match order (1, 2, 3...)"
+                />
+              </div>
+
+              {/* Start Time */}
+              <div className="space-y-2">
+                <Label className="text-white font-medium">Start Time (Optional)</Label>
+                <Input
+                  type="datetime-local"
+                  value={editingMatchData.start_time}
+                  onChange={(e) => setEditingMatchData(prev => ({ ...prev, start_time: e.target.value }))}
+                  className="bg-gray-800 border-gray-600 text-white focus:border-cranberry focus:ring-cranberry [color-scheme:dark]"
+                  placeholder="Select match start time"
+                />
+                <div className="text-xs text-gray-400">
+                  Leave empty if time is not yet determined
+                </div>
+              </div>
+
+              {/* Validation Messages */}
+              {editingMatchData.team1_id !== '' && editingMatchData.team2_id !== '' && editingMatchData.team1_id === editingMatchData.team2_id && editingMatchData.team1_id !== null && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                  <div className="text-red-400 text-sm">Please select different teams for Team 1 and Team 2</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditMatchDialogOpen(false)}
+              className="border-gray-600 text-white hover:bg-gray-800 cursor-pointer"
+              disabled={isUpdatingMatch}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateMatch}
+              disabled={isUpdatingMatch || !editingMatchData || editingMatchData.team1_id === '' || editingMatchData.team2_id === ''}
+              className="bg-cranberry/20 hover:bg-cranberry border cursor-pointer border-cranberry text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isUpdatingMatch ? 'Updating...' : 'Update Match'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE MATCH CONFIRMATION DIALOG */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="bg-black/80 border-red-500/40 backdrop-blur text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Delete Match</DialogTitle>
+            <DialogDescription className="text-gray-300">
+              Are you sure you want to delete this match? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {deletingMatch && (
+            <div className="py-4">
+              <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                <div className="text-sm text-gray-300">
+                  <div className="font-medium mb-2">Match #{deletingMatch.id}</div>
+                  <div className="space-y-1">
+                    <div>Team 1: {deletingMatch.teams[0]?.name || 'TBD'}</div>
+                    <div>Team 2: {deletingMatch.teams[1]?.name || 'TBD'}</div>
+                    <div>Round: {deletingMatch.roundTitle || 'Unknown'}</div>
+                    {deletingMatch.date && deletingMatch.date !== 'TBD' && (
+                      <div>Date: {deletingMatch.date}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              className="border-gray-600 text-white hover:bg-gray-800 cursor-pointer"
+              disabled={isDeletingMatch}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              disabled={isDeletingMatch}
+              className="bg-red-600/20 hover:bg-red-600 border cursor-pointer border-red-600 text-red-400 hover:text-white"
+            >
+              {isDeletingMatch ? 'Deleting...' : 'Delete Match'}
             </Button>
           </DialogFooter>
         </DialogContent>

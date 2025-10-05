@@ -12,6 +12,7 @@ import {
   Trophy,
   Users,
   LogOut,
+  GitBranch,
 } from "lucide-react";
 
 // Navigation items configuration
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { label: "Overview", path: "/portal/dashboard", icon: LayoutDashboard },
   { label: "Registrations", path: "/portal/dashboard/registration", icon: ClipboardList },
   { label: "Payment", path: "/portal/dashboard/payment", icon: CreditCard },
+  { label: "Brackets", path: "/portal/dashboard/bracket", icon: GitBranch },
   { label: "Leaderboard", path: "/portal/dashboard/leaderboard", icon: Trophy },
   { label: "Players", path: "/portal/dashboard/players", icon: Users },
 ];

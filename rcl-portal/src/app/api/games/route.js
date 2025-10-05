@@ -74,3 +74,67 @@ export async function POST(request) {
     );
   }
 }
+
+export async function PUT(request) {
+  try {
+    const body = await request.json();
+    const { match_id, ...updateData } = body;
+    
+    const { data, error } = await supabase
+      .from('matches')
+      .update(updateData)
+      .eq('match_id', match_id)
+      .select();
+
+    if (error) {
+      console.error('Error updating match:', error);
+      return NextResponse.json(
+        { error: 'Failed to update match' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ match: data[0] });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const match_id = searchParams.get('match_id');
+    
+    if (!match_id) {
+      return NextResponse.json(
+        { error: 'match_id is required' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from('matches')
+      .delete()
+      .eq('match_id', match_id);
+
+    if (error) {
+      console.error('Error deleting match:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete match' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
