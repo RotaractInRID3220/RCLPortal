@@ -210,3 +210,38 @@ body {
   min-width: 200px;  /* Set minimum column width */
   max-width: 250px;  /* Set maximum column width */
 }
+
+/* E-Arena Custom Styles */
+.font-belanosima {
+  font-family: 'Belanosima', 'Bebas Neue', sans-serif;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s linear infinite;
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 100%; /* Keep the size fixed */
+  animation: gradient 10s linear infinite; /* Smooth movement */
+}
