@@ -48,7 +48,7 @@ export default function EArenaPage() {
               </h1>
 
               {/* E-ARENA Main Title */}
-              <h2 className="bg-gradient-to-b from-cranberry to-cranberry/20 bg-clip-text text-transparent font-belanosima text-7xl md:text-9xl lg:text-[280px] font-normal leading-[0.9] tracking-tight mb-10 select-none"
+              <h2 className="bg-gradient-to-b from-cranberry to-cranberry/20 bg-clip-text text-transparent font-belanosima text-7xl md:text-9xl lg:text-[200px] xl:text-[280px] font-normal leading-[0.9] tracking-tight mb-10 select-none"
                   style={{ 
                     fontFamily: 'Belanosima, system-ui, sans-serif',
                     WebkitTextStroke: '2px rgba(216, 27, 93, 0.3)',
@@ -57,7 +57,7 @@ export default function EArenaPage() {
               </h2>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-6 justify-center items-center max-w-3xl absolute md:bottom-30 bottom-14 lg:bottom-15 left-0 right-0 mx-auto px-10 sm:px-0">
+              <div className="flex flex-col sm:flex-row gap-6 justify-center items-center max-w-3xl absolute md:bottom-30 bottom-14 lg:bottom-24 xl:bottom-15 left-0 right-0 mx-auto px-10 sm:px-0">
                 <Link
                   href="#handbook"
                   className="group relative w-full sm:w-auto px-12 py-3 bg-cranberry/10 border border-cranberry rounded-lg overflow-hidden transition-all duration-300 hover:bg-cranberry/30 hover:border-cranberry/80 hover:shadow-lg hover:shadow-cranberry/30"
