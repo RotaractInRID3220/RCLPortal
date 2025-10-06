@@ -126,6 +126,17 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+      ::-webkit-scrollbar {
+    width: 6px;
+    background: #000000; /* Bar background */
+  }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.57 0.2173 8.97); /* Cranberry */
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.57 0.2173 8.97 / 0.8);
+  }
 }
 
 /* Hide scrollbars utility class */
