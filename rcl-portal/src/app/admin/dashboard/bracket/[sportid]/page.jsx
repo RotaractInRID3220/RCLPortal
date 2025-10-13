@@ -811,7 +811,8 @@ const BracketXPage = () => {
             background: 'rgba(0, 0, 0, 0.2)',
             borderRadius: '12px',
             padding: '20px',
-          }}>
+          }}
+          className="overflow-x-scroll scrollbar-thumb-only">
             <Bracket 
               rounds={rounds}
               renderSeedComponent={CustomSeed}

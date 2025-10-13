@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckIcon, ChevronsUpDown, X } from "lucide-react";
+import { CheckIcon, ChevronsUpDown, X, Clock, Lock, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Command,
@@ -56,7 +56,7 @@ const PlayerRow = React.memo(({ player, isMain, clubMembers, onDeletePlayer, isR
             </div>
             <div className="flex space-x-4 items-center">
                 <p className="text-xs px-2 py-1 bg-white/10 rounded-full">
-                    {memberInfo?.status === 1 ? 'Active' : memberInfo?.status === 5 ? 'Prospective' : 'Unknown'}
+                    {memberInfo?.status === 1 ? 'General' : memberInfo?.status === 5 ? 'Prospective' : 'Unknown'}
                 </p>
                 <p className={`text-xs font-semibold px-2 py-1 rounded-full ${isMain ? 'bg-cranberry/40' : 'bg-white/20'}`}>
                     {isMain ? 'Main' : 'Reserve'}
@@ -137,8 +137,38 @@ const SportRegistrationPage = React.memo(() => {
     // Check if registration/deletion is allowed based on deadline
     const isRegistrationAllowed = useMemo(() => {
         const currentDate = new Date();
+        const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
         const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
-        return currentDate <= deadlineDate;
+        return currentDate >= openingDate && currentDate <= deadlineDate;
+    }, []);
+
+    // Determine registration status for UI display
+    const registrationStatus = useMemo(() => {
+        const currentDate = new Date();
+        const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
+        const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
+        
+        if (currentDate < openingDate) return 'not-open';
+        if (currentDate > deadlineDate) return 'closed';
+        return 'open';
+    }, []);
+
+    // Calculate days until opening/closing for better UX
+    const daysInfo = useMemo(() => {
+        const currentDate = new Date();
+        const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
+        const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
+        
+        if (currentDate < openingDate) {
+            const diffTime = openingDate - currentDate;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return { days: diffDays, type: 'until-open' };
+        } else if (currentDate <= deadlineDate) {
+            const diffTime = deadlineDate - currentDate;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return { days: diffDays, type: 'until-close' };
+        }
+        return { days: 0, type: 'closed' };
     }, []);
 
     // Optimized fetch functions with caching
@@ -164,6 +194,7 @@ const SportRegistrationPage = React.memo(() => {
     }, [sportsData.length, lastFetchTimestamp.sports, setSportsData, setLastFetchTimestamp]);
 
     const fetchRegisteredPlayers = useCallback(async () => {
+        if (!userDeets || !userDeets.club_id) return;
         try {
             const response = await getRegistrations({ 
                 sport_id: params.sportid, 
@@ -179,7 +210,7 @@ const SportRegistrationPage = React.memo(() => {
             console.error('Error fetching registered players:', error);
             setRegisteredPlayers([]);
         }
-    }, [params.sportid, userDeets.club_id]);
+    }, [params.sportid, userDeets]);
 
     useEffect(() => {
         const initializeData = async () => {
@@ -199,13 +230,17 @@ const SportRegistrationPage = React.memo(() => {
             const foundSport = currentSportsData.find(event => event.sport_id === sportId);
             setSelectedSportData(foundSport);
 
-            // Fetch registered players
-            await fetchRegisteredPlayers();
             setLoading(false);
         };
 
         initializeData();
     }, []);
+
+    useEffect(() => {
+        if (userDeets && userDeets.club_id && params.sportid) {
+            fetchRegisteredPlayers();
+        }
+    }, [userDeets, params.sportid, fetchRegisteredPlayers]);
 
 
     
@@ -284,6 +319,11 @@ const SportRegistrationPage = React.memo(() => {
     const canRegisterPlayer = useMemo(() => {
         if (!selectedMember) return false;
 
+        // For general members (status 1), RI number is required
+        if (selectedMember.status === 1 && (!selectedMember.ri_number || selectedMember.ri_number.trim() === '')) {
+            return false;
+        }
+
         if (isMainPlayer) {
             return playerCounts.mainPlayers < playerCounts.maxMain;
         } else {
@@ -343,121 +383,195 @@ const SportRegistrationPage = React.memo(() => {
                 <p className="bg-white/5 border border-white/80 px-4 py-1 rounded-full text-xs text-white/80">{selectedSportData?.gender_type}</p>
             </div>
 
-            {isRegistrationAllowed && (
-                <div className="bg-white/5 rounded-lg p-8 ">
-                    <h1 className="text-lg mb-6">Register Players</h1>
-                    
-                    <div className='flex w-full space-x-5'>
-                        <div className="mb-6 w-3/4">
-                            <Popover open={open} onOpenChange={setOpen} className="w-full">
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        role="combobox"
-                                        aria-expanded={open}
-                                        className="w-full justify-between bg-white/5 border-white/20 hover:bg-white/10 hover:text-white text-white"
-                                    >
-                                        {selectedValue
-                                            ? selectedValue
-                                            : "Select a player..."}
-                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-full p-0 bg-black/50 border-white/20" align="start" sideOffset={5} style={{ width: 'var(--radix-popover-trigger-width)' }}>
-                                    <Command className="w-full">
-                                        <CommandInput placeholder="Search members..." className="w-full" />
-                                        <CommandList className="w-full">
-                                            <CommandEmpty className="py-6 text-center text-sm text-white/70">No members found.</CommandEmpty>
-                                            <CommandGroup className="max-h-64 overflow-auto">
-                                                {availableClubMembers.length > 0 ? (
-                                                    availableClubMembers.map((member) => (
-                                                        <CommandItem
-                                                            key={member.id || member.membership_id}
-                                                            value={member.card_name}
-                                                            onSelect={handleSelectMember}
-                                                            className="hover:bg-white/10 cursor-pointer"
-                                                        >
-                                                            <CheckIcon
-                                                                className={cn(
-                                                                    "mr-2 h-4 w-4",
-                                                                    selectedValue === member.card_name
-                                                                        ? "opacity-100"
-                                                                        : "opacity-0"
-                                                                )}
-                                                            />
-                                                            {member.card_name}
-                                                        </CommandItem>
-                                                    ))
-                                                ) : (
-                                                    <CommandItem disabled>
-                                                        {clubMembers.length === 0 ? 'No club members available' : 'All eligible members already registered'}
-                                                    </CommandItem>
-                                                )}
-                                            </CommandGroup>
-                                        </CommandList>
-                                    </Command>
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <Input
-                            type="text"
-                            placeholder="RI number"
-                            value={selectedMember?.ri_number || ""}
-                            onChange={(e) => setSelectedMember({ ...selectedMember, ri_number: e.target.value })}
-                            className="border border-white/20 bg-transparent w-1/4 text-white placeholder:text-white/50"
-                        />
-                    </div>
-                    <div className="flex items-center space-x-6 mb-4">
-                        <div className="flex items-center space-x-2">
-                            <Checkbox 
-                                id="mainPlayer" 
-                                checked={isMainPlayer} 
-                                onCheckedChange={handleMainPlayerChange}
-                                className="border-white/50 data-[state=checked]:bg-cranberry data-[state=checked]:border-cranberry"
-                            />
-                            <label htmlFor="mainPlayer" className="text-sm text-white/80 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                Main Player
-                            </label>
+            {registrationStatus === 'open' && (
+                <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-lg p-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full -mr-16 -mt-16"></div>
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center space-x-3">
+                                <div className="p-2 bg-green-500/20 rounded-full">
+                                    <CheckIcon className="w-6 h-6 text-green-400" />
+                                </div>
+                                <h1 className="text-xl font-semibold text-white">Register Players</h1>
+                            </div>
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-1">
+                                <span className="text-sm text-green-300">
+                                    {daysInfo.days} day{daysInfo.days !== 1 ? 's' : ''} left to register
+                                </span>
+                            </div>
                         </div>
                         
-                        <div className="flex items-center space-x-2">
-                            <Checkbox 
-                                id="reservePlayer" 
-                                checked={!isMainPlayer} 
-                                onCheckedChange={handleReservePlayerChange}
-                                className="border-white/50 data-[state=checked]:bg-cranberry data-[state=checked]:border-cranberry"
-                            />
-                            <label htmlFor="reservePlayer" className="text-sm text-white/80 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                Reserve Player
-                            </label>
+                        <div className='flex w-full space-x-5'>
+                            <div className={`mb-6 ${selectedMember?.status === 1 ? 'w-3/4' : 'w-full'}`}>
+                                <Popover open={open} onOpenChange={setOpen} className="w-full">
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={open}
+                                            className="w-full justify-between bg-white/5 border-white/20 hover:bg-white/10 hover:text-white text-white"
+                                        >
+                                            {selectedValue
+                                                ? selectedValue
+                                                : "Select a player..."}
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-full p-0 bg-black/50 border-white/20" align="start" sideOffset={5} style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                                        <Command className="w-full">
+                                            <CommandInput placeholder="Search members..." className="w-full" />
+                                            <CommandList className="w-full">
+                                                <CommandEmpty className="py-6 text-center text-sm text-white/70">No members found.</CommandEmpty>
+                                                <CommandGroup className="max-h-64 overflow-auto">
+                                                    {availableClubMembers.length > 0 ? (
+                                                        availableClubMembers.map((member) => (
+                                                            <CommandItem
+                                                                key={member.id || member.membership_id}
+                                                                value={member.card_name}
+                                                                onSelect={handleSelectMember}
+                                                                className="hover:bg-white/10 cursor-pointer"
+                                                            >
+                                                                <CheckIcon
+                                                                    className={cn(
+                                                                        "mr-2 h-4 w-4",
+                                                                        selectedValue === member.card_name
+                                                                            ? "opacity-100"
+                                                                            : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                {member.card_name}
+                                                            </CommandItem>
+                                                        ))
+                                                    ) : (
+                                                        <CommandItem disabled>
+                                                            {clubMembers.length === 0 ? 'No club members available' : 'All eligible members already registered'}
+                                                        </CommandItem>
+                                                    )}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            {selectedMember?.status === 1 && (
+                                <Input
+                                    type="text"
+                                    placeholder="RI number"
+                                    value={selectedMember?.ri_number || ""}
+                                    onChange={(e) => setSelectedMember({ ...selectedMember, ri_number: e.target.value })}
+                                    className="border border-white/20 bg-transparent w-1/4 text-white placeholder:text-white/50"
+                                />
+                            )}
                         </div>
+                        <div className="flex items-center space-x-6 mb-4">
+                            <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id="mainPlayer" 
+                                    checked={isMainPlayer} 
+                                    onCheckedChange={handleMainPlayerChange}
+                                    className="border-white/50 data-[state=checked]:bg-cranberry data-[state=checked]:border-cranberry"
+                                />
+                                <label htmlFor="mainPlayer" className="text-sm text-white/80 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    Main Player
+                                </label>
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id="reservePlayer" 
+                                    checked={!isMainPlayer} 
+                                    onCheckedChange={handleReservePlayerChange}
+                                    className="border-white/50 data-[state=checked]:bg-cranberry data-[state=checked]:border-cranberry"
+                                />
+                                <label htmlFor="reservePlayer" className="text-sm text-white/80 leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                    Reserve Player
+                                </label>
+                            </div>
+                        </div>
+                        
+                        {/* Player type selection */}
+                        {selectedMember && (
+                            <div className="mb-6 p-4 border border-white/20 rounded-md bg-black/15 grid grid-cols-2">
+                                <h3 className="text-sm text-white/80 mb-3">Selected Player: <span className="font-semibold">{selectedMember.card_name}</span></h3>
+                                <h3 className="text-sm text-white/80 mb-3">RMIS Id: <span className="font-semibold">{selectedMember.membership_id}</span></h3>
+                                <h3 className="text-sm text-white/80 mb-3">Membership status: <span className="font-semibold">{selectedMember.status == 1 ? 'General Member' : 'Prospective Member'}</span></h3>
+                                {selectedMember.status === 1 && (
+                                    <h3 className="text-sm text-white/80 mb-3">RI Number: <span className="font-semibold">{selectedMember.ri_number || 'Not provided'}</span></h3>
+                                )}
+                                <h3 className="text-sm text-white/80 mb-3">NIC: <span className="font-semibold">{selectedMember.nic_pp}</span></h3>
+                            </div>
+                        )}
+                        
+                        <Button 
+                            className="bg-cranberry/10 border border-cranberry hover:bg-cranberry cursor-pointer text-white w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!canRegisterPlayer || loading}
+                            onClick={handleRegisterPlayer}
+                        >
+                            {loading ? 'Registering...' : 'Register Player'}
+                        </Button>
                     </div>
-                    
-                    {/* Player type selection */}
-                    {selectedMember && (
-                        <div className="mb-6 p-4 border border-white/20 rounded-md bg-black/15 grid grid-cols-2">
-                            <h3 className="text-sm text-white/80 mb-3">Selected Player: <span className="font-semibold">{selectedMember.card_name}</span></h3>
-                            <h3 className="text-sm text-white/80 mb-3">RMIS Id: <span className="font-semibold">{selectedMember.membership_id}</span></h3>
-                            <h3 className="text-sm text-white/80 mb-3">Membership status: <span className="font-semibold">{selectedMember.status == 1 ? 'General Member' : 'Prospective Member'}</span></h3>
-                            <h3 className="text-sm text-white/80 mb-3">NIC: <span className="font-semibold">{selectedMember.nic_pp}</span></h3>
-
-                        </div>
-                    )}
-                    
-                    <Button 
-                        className="bg-cranberry/10 border border-cranberry hover:bg-cranberry cursor-pointer text-white w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={!canRegisterPlayer || loading}
-                        onClick={handleRegisterPlayer}
-                    >
-                        {loading ? 'Registering...' : 'Register Player'}
-                    </Button>
                 </div>
             )}
 
-            {!isRegistrationAllowed && (
-                <div className="bg-white/5 rounded-lg p-8">
-                    <h1 className="text-lg mb-6">Registration Closed</h1>
-                    <p className="text-white/70">The registration deadline has passed. You can no longer register new players or remove existing ones.</p>
+            {registrationStatus === 'not-open' && (
+                <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16"></div>
+                    <div className="relative z-10">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="p-2 bg-blue-500/20 rounded-full">
+                                <Clock className="w-6 h-6 text-blue-400" />
+                            </div>
+                            <h1 className="text-xl font-semibold text-white">Registrations Not Yet Open</h1>
+                        </div>
+                        <p className="text-white/70 mb-4">
+                            Player registrations will open on <span className="font-semibold text-blue-300">
+                                {new Date(APP_CONFIG.REGISTRATION_OPENING_DATE).toLocaleDateString('en-US', { 
+                                    weekday: 'long', 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                })}
+                            </span>
+                        </p>
+                        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                            <div className="flex items-center space-x-2">
+                                <Calendar className="w-4 h-4 text-blue-400" />
+                                <span className="text-sm text-blue-300">
+                                    {daysInfo.days} day{daysInfo.days !== 1 ? 's' : ''} remaining until registrations open
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {registrationStatus === 'closed' && (
+                <div className="bg-gradient-to-br from-red-500/10 to-orange-500/10 border border-red-500/20 rounded-lg p-8 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -mr-16 -mt-16"></div>
+                    <div className="relative z-10">
+                        <div className="flex items-center space-x-3 mb-4">
+                            <div className="p-2 bg-red-500/20 rounded-full">
+                                <Lock className="w-6 h-6 text-red-400" />
+                            </div>
+                            <h1 className="text-xl font-semibold text-white">Registration Period Closed</h1>
+                        </div>
+                        <p className="text-white/70 mb-4">
+                            The registration deadline has passed. No further changes can be made to team rosters.
+                        </p>
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
+                            <div className="flex items-center space-x-2">
+                                <X className="w-4 h-4 text-red-400" />
+                                <span className="text-sm text-red-300">
+                                    Registration closed on {new Date(APP_CONFIG.REGISTRATION_DEADLINE).toLocaleDateString('en-US', { 
+                                        weekday: 'long', 
+                                        year: 'numeric', 
+                                        month: 'long', 
+                                        day: 'numeric' 
+                                    })}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -497,7 +611,7 @@ const SportRegistrationPage = React.memo(() => {
             </div>
             
             {/* Delete Confirmation Dialog */}
-            {isRegistrationAllowed && (
+            {registrationStatus === 'open' && (
                 <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                     <AlertDialogContent className="bg-black/80 border-white/20 text-white">
                         <AlertDialogHeader>

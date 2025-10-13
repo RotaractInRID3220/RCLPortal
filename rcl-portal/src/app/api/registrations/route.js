@@ -109,15 +109,15 @@ export async function POST(request) {
     }
 
     try {
-        // First check if registration already exists
+        // First check if registration already exists - optimized query
         const { data: existingRegistration, error: checkError } = await supabase
             .from('registrations')
-            .select()
+            .select('RMIS_ID, sport_id, main_player, club_id')
             .eq('RMIS_ID', member.membership_id)
             .eq('sport_id', sport_id)
-            .single();
+            .maybeSingle();
         
-        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        if (checkError) {
             console.error('API: Error checking existing registration:', checkError);
             return NextResponse.json({ error: 'Failed to check registration status' }, { status: 500 });
         }
@@ -132,15 +132,16 @@ export async function POST(request) {
             }, { status: 200 });
         }
         
-        // If registration doesn't exist yet, insert a new record
+        // If registration doesn't exist yet, insert a new record - optimized insert
         const { data, error } = await supabase
             .from('registrations')
-            .insert([{ 
-                RMIS_ID : member.membership_id,
-                sport_id : sport_id,
-                main_player : isMainPlayer,
-                club_id : member.club_id
-            }]);
+            .insert({ 
+                RMIS_ID: member.membership_id,
+                sport_id: sport_id,
+                main_player: isMainPlayer,
+                club_id: member.club_id
+            })
+            .select('RMIS_ID, sport_id, main_player, club_id');
 
         if (error) {
             console.error('API: Error registering member:', error);
