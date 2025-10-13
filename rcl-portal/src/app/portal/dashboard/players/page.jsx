@@ -27,6 +27,13 @@ const PlayersPage = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const itemsPerPage = 10
 
+  // Check if registration deadline has passed
+  const isAfterDeadline = useMemo(() => {
+    const currentDate = new Date();
+    const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
+    return currentDate > deadlineDate;
+  }, []);
+
   useEffect(() => {
     if (userDetails?.club_id && !hasLoadedData && !dataLoading) {
       fetchPlayers()
@@ -183,35 +190,37 @@ const PlayersPage = () => {
     <div>
       <div className="flex w-full justify-between items-center mb-8">
         <h1 className="text-3xl font-semibold tracking-wide">PLAYERS</h1>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              disabled={cleaningPlayers}
-              className="bg-red-500/20 border border-red-500 hover:bg-red-500/30 text-red-200"
-            >
-              <UserMinus className="w-4 h-4 mr-2" />
-              {cleaningPlayers ? 'Cleaning...' : 'Clean Players'}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="bg-gray-900 border-gray-700">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-white">Clean Players</AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-300">
-                This will remove all players from your club who don't have any sport registrations.
-                This action cannot be undone. Are you sure you want to continue?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600">Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={cleanPlayers}
-                className="bg-red-600 hover:bg-red-700"
+        {!isAfterDeadline && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                disabled={cleaningPlayers}
+                className="bg-red-500/20 border border-red-500 hover:bg-red-500/30 text-red-200"
               >
-                Clean Players
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                <UserMinus className="w-4 h-4 mr-2" />
+                {cleaningPlayers ? 'Cleaning...' : 'Clean Players'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="bg-gray-900 border-gray-700">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-white">Clean Players</AlertDialogTitle>
+                <AlertDialogDescription className="text-gray-300">
+                  This will remove all players from your club who don't have any sport registrations.
+                  This action cannot be undone. Are you sure you want to continue?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={cleanPlayers}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Clean Players
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {/* Warning message for low general member percentage */}
