@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { userLogOut } from "@/services/userServices";
 import { useAtom } from "jotai";
 import { useRouter, usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import React from "react";
 import {
   LayoutDashboard,
@@ -15,18 +16,20 @@ import {
   UsersRound,
   CreditCard,
   LogOut,
+  Shield,
 } from "lucide-react";
 
-// Navigation items configuration
+// Navigation items configuration with permission requirements
 const NAV_ITEMS = [
-  { label: "Overview", path: "/admin/dashboard", icon: LayoutDashboard },
-  { label: "Events", path: "/admin/dashboard/events", icon: Calendar },
-  { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users },
-  { label: "Bracket", path: "/admin/dashboard/bracket", icon: GitBranch },
-  { label: "Leaderboard", path: "/admin/dashboard/leaderboard", icon: Trophy },
-  { label: "Registrations", path: "/admin/dashboard/registrations", icon: ClipboardList },
-  { label: "Teams", path: "/admin/dashboard/teams", icon: UsersRound },
-  { label: "Payments", path: "/admin/dashboard/payments", icon: CreditCard },
+  { label: "Overview", path: "/admin/dashboard", icon: LayoutDashboard, permission: "basic" }, // Basic admin access
+  { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users, permission: "super_admin" }, // Requires explicit admin permission
+  { label: "Events", path: "/admin/dashboard/events", icon: Calendar, permission: "admin" },
+  { label: "Registrations", path: "/admin/dashboard/registrations", icon: ClipboardList, permission: "basic" },
+  { label: "Teams", path: "/admin/dashboard/teams", icon: UsersRound, permission: "admin" },
+  { label: "Bracket", path: "/admin/dashboard/bracket", icon: GitBranch, permission: "basic" },
+  { label: "Leaderboard", path: "/admin/dashboard/leaderboard", icon: Trophy, permission: "basic" },
+  { label: "Payments", path: "/admin/dashboard/payments", icon: CreditCard, permission: "super_admin" }, // Requires explicit admin permission
+  { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },
 ];
 
 // Reusable NavLink component
@@ -55,6 +58,7 @@ const NavLink = ({ label, path, icon: Icon, isActive, onClick }) => (
 
 const AdminSideNav = () => {
   const [userDetails, setUserDetails] = useAtom(userDeetsAtom);
+  const { data: session } = useSession();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -65,6 +69,42 @@ const AdminSideNav = () => {
   const handleNavigation = (path) => {
     router.push(path);
   };
+
+  // Filter navigation items based on user permissions
+  const userPermissionLevel = session?.user?.permission_level;
+  const userRoleId = session?.user?.role_id;
+  const isBasicAdmin = [1, 2, 3, 4].includes(userRoleId);
+  
+  const filteredNavItems = NAV_ITEMS.filter((item) => {
+    // Basic permission: accessible to all role 1-4 users
+    if (item.permission === "basic" && isBasicAdmin) {
+      return true;
+    }
+    
+    // Admin permission: requires explicit admin or super_admin permission
+    if (item.permission === "admin") {
+      if (!userPermissionLevel) return false;
+      
+      const permissionHierarchy = { 'admin': 1, 'super_admin': 2 };
+      const requiredLevel = permissionHierarchy[item.permission];
+      const userLevel = permissionHierarchy[userPermissionLevel];
+      
+      return userLevel >= requiredLevel;
+    }
+    
+    // Super admin permission: requires explicit super_admin permission
+    if (item.permission === "super_admin") {
+      if (!userPermissionLevel) return false;
+      
+      const permissionHierarchy = { 'admin': 1, 'super_admin': 2 };
+      const requiredLevel = permissionHierarchy[item.permission];
+      const userLevel = permissionHierarchy[userPermissionLevel];
+      
+      return userLevel >= requiredLevel;
+    }
+    
+    return false; // Fallback
+  });
 
   return (
     <div
@@ -85,7 +125,7 @@ const AdminSideNav = () => {
 
           {/* Navigation Links */}
           <nav className="w-full flex flex-col space-y-2" aria-label="Admin navigation">
-            {NAV_ITEMS.map((item) => (
+            {filteredNavItems.map((item) => (
               <NavLink
                 key={item.path}
                 label={item.label}

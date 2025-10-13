@@ -21,6 +21,7 @@ import { createEvent, getAllEvents } from '@/services/sportServices';
 import { toast } from 'sonner';
 import { useAtom } from 'jotai';
 import { sportsDataAtom, sportsLoadingAtom } from '@/app/state/store';
+import PrivateRoute from '@/lib/PrivateRoute';
 
 const page = () => {
     const[addEvent, setAddEvent] = useState(false);
@@ -163,6 +164,7 @@ const page = () => {
     };
 
     return (
+        <PrivateRoute requiredPermission="admin"  accessType="admin">
         <div>
             <div className="flex w-full justify-between items-center mb-8">
                 <h1 className="text-3xl font-semibold tracking-wide">EVENTS</h1>
@@ -376,6 +378,7 @@ const page = () => {
                 </div>
             )}
         </div>
+        </PrivateRoute>
     )
 }
 

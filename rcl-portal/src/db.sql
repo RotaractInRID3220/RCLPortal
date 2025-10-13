@@ -113,3 +113,9 @@ CREATE TABLE public.track_events (
     CONSTRAINT track_events_pkey PRIMARY KEY (id),
     CONSTRAINT track_events_sport_id_fkey FOREIGN KEY (sport_id) REFERENCES public.events(sport_id)
 );
+CREATE TABLE public.permissions (
+    RMIS_ID text NOT NULL,
+    permission_level text NOT NULL,
+    card_name text,
+    CONSTRAINT permissions_pkey PRIMARY KEY (RMIS_ID)
+);

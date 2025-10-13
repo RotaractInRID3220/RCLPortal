@@ -7,7 +7,8 @@ const PrivateRoute = ({
   children, 
   allowedRoles = [], 
   accessType = 'admin', // 'admin' or 'portal'
-  redirectTo 
+  redirectTo,
+  requiredPermission // 'admin' or 'super_admin'
 }) => {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -45,7 +46,28 @@ const PrivateRoute = ({
       return
     }
 
-  }, [session, status, router, finalRedirectTo, allowedRoles, accessType])
+    // Check permission level if required
+    if (requiredPermission) {
+      const userLevel = session.user.permission_level;
+      if (!userLevel) {
+        console.log('Permission access denied, no permission level set')
+        router.push('/unauthorized')
+        return
+      }
+      
+      // Permission hierarchy: super_admin > admin
+      const permissionHierarchy = { 'admin': 1, 'super_admin': 2 };
+      const requiredLevel = permissionHierarchy[requiredPermission];
+      const userPermissionLevel = permissionHierarchy[userLevel];
+      
+      if (!requiredLevel || !userPermissionLevel || userPermissionLevel < requiredLevel) {
+        console.log('Permission access denied, user level:', userLevel, 'required:', requiredPermission)
+        router.push('/unauthorized')
+        return
+      }
+    }
+
+  }, [session, status, router, finalRedirectTo, allowedRoles, accessType, requiredPermission])
 
   // If we're on the login page, don't apply PrivateRoute logic
   if (pathname === finalRedirectTo) {
@@ -80,6 +102,23 @@ const PrivateRoute = ({
   // Check specific role access if specified
   if (allowedRoles.length > 0 && !allowedRoles.includes(session.user.role_id)) {
     return <div>Access Denied - Insufficient Permissions</div>
+  }
+
+  // Check permission level if required
+  if (requiredPermission) {
+    const userLevel = session.user.permission_level;
+    if (!userLevel) {
+      return <div>Access Denied - Insufficient Permissions</div>
+    }
+    
+    // Permission hierarchy: super_admin > admin
+    const permissionHierarchy = { 'admin': 1, 'super_admin': 2 };
+    const requiredLevel = permissionHierarchy[requiredPermission];
+    const userPermissionLevel = permissionHierarchy[userLevel];
+    
+    if (!requiredLevel || !userPermissionLevel || userPermissionLevel < requiredLevel) {
+      return <div>Access Denied - Insufficient Permissions</div>
+    }
   }
 
   return <>{children}</>

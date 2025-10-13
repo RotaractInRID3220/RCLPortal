@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { createHash } from "crypto"
+import { supabase } from '@/lib/supabaseClient'
 
 const handler = NextAuth({
   providers: [
@@ -62,6 +63,19 @@ const handler = NextAuth({
           // Remove sensitive data and return user
           const { m_password, ...safeUser } = user
           
+          // Fetch permission level
+          let permission_level = null;
+          if (safeUser.membership_id) {
+            const { data, error } = await supabase
+              .from('permissions')
+              .select('permission_level')
+              .eq('RMIS_ID', safeUser.membership_id)
+              .single();
+            if (!error && data) {
+              permission_level = data.permission_level;
+            }
+          }
+          
           return {
             id: safeUser.id || safeUser.m_id,
             email: safeUser.m_username,
@@ -69,7 +83,8 @@ const handler = NextAuth({
             role_id: safeUser.role_id,
             hasAdminAccess: [1,2,3,4].includes(safeUser.role_id),
             hasPortalAccess: [1,2,3,4,5,6].includes(safeUser.role_id),
-            userDeets: safeUser
+            userDeets: safeUser,
+            permission_level: permission_level
           }
         } catch (error) {
           console.error('Auth error:', error)
@@ -86,6 +101,7 @@ const handler = NextAuth({
         token.hasAdminAccess = user.hasAdminAccess
         token.hasPortalAccess = user.hasPortalAccess
         token.userDeets = user.userDeets
+        token.permission_level = user.permission_level
       }
       return token
     },
@@ -95,6 +111,7 @@ const handler = NextAuth({
       session.user.hasAdminAccess = token.hasAdminAccess
       session.user.hasPortalAccess = token.hasPortalAccess
       session.user.userDeets = token.userDeets
+      session.user.permission_level = token.permission_level
       return session
     }
   },

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Search, Eye, Download, CheckCircle, XCircle, Clock, Receipt, Users, DollarSign } from 'lucide-react'
+import PrivateRoute from '@/lib/PrivateRoute'
 
 const AdminPaymentsPage = () => {
   const [userDetails] = useAtom(userDeetsAtom)
@@ -265,6 +266,7 @@ const AdminPaymentsPage = () => {
   }
 
   return (
+    <PrivateRoute requiredPermission="super_admin"  accessType="admin">
     <div className="space-y-6">
       {/* Header */}
       <div className="flex w-full justify-between items-center mb-8">
@@ -549,6 +551,7 @@ const AdminPaymentsPage = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </PrivateRoute>
   )
 }
 
