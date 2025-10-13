@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAtom } from 'jotai'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Combobox } from '@/components/ui/combobox'
 import { fetchClubs } from '@/services/clubServices'
 import { getAllEvents } from '@/services/sportServices'
 import { clubsDataAtom, sportsDataAtom, sportsLoadingAtom, lastFetchTimestampAtom, isCacheValid } from '@/app/state/store'
@@ -21,12 +21,6 @@ const RegistrationsByClub = React.memo(() => {
   const [showRegistrations, setShowRegistrations] = useState(false)
 
   const loadClubsData = useCallback(async () => {
-    // Check cache validity for clubs
-    if (clubsData.length > 0 && isCacheValid(lastFetchTimestamp.clubs, 'clubs')) {
-      console.log('Using cached clubs data');
-      return;
-    }
-
     try {
       const clubsResult = await fetchClubs()
       setClubsData(clubsResult)
@@ -36,15 +30,9 @@ const RegistrationsByClub = React.memo(() => {
       console.error('Error loading clubs:', error)
       toast.error('Failed to load clubs data')
     }
-  }, [clubsData.length, lastFetchTimestamp.clubs, setClubsData, setLastFetchTimestamp])
+  }, [setClubsData, setLastFetchTimestamp])
 
   const loadSportsData = useCallback(async () => {
-    // Check cache validity for sports
-    if (sportsData.length > 0 && isCacheValid(lastFetchTimestamp.sports, 'sports')) {
-      console.log('Using cached sports data');
-      return;
-    }
-
     try {
       setSportsLoading(true)
       const sportsResult = await getAllEvents({ type: ["team", "individual"] })
@@ -59,20 +47,41 @@ const RegistrationsByClub = React.memo(() => {
     } finally {
       setSportsLoading(false)
     }
-  }, [sportsData.length, lastFetchTimestamp.sports, setSportsData, setSportsLoading, setLastFetchTimestamp])
+  }, [setSportsData, setSportsLoading, setLastFetchTimestamp])
 
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true)
+      const needsClubsData = !(clubsData.length > 0 && isCacheValid(lastFetchTimestamp.clubs, 'clubs'))
+      const needsSportsData = !(sportsData.length > 0 && isCacheValid(lastFetchTimestamp.sports, 'sports'))
+      
+      if (needsClubsData || needsSportsData) {
+        setLoading(true)
+      }
+      
       try {
-        await Promise.all([loadClubsData(), loadSportsData()])
+        const promises = []
+        if (needsClubsData) {
+          console.log('Loading clubs data...')
+          promises.push(loadClubsData())
+        } else {
+          console.log('Using cached clubs data')
+        }
+        
+        if (needsSportsData) {
+          console.log('Loading sports data...')
+          promises.push(loadSportsData())
+        } else {
+          console.log('Using cached sports data')
+        }
+        
+        await Promise.all(promises)
       } finally {
         setLoading(false)
       }
     }
 
     loadData()
-  }, [loadClubsData, loadSportsData])
+  }, []) // Only run once on mount
 
   const handleSeeRegistrations = useCallback(() => {
     if (!selectedClub) {
@@ -118,18 +127,18 @@ const RegistrationsByClub = React.memo(() => {
                 <label className="text-sm font-medium text-white/70">
                   Club <span className="text-red-400">*</span>
                 </label>
-                <Select value={selectedClub} onValueChange={setSelectedClub}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white w-full">
-                    <SelectValue placeholder="Select a club" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clubsData.map((club) => (
-                      <SelectItem key={club.club_id} value={club.club_id.toString()}>
-                        {club.club_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={clubsData.map((club) => ({
+                    value: club.club_id.toString(),
+                    label: club.club_name
+                  }))}
+                  value={selectedClub}
+                  onValueChange={setSelectedClub}
+                  placeholder="Select a club"
+                  searchPlaceholder="Search clubs..."
+                  emptyMessage="No clubs found."
+                  className="bg-white/10 border-white/20 text-white"
+                />
               </div>
 
               {/* Sport Selection (Optional) */}
@@ -137,19 +146,21 @@ const RegistrationsByClub = React.memo(() => {
                 <label className="text-sm font-medium text-white/70">
                   Sport <span className="text-white/50">(Optional)</span>
                 </label>
-                <Select value={selectedSport} onValueChange={setSelectedSport}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white w-full">
-                    <SelectValue placeholder="All sports" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All sports</SelectItem>
-                    {sportsData.map((sport) => (
-                      <SelectItem key={sport.sport_id} value={sport.sport_id.toString()}>
-                        {sport.sport_name} ({sport.gender_type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={[
+                    { value: "all", label: "All sports" },
+                    ...sportsData.map((sport) => ({
+                      value: sport.sport_id.toString(),
+                      label: `${sport.sport_name} (${sport.gender_type})`
+                    }))
+                  ]}
+                  value={selectedSport}
+                  onValueChange={setSelectedSport}
+                  placeholder="All sports"
+                  searchPlaceholder="Search sports..."
+                  emptyMessage="No sports found."
+                  className="bg-white/10 border-white/20 text-white"
+                />
               </div>
             </div>
                           {/* See Registrations Button */}

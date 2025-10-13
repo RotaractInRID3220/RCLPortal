@@ -26,6 +26,8 @@ export async function GET(request) {
                     status,
                     RI_ID,
                     club_id,
+                    converted,
+                    converted_by,
                     clubs!inner(
                         club_id,
                         club_name,

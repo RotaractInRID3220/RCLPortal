@@ -116,3 +116,52 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Server error processing registration' }, { status: 500 });
     }
 }
+
+export async function PUT(request) {
+    try {
+        const requestData = await request.json();
+        const { RMIS_ID, converted_by } = requestData;
+
+        // Validate required parameters
+        if (!RMIS_ID || !converted_by) {
+            console.log('API: Missing required parameters for PUT:', { RMIS_ID, converted_by });
+            return NextResponse.json({ 
+                error: 'Missing required parameters: RMIS_ID and converted_by are required' 
+            }, { status: 400 });
+        }
+
+        console.log(`API: Converting player for RMIS_ID: ${RMIS_ID}, converted_by: ${converted_by}`);
+
+        // Update the player
+        const { data, error } = await supabase
+            .from('players')
+            .update({ 
+                status: 5,
+                converted: true,
+                converted_by: converted_by
+            })
+            .eq('RMIS_ID', RMIS_ID)
+            .select('RMIS_ID, status, converted, converted_by');
+
+        if (error) {
+            console.error('API: Error updating player:', error);
+            return NextResponse.json({ error: 'Failed to convert player' }, { status: 500 });
+        }
+
+        if (!data || data.length === 0) {
+            console.log('API: No player found to update');
+            return NextResponse.json({ error: 'Player not found' }, { status: 404 });
+        }
+
+        console.log('API: Player converted successfully');
+        return NextResponse.json({ 
+            success: true,
+            message: 'Player converted successfully',
+            data: data[0]
+        }, { status: 200 });
+
+    } catch (err) {
+        console.error('API: Exception occurred during PUT:', err);
+        return NextResponse.json({ error: 'Server error converting player' }, { status: 500 });
+    }
+}

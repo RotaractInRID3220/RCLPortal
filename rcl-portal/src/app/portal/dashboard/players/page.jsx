@@ -27,6 +27,9 @@ const PlayersPage = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const itemsPerPage = 10
 
+  // Check if there are any converted players
+  const hasConvertedPlayers = allPlayers.some(player => player.converted)
+
   // Check if registration deadline has passed
   const isAfterDeadline = useMemo(() => {
     const currentDate = new Date();
@@ -180,8 +183,8 @@ const PlayersPage = () => {
 
   if (dataLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cranberry"></div>
+      <div className="flex justify-center items-center mt-40">
+        <img src="/load.svg" alt="" className="w-20" />
       </div>
     )
   }
@@ -232,6 +235,19 @@ const PlayersPage = () => {
             <div className="text-sm text-yellow-200/80">
               Only {generalPercentage.toFixed(1)}% of your players are general members ({generalMembers}/{totalMembers}).
               Consider registering more general members to meet the {APP_CONFIG.GENERAL_MEMBER_WARNING_THRESHOLD}% threshold.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info message for converted players */}
+      {hasConvertedPlayers && (
+        <div className="mb-6 px-4 py-3 bg-blue-500/20 border border-blue-400 rounded-lg flex items-center gap-3">
+          <Users className="text-blue-400 w-5 h-5 flex-shrink-0" />
+          <div className="text-blue-200">
+            <div className="font-medium">Converted Players</div>
+            <div className="text-sm text-blue-200/80">
+              Players with a red background have been converted by the District Steering Committee due to an issue with their RI number.
             </div>
           </div>
         </div>
@@ -308,7 +324,7 @@ const PlayersPage = () => {
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {paginatedPlayers.map((player) => (
-                    <tr key={player.RMIS_ID} className="hover:bg-white/5">
+                    <tr key={player.RMIS_ID} className={`hover:bg-white/5 ${player.converted ? 'bg-red-500/20 border-l-4 border-red-500' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                         {player.name || 'N/A'}
                       </td>

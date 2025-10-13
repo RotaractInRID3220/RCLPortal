@@ -98,6 +98,56 @@ export async function DELETE(request) {
     }
 }
 
+export async function PUT(request) {
+    try {
+        const requestData = await request.json();
+        const { RMIS_ID, sport_id, converted_by } = requestData;
+
+        // Validate required parameters
+        if (!RMIS_ID || !sport_id || !converted_by) {
+            console.log('API: Missing required parameters for PUT:', { RMIS_ID, sport_id, converted_by });
+            return NextResponse.json({ 
+                error: 'Missing required parameters: RMIS_ID, sport_id, and converted_by are required' 
+            }, { status: 400 });
+        }
+
+        console.log(`API: Converting registration for RMIS_ID: ${RMIS_ID}, sport_id: ${sport_id}, converted_by: ${converted_by}`);
+
+        // Update the registration
+        const { data, error } = await supabase
+            .from('registrations')
+            .update({ 
+                status: 5,
+                converted: true,
+                converted_by: converted_by
+                        })
+            .eq('RMIS_ID', RMIS_ID)
+            .eq('sport_id', sport_id)
+            .select('RMIS_ID, sport_id, status, converted, converted_by, updated_at');
+
+        if (error) {
+            console.error('API: Error updating registration:', error);
+            return NextResponse.json({ error: 'Failed to convert registration' }, { status: 500 });
+        }
+
+        if (!data || data.length === 0) {
+            console.log('API: No registration found to update');
+            return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
+        }
+
+        console.log('API: Registration converted successfully');
+        return NextResponse.json({ 
+            success: true,
+            message: 'Registration converted successfully',
+            data: data[0]
+        }, { status: 200 });
+
+    } catch (err) {
+        console.error('API: Exception occurred during PUT:', err);
+        return NextResponse.json({ error: 'Server error converting registration' }, { status: 500 });
+    }
+}
+
 export async function POST(request) {
     const requestData = await request.json();
     const { member, sport_id, isMainPlayer } = requestData;

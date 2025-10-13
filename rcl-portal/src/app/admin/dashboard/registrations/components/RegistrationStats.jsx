@@ -1,11 +1,14 @@
 'use client'
 import React from 'react'
 
-const RegistrationStats = React.memo(({ registrations, totalCount }) => {
-  // Use totalCount for accurate stats when pagination is enabled, fall back to current page data
+const RegistrationStats = React.memo(({ registrations, totalCount, fullData }) => {
+  // Use totalCount for total registrations count
   const totalRegistrations = totalCount || registrations.length
-  const mainPlayers = registrations.filter(reg => reg.main_player === true).length
-  const reservePlayers = registrations.filter(reg => reg.main_player === false).length
+  
+  // Calculate stats from full data if available, otherwise from current page
+  const statsData = fullData || registrations
+  const mainPlayers = statsData.filter(reg => reg.main_player === true).length
+  const reservePlayers = statsData.filter(reg => reg.main_player === false).length
 
   return (
     <div className="bg-white/5 border border-white/20 rounded-lg p-6 mb-6">
@@ -15,21 +18,21 @@ const RegistrationStats = React.memo(({ registrations, totalCount }) => {
         <div className="text-center">
           <div className="text-7xl font-bold text-cranberry">{totalRegistrations}</div>
           <div className="text-sm text-white/70 mt-1">
-            Total Registrations{totalCount ? ' (All)' : ' (Current Page)'}
+            Total Registrations
           </div>
         </div>
         
         <div className="text-center">
           <div className="text-7xl font-bold text-green-400">{mainPlayers}</div>
           <div className="text-sm text-white/70 mt-1">
-            Main Players{totalCount ? ' (Current Page)' : ''}
+            Main Players
           </div>
         </div>
         
         <div className="text-center">
           <div className="text-7xl font-bold text-blue-400">{reservePlayers}</div>
           <div className="text-sm text-white/70 mt-1">
-            Reserve Players{totalCount ? ' (Current Page)' : ''}
+            Reserve Players
           </div>
         </div>
       </div>
