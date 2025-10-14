@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
+import PrivateRoute from '@/lib/PrivateRoute'
 
 export default function PermissionsPage() {
   const { data: session, status } = useSession()
