@@ -22,6 +22,7 @@ import AddTeamsButton from '../components/AddTeamsButton'
 import TeamStats from '../components/TeamStats'
 import ManualTeamAddition from '../components/ManualTeamAddition'
 import NonEligibleClubs from '../components/NonEligibleClubs'
+import PrivateRoute from '@/lib/PrivateRoute'
 
 const SportTeamsPage = ({ params }) => {
   const router = useRouter()
@@ -117,6 +118,7 @@ const SportTeamsPage = ({ params }) => {
   const totalPlayers = teams.reduce((sum, team) => sum + team.player_count, 0)
 
   return (
+    <PrivateRoute requiredPermission="admin"  accessType="admin">
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
@@ -330,6 +332,7 @@ const SportTeamsPage = ({ params }) => {
         </div>
       </div>
     </div>
+    </PrivateRoute>
   )
 }
 

@@ -13,6 +13,7 @@ import { clubsAtom, clubsLoadingAtom, clubsErrorAtom } from "@/app/state/store";
 import { useAtom } from "jotai";
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
+import PrivateRoute from "@/lib/PrivateRoute";
 
 const page = () => {
   const [addClub, setAddClub] = useState(false);
@@ -73,6 +74,7 @@ const page = () => {
   };
 
   return (
+    <PrivateRoute requiredPermission="super_admin"  accessType="admin">
     <div>
       <div className="flex w-full justify-between items-center mb-8">
         <h1 className="text-3xl font-semibold tracking-wide">CLUB MANAGEMENT</h1>
@@ -158,6 +160,7 @@ const page = () => {
         </div>
       </div>
     </div>
+    </PrivateRoute>
   );
 };
 

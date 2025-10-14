@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createEvent, getAllEvents } from '@/services/sportServices';
 import { toast } from 'sonner';
 import { useAtom } from 'jotai';
-import { sportsDataAtom, sportsLoadingAtom, lastFetchTimestampAtom, isCacheValid } from '@/app/state/store';
+import { sportsDataAtom, sportsLoadingAtom, lastFetchTimestampAtom, isCacheValid, userDeetsAtom } from '@/app/state/store';
+import { getClubByClubId } from '@/services/clubServices';
 
 // Memoized Event Card component
 const EventCard = React.memo(({ event, onClick }) => {
@@ -30,7 +31,9 @@ const PortalRegistrationPage = React.memo(() => {
     const [sportsData, setSportsData] = useAtom(sportsDataAtom);
     const [sportsLoading, setSportsLoading] = useAtom(sportsLoadingAtom);
     const [lastFetchTimestamp, setLastFetchTimestamp] = useAtom(lastFetchTimestampAtom);
-    const [clubData, setClubData] = useState({category : 'community'});
+    const [userDeets] = useAtom(userDeetsAtom);
+    const [clubData, setClubData] = useState(null);
+    const [clubLoading, setClubLoading] = useState(true);
 
     // Memoized navigation function
     const navigateToBracket = useCallback((eventId) => {
@@ -39,13 +42,21 @@ const PortalRegistrationPage = React.memo(() => {
 
     // Memoized filtered sports data
     const filteredSportsData = useMemo(() => {
-        return sportsData.filter(event => event.category === clubData.category);
-    }, [sportsData, clubData.category]);
+        if (!clubData) return [];
+        const filtered = sportsData.filter(event => event.category === clubData.category);
+        console.log('Filtering sports data:', {
+            clubData,
+            sportsData: sportsData.map(s => ({ name: s.sport_name, category: s.category })),
+            filteredCount: filtered.length,
+            totalCount: sportsData.length
+        });
+        return filtered;
+    }, [sportsData, clubData]);
 
     // Optimized fetch function with caching
     const fetchAllSports = useCallback(async () => {
         // Check cache validity first
-        if (sportsData.length > 0 && isCacheValid(lastFetchTimestamp.sports)) {
+        if (isCacheValid(lastFetchTimestamp.sports, 'sports')) {
             console.log('Using cached sports data for portal registration');
             return;
         }
@@ -57,14 +68,55 @@ const PortalRegistrationPage = React.memo(() => {
                 setSportsData(result.data);
                 setLastFetchTimestamp(prev => ({ ...prev, sports: Date.now() }));
                 console.log('Sports data loaded and cached:', result.data);
+            } else {
+                // If API fails, set empty data and cache to prevent infinite retries
+                setSportsData([]);
+                setLastFetchTimestamp(prev => ({ ...prev, sports: Date.now() }));
             }
         } catch (error) {
             console.error('Failed to fetch sports:', error);
-            // Error toast already handled by getAllEvents service
+            // Set empty data and cache on error to prevent infinite loop
+            setSportsData([]);
+            setLastFetchTimestamp(prev => ({ ...prev, sports: Date.now() }));
         } finally {
             setSportsLoading(false);
         }
-    }, [setSportsData, setSportsLoading, setLastFetchTimestamp, sportsData.length, lastFetchTimestamp.sports]);
+    }, [setSportsData, setSportsLoading, setLastFetchTimestamp, lastFetchTimestamp.sports]);
+
+    // Fetch club data
+    const fetchClubData = useCallback(async () => {
+        console.log('fetchClubData called with userDeets:', userDeets);
+        if (!userDeets?.club_id) {
+            console.log('No club_id in userDeets, setting clubLoading to false');
+            setClubLoading(false);
+            return;
+        }
+
+        try {
+            setClubLoading(true);
+            console.log('Fetching club data for club_id:', userDeets.club_id);
+            const club = await getClubByClubId(userDeets.club_id);
+            console.log('Club data fetched:', club);
+            if (club) {
+                setClubData(club);
+            } else {
+                // Default to community if club not found
+                console.log('Club not found, defaulting to community');
+                setClubData({ category: 'community' });
+            }
+        } catch (error) {
+            console.error('Failed to fetch club data:', error);
+            // Default to community on error
+            setClubData({ category: 'community' });
+        } finally {
+            setClubLoading(false);
+        }
+    }, [userDeets?.club_id]);
+
+    // Load club data when userDeets changes
+    useEffect(() => {
+        fetchClubData();
+    }, [fetchClubData]);
 
     // Load sports data when component mounts
     useEffect(() => {
@@ -78,7 +130,7 @@ const PortalRegistrationPage = React.memo(() => {
             </div>
 
             <div>
-                {sportsLoading ? (
+                {sportsLoading || clubLoading ? (
                     <div className="flex justify-center items-center mt-40">
                         <img src="/load.svg" alt="" className="w-20" />
                     </div>
@@ -92,7 +144,7 @@ const PortalRegistrationPage = React.memo(() => {
                         <div>
                             {filteredSportsData.length === 0 ? (
                                 <div className="text-center py-6 bg-white/5 rounded-lg">
-                                    <p className="text-gray-400">No events available for this category yet</p>
+                                    <p className="text-gray-400">No events available for your club category yet</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-4 gap-4">

@@ -355,4 +355,40 @@ export const getRegistrationsWithPlayerData = async (filters = null, pagination 
     }
 }
 
+export const convertPlayer = async (RMIS_ID, converted_by) => {
+    try {
+        const response = await fetch('/api/players', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                RMIS_ID,
+                converted_by
+            }),
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+            return {
+                success: false,
+                error: data.error || 'Failed to convert player'
+            };
+        }
+
+        return {
+            success: true,
+            data: data.data,
+            message: data.message
+        };
+    } catch (error) {
+        console.error('Error converting player:', error);
+        return {
+            success: false,
+            error: 'Network error occurred while converting player'
+        };
+    }
+};
+
 

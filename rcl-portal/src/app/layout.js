@@ -30,6 +30,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body
         className={`${bebas.variable} ${poppins.variable} antialiased dark`}
+        suppressHydrationWarning={true}
       >
         <SessionProvider>
           {children}

@@ -3,7 +3,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import Footer from './components/Footer'
 import GameCard from './components/GameCard'
-import { FaInfoCircle } from 'react-icons/fa'
+import { FaInfoCircle, FaBolt } from 'react-icons/fa'
+import { useState, useEffect } from 'react'
+import { APP_CONFIG } from '@/config/app.config'
 
 export default function EArenaPage() {
   const games = [
@@ -11,6 +13,41 @@ export default function EArenaPage() {
     { title: 'fifa', image: '/fifa image.png' },
     { title: 'codm', image: '/cod.png' },
   ]
+
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0
+  })
+
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false)
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const targetDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE)
+      const now = new Date()
+      const difference = targetDate - now
+
+      if (difference > 0) {
+        setTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((difference / 1000 / 60) % 60),
+          seconds: Math.floor((difference / 1000) % 60)
+        })
+        setIsRegistrationOpen(false)
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        setIsRegistrationOpen(true)
+      }
+    }
+
+    calculateTimeLeft()
+    const timer = setInterval(calculateTimeLeft, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
 
   return (
     <>
@@ -48,7 +85,7 @@ export default function EArenaPage() {
               </h1>
 
               {/* E-ARENA Main Title */}
-              <h2 className="bg-gradient-to-b from-cranberry to-cranberry/20 bg-clip-text text-transparent font-belanosima text-7xl md:text-9xl lg:text-[280px] font-normal leading-[0.9] tracking-tight mb-10 select-none"
+              <h2 className="bg-gradient-to-b from-cranberry to-cranberry/20 bg-clip-text text-transparent font-belanosima text-7xl md:text-9xl lg:text-[200px] xl:text-[280px] font-normal leading-[0.9] tracking-tight mb-10 select-none"
                   style={{ 
                     fontFamily: 'Belanosima, system-ui, sans-serif',
                     WebkitTextStroke: '2px rgba(216, 27, 93, 0.3)',
@@ -57,7 +94,7 @@ export default function EArenaPage() {
               </h2>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-6 justify-center items-center max-w-3xl absolute md:bottom-30 bottom-14 lg:bottom-15 left-0 right-0 mx-auto px-10 sm:px-0">
+              {/* <div className="flex flex-col sm:flex-row gap-6 justify-center items-center max-w-3xl absolute md:bottom-30 bottom-14 lg:bottom-24 xl:bottom-15 left-0 right-0 mx-auto px-10 sm:px-0">
                 <Link
                   href="#handbook"
                   className="group relative w-full sm:w-auto px-12 py-3 bg-cranberry/10 border border-cranberry rounded-lg overflow-hidden transition-all duration-300 hover:bg-cranberry/30 hover:border-cranberry/80 hover:shadow-lg hover:shadow-cranberry/30"
@@ -77,6 +114,60 @@ export default function EArenaPage() {
                     ORDER YOUR TSHIRT
                   </span>
                 </Link>
+              </div> */}
+
+              {/* Countdown Timer / Registration Open Message */}
+              <div className="flex flex-col gap-4 justify-center items-center max-w-4xl absolute md:bottom-30 bottom-20 lg:bottom-20 xl:bottom-10 left-0 right-0 mx-auto px-6 sm:px-0">
+                {!isRegistrationOpen ? (
+                  <>
+                    <p className="font-bebas text-white text-2xl md:text-2xl tracking-wider animate-pulse">
+                      REGISTRATIONS OPENING IN
+                    </p>
+                    <div className="flex gap-3 sm:gap-4 md:gap-5">
+                      {[
+                        { value: timeLeft.days, label: 'DAYS' },
+                        { value: timeLeft.hours, label: 'HOURS' },
+                        { value: timeLeft.minutes, label: 'MINS' },
+                        { value: timeLeft.seconds, label: 'SECS' }
+                      ].map((item, index) => (
+                        <div key={item.label} className="flex items-center gap-3 sm:gap-4 md:gap-4">
+                          {/* Time Unit Box */}
+                          <div className="group relative bg-cranberry/10 border-2 border-cranberry rounded-xl w-[70px] sm:w-[90px] md:w-[100px] py-3 sm:py-4 md:py-3 transition-all duration-300 hover:bg-cranberry/20 hover:border-cranberry hover:shadow-[0_0_20px_rgba(216,27,93,0.4)] hover:scale-105">
+                            <div className="relative z-10 text-center select-none">
+                              <div className="font-poppins text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold text-cranberry group-hover:text-white transition-colors duration-300 tabular-nums">
+                                {String(item.value).padStart(2, '0')}
+                              </div>
+                              <div className="font-bebas text-white/80 text-xs sm:text-sm md:text-base mt-1 tracking-wider group-hover:text-white transition-colors duration-300">
+                                {item.label}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Separator (except after last item) */}
+                          {index < 3 && (
+                            <span className="font-belanosima text-3xl sm:text-4xl md:text-4xl font-bold text-cranberry animate-pulse">:</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="group relative">
+                    {/* Animated glowing border effect */}
+                    <div className="absolute -inset-1 bg-gradient-to-r from-cranberry via-pink-500 to-cranberry rounded-xl blur opacity-5 group-hover:opacity-10 animate-pulse "></div>
+                    
+                    {/* Main box */}
+                    <div className="relative bg-black/70 border-2 border-cranberry rounded-xl px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-4 transition-all duration-300 hover:border-pink-500 hover:shadow-[0_0_30px_rgba(216,27,93,0.2)] ">
+                      <div className="flex items-center justify-center gap-3 select-none">
+                        <FaBolt className="text-cranberry text-xl sm:text-2xl md:text-3xl animate-pulse" />
+                        <p className="font-bebas text-cranberry text-xl sm:text-2xl md:text-3xl tracking-wider group-hover:text-white transition-colors duration-300 whitespace-nowrap">
+                          REGISTRATIONS ARE NOW OPEN!
+                        </p>
+                        <FaBolt className="text-cranberry text-xl sm:text-2xl md:text-3xl animate-pulse" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </section>

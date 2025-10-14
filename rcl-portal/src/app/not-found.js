@@ -61,7 +61,7 @@ export default function NotFound() {
         </div>
 
         {/* Navigation options */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-4xl mb-12">
+        {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full max-w-4xl mb-12">
           <Link
             href="/"
             className="group bg-cranberry/10 hover:bg-cranberry/20 border border-cranberry/30 hover:border-cranberry rounded-xl p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cranberry/20 text-center"
@@ -97,7 +97,7 @@ export default function NotFound() {
             <h3 className="text-lg font-semibold text-white mb-1">Player</h3>
             <p className="text-white/60 text-sm">Player portal</p>
           </Link>
-        </div>
+        </div> */}
 
       </div>
 

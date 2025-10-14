@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { UserMinus, Users, AlertTriangle, Search } from 'lucide-react'
+import { UserMinus, Users, AlertTriangle, Search, RefreshCw } from 'lucide-react'
 import { getPlayersByClub } from '@/services/playerService'
 import { APP_CONFIG } from '@/config/app.config'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -20,12 +20,23 @@ const PlayersPage = () => {
   const [allPlayers, setAllPlayers] = useState([])
   const [dataLoading, setDataLoading] = useState(false)
   const [cleaningPlayers, setCleaningPlayers] = useState(false)
+  const [syncingRMIS, setSyncingRMIS] = useState(false)
   const [hasLoadedData, setHasLoadedData] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const itemsPerPage = 10
+
+  // Check if there are any converted players
+  const hasConvertedPlayers = allPlayers.some(player => player.converted)
+
+  // Check if registration deadline has passed
+  const isAfterDeadline = useMemo(() => {
+    const currentDate = new Date();
+    const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
+    return currentDate > deadlineDate;
+  }, []);
 
   useEffect(() => {
     if (userDetails?.club_id && !hasLoadedData && !dataLoading) {
@@ -81,6 +92,49 @@ const PlayersPage = () => {
       toast.error('Failed to clean players: ' + error.message)
     } finally {
       setCleaningPlayers(false)
+    }
+  }
+
+  const syncWithRMIS = async () => {
+    if (!userDetails?.club_id) return
+
+    try {
+      setSyncingRMIS(true)
+
+      const response = await fetch('/api/players/sync-rmis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          club_id: userDetails.club_id
+        })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        
+        if (result.updatedCount > 0) {
+          toast.success(result.message, {
+            description: result.updates.map(u => 
+              `${u.RMIS_ID}: ${u.oldStatus} → ${u.newStatus}`
+            ).join('\n')
+          })
+          
+          // Refresh players data
+          setHasLoadedData(false)
+        } else {
+          toast.info(result.message)
+        }
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to sync with RMIS')
+      }
+    } catch (error) {
+      console.error('Error syncing with RMIS:', error)
+      toast.error('Failed to sync with RMIS: ' + error.message)
+    } finally {
+      setSyncingRMIS(false)
     }
   }
 
@@ -173,8 +227,8 @@ const PlayersPage = () => {
 
   if (dataLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cranberry"></div>
+      <div className="flex justify-center items-center mt-40">
+        <img src="/load.svg" alt="" className="w-20" />
       </div>
     )
   }
@@ -183,35 +237,73 @@ const PlayersPage = () => {
     <div>
       <div className="flex w-full justify-between items-center mb-8">
         <h1 className="text-3xl font-semibold tracking-wide">PLAYERS</h1>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              disabled={cleaningPlayers}
-              className="bg-red-500/20 border border-red-500 hover:bg-red-500/30 text-red-200"
-            >
-              <UserMinus className="w-4 h-4 mr-2" />
-              {cleaningPlayers ? 'Cleaning...' : 'Clean Players'}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="bg-gray-900 border-gray-700">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-white">Clean Players</AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-300">
-                This will remove all players from your club who don't have any sport registrations.
-                This action cannot be undone. Are you sure you want to continue?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600">Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={cleanPlayers}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                Clean Players
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <div className="flex gap-3">
+          {/* Sync with RMIS Button */}
+          {!isAfterDeadline && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  disabled={syncingRMIS}
+                  className="bg-blue-500/20 border border-blue-500 hover:bg-blue-500/40 text-blue-200 cursor-pointer"
+                >
+                  <RefreshCw className={`w-4 h-4 mr-2 ${syncingRMIS ? 'animate-spin' : ''}`} />
+                  {syncingRMIS ? 'Syncing...' : 'Sync with RMIS'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-black-900/60 backdrop-blur-lg border-cranberry/30">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-white">Sync with RMIS</AlertDialogTitle>
+                  <AlertDialogDescription className="text-gray-300">
+                    This will check and update player statuses (General/Prospective) based on the latest data from the RMIS database.
+                    Are you sure you want to continue?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600 cursor-pointer">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={syncWithRMIS}
+                    className="bg-cranberry hover:bg-cranberry cursor-pointer"
+                  >
+                    Sync Now
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
+          {/* Clean Players Button */}
+          {!isAfterDeadline && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  disabled={cleaningPlayers}
+                  className="bg-red-500/20 border border-red-500 hover:bg-red-500/30 text-red-200 cursor-pointer"
+                >
+                  <UserMinus className="w-4 h-4 mr-2" />
+                  {cleaningPlayers ? 'Cleaning...' : 'Clean Players'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-black-900/60 backdrop-blur-lg border-cranberry/30">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-white">Clean Players</AlertDialogTitle>
+                  <AlertDialogDescription className="text-gray-300">
+                    This will remove all players from your club who don't have any sport registrations.
+                    This action cannot be undone. Are you sure you want to continue?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600 cursor-pointer">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={cleanPlayers}
+                    className="bg-cranberry hover:bg-cranberry cursor-pointer"
+                  >
+                    Clean Players
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </div>
 
       {/* Warning message for low general member percentage */}
@@ -223,6 +315,19 @@ const PlayersPage = () => {
             <div className="text-sm text-yellow-200/80">
               Only {generalPercentage.toFixed(1)}% of your players are general members ({generalMembers}/{totalMembers}).
               Consider registering more general members to meet the {APP_CONFIG.GENERAL_MEMBER_WARNING_THRESHOLD}% threshold.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info message for converted players */}
+      {hasConvertedPlayers && (
+        <div className="mb-6 px-4 py-3 bg-red-500/20 border border-red-400 rounded-lg flex items-center gap-3">
+          <Users className="text-red-400 w-5 h-5 flex-shrink-0" />
+          <div className="text-red-200">
+            <div className="font-medium">Converted Players</div>
+            <div className="text-sm text-red-200/80">
+              Players with a red background have been converted by the District Steering Committee due to an issue with their RI number.
             </div>
           </div>
         </div>
@@ -299,7 +404,7 @@ const PlayersPage = () => {
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {paginatedPlayers.map((player) => (
-                    <tr key={player.RMIS_ID} className="hover:bg-white/5">
+                    <tr key={player.RMIS_ID} className={`hover:bg-white/5 ${player.converted ? 'bg-red-500/20 border-l-2 border-red-500' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                         {player.name || 'N/A'}
                       </td>

@@ -6,15 +6,16 @@ export async function POST(request) {
         const requestData = await request.json();
         const { club_id } = requestData;
 
-        if (!club_id) {
-            return NextResponse.json({ error: 'club_id is required' }, { status: 400 });
+        // Build query based on whether club_id is provided
+        let playersQuery = supabase
+            .from('players')
+            .select('RMIS_ID, club_id');
+
+        if (club_id) {
+            playersQuery = playersQuery.eq('club_id', club_id);
         }
 
-        // First, get all players for this club
-        const { data: players, error: playersError } = await supabase
-            .from('players')
-            .select('RMIS_ID, club_id')
-            .eq('club_id', club_id);
+        const { data: players, error: playersError } = await playersQuery;
 
         if (playersError) {
             console.error('Error fetching players:', playersError);
@@ -22,10 +23,11 @@ export async function POST(request) {
         }
 
         if (!players || players.length === 0) {
+            const scope = club_id ? 'this club' : 'the system';
             return NextResponse.json({ 
                 success: true, 
                 deletedCount: 0,
-                message: 'No players found for this club' 
+                message: `No players found for ${scope}` 
             });
         }
 
@@ -72,10 +74,11 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Failed to delete players' }, { status: 500 });
         }
 
+        const scope = club_id ? 'from this club' : 'globally';
         return NextResponse.json({ 
             success: true, 
             deletedCount: playersToDelete.length,
-            message: `Successfully removed ${playersToDelete.length} players without registrations`
+            message: `Successfully removed ${playersToDelete.length} players without registrations ${scope}`
         });
 
     } catch (error) {

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAtom } from 'jotai'
 import { userDeetsAtom, loadingAtom } from '@/app/state/store'
 import { APP_CONFIG } from '../../../../config/app.config.js'
@@ -35,6 +35,13 @@ const PaymentPage = () => {
   const [cleaningPlayers, setCleaningPlayers] = useState(false)
 
   const registrationFee = parseInt(APP_CONFIG.REGISTRATION_FEE) || 800
+
+  // Check if registration deadline has passed
+  const isAfterDeadline = useMemo(() => {
+    const currentDate = new Date();
+    const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
+    return currentDate > deadlineDate;
+  }, []);
 
   useEffect(() => {
     if (userDetails?.club_id && !hasLoadedData && !dataLoading) {
@@ -290,38 +297,40 @@ const PaymentPage = () => {
     <div className="space-y-6">
       <div className="flex w-full justify-between items-center mb-8">
         <h1 className="text-2xl font-semibold tracking-wide">PAYMENT MANAGEMENT</h1>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" disabled={cleaningPlayers || dataLoading} className="cursor-pointer">
-              {cleaningPlayers ? (
-                <>
-                  <img src="/load.svg" alt="Loading..." className="w-4 h-4 mr-2" />
-                  Cleaning...
-                </>
-              ) : (
-                <>
-                  <UserMinus className="w-4 h-4 mr-2" />
-                  Clean Players
-                </>
-              )}
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Clean Players Without Registrations</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will remove all players from your club who don't have any registration records. 
-                This action will update your payment calculations. Are you sure you want to continue?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={cleanPlayers} className="cursor-pointer">
-                Yes, Clean Players
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {!isAfterDeadline && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" disabled={cleaningPlayers || dataLoading} className="cursor-pointer">
+                {cleaningPlayers ? (
+                  <>
+                    <img src="/load.svg" alt="Loading..." className="w-4 h-4 mr-2" />
+                    Cleaning...
+                  </>
+                ) : (
+                  <>
+                    <UserMinus className="w-4 h-4 mr-2" />
+                    Clean Players
+                  </>
+                )}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clean Players Without Registrations</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove all players from your club who don't have any registration records. 
+                  This action will update your payment calculations. Are you sure you want to continue?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="cursor-pointer">Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={cleanPlayers} className="cursor-pointer">
+                  Yes, Clean Players
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
 
       {/* Payment Statistics */}

@@ -4,17 +4,22 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAtom } from 'jotai'
 import { sportsDataAtom } from '@/app/state/store'
 import { getAllEvents } from '@/services/sportServices'
+import { awardTournamentPoints } from '@/services/clubPointsService'
+import { APP_CONFIG } from '@/config/app.config'
 import { Button } from '@/components/ui/button'
-import ClubPointsForm from '../components/ClubPointsForm'
-import LeaderboardDisplay from '../components/LeaderboardDisplay'
+import { toast } from 'sonner'
+import TournamentStandings from './components/TournamentStandings'
+import AwardPointsDialog from './components/AwardPointsDialog'
 
-const page = () => {
+const TournamentLeaderboardPage = () => {
   const params = useParams()
   const router = useRouter()
   const [sportsData, setSportsData] = useAtom(sportsDataAtom)
   const [selectedSport, setSelectedSport] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [standings, setStandings] = useState([])
+  const [isAwardDialogOpen, setIsAwardDialogOpen] = useState(false)
+  const [isAwarding, setIsAwarding] = useState(false)
 
   const sportId = params.sportid
 
@@ -37,7 +42,7 @@ const page = () => {
         const sport = currentSportsData.find(s => s.sport_id == sportId)
         setSelectedSport(sport)
       } catch (error) {
-        console.error('Failed to fetch sport data:', error)
+        toast.error('Failed to load sport data')
       } finally {
         setLoading(false)
       }
@@ -48,19 +53,71 @@ const page = () => {
     }
   }, [sportId, sportsData, setSportsData])
 
+  useEffect(() => {
+    if (sportId && selectedSport) {
+      calculateStandings()
+    }
+  }, [sportId, selectedSport])
+
+  // Calculates tournament standings based on match results
+  const calculateStandings = async () => {
+    try {
+      setLoading(true)
+
+      const response = await fetch(`/api/leaderboard/tournament-standings?sportId=${sportId}`)
+      const result = await response.json()
+
+      if (response.ok) {
+        setStandings(result.standings || [])
+      } else {
+        toast.error(result.error || 'Failed to fetch tournament standings')
+        setStandings([])
+      }
+    } catch (error) {
+      console.error('Error fetching tournament standings:', error)
+      toast.error('Failed to load tournament standings')
+      setStandings([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleBackToSports = () => {
     router.push('/admin/dashboard/leaderboard')
   }
 
-  const handlePointAdded = () => {
-    // Refresh the leaderboard display when a point is added
-    setRefreshKey(prev => prev + 1)
+  const handleOpenAwardDialog = () => {
+    setIsAwardDialogOpen(true)
+  }
+
+  const handleCloseAwardDialog = () => {
+    setIsAwardDialogOpen(false)
+  }
+
+  // Awards points to top 3 teams
+  const handleConfirmAward = async () => {
+    try {
+      setIsAwarding(true)
+      
+      const result = await awardTournamentPoints(sportId, standings)
+      
+      if (result.success) {
+        toast.success(`Successfully awarded points to ${result.updated} team(s)`)
+        setIsAwardDialogOpen(false)
+      } else {
+        toast.error(result.error || 'Failed to award points')
+      }
+    } catch (error) {
+      toast.error('Failed to award tournament points')
+    } finally {
+      setIsAwarding(false)
+    }
   }
 
   if (loading) {
     return (
       <div className="flex justify-center items-center mt-40">
-        <img src="/load.svg" alt="" className="w-20" />
+        <img src="/load.svg" alt="Loading" className="w-20" />
       </div>
     )
   }
@@ -77,44 +134,47 @@ const page = () => {
   }
 
   return (
-    <div>
+    <div className="space-y-8">
       {/* Header */}
-      <div className="flex w-full justify-between items-center mb-8">
+      <div className="flex w-full justify-between items-start">
         <div>
           <Button 
             onClick={handleBackToSports}
             variant="outline" 
-            className="mb-2"
+            className="mb-3"
           >
             ← Back to Sports
           </Button>
           <h1 className="text-3xl font-semibold tracking-wide">
-            {selectedSport.sport_name} - LEADERBOARD
+            {selectedSport.sport_name} - TOURNAMENT STANDINGS
           </h1>
           <p className="text-gray-400 mt-1">
             {selectedSport.category} • {selectedSport.gender_type} • {selectedSport.sport_type}
           </p>
         </div>
+
+        <Button 
+          onClick={handleOpenAwardDialog}
+          disabled={standings.length === 0}
+          className="bg-cranberry/20 border border-cranberry hover:bg-cranberry text-white disabled:bg-gray-700 disabled:cursor-not-allowed cursor-pointer"
+        >
+          Award Points
+        </Button>
       </div>
 
-      {/* Add Points Form */}
-      <div className="mb-8">
-        <ClubPointsForm 
-          sport={selectedSport} 
-          onPointAdded={handlePointAdded}
-        />
-      </div>
+      {/* Tournament Standings */}
+      <TournamentStandings standings={standings} loading={false} />
 
-      {/* Leaderboard Display */}
-      <div>
-        <LeaderboardDisplay 
-          sport={selectedSport} 
-          refreshKey={refreshKey}
-          onPointDeleted={handlePointAdded}
-        />
-      </div>
+      {/* Award Points Confirmation Dialog */}
+      <AwardPointsDialog
+        isOpen={isAwardDialogOpen}
+        onClose={handleCloseAwardDialog}
+        onConfirm={handleConfirmAward}
+        isAwarding={isAwarding}
+        standings={standings}
+      />
     </div>
   )
 }
 
-export default page
+export default TournamentLeaderboardPage

@@ -21,6 +21,8 @@ import { createEvent, getAllEvents } from '@/services/sportServices';
 import { toast } from 'sonner';
 import { useAtom } from 'jotai';
 import { sportsDataAtom, sportsLoadingAtom } from '@/app/state/store';
+import PrivateRoute from '@/lib/PrivateRoute';
+import { SPORT_DAYS } from '@/config/app.config';
 
 const page = () => {
     const[addEvent, setAddEvent] = useState(false);
@@ -163,6 +165,7 @@ const page = () => {
     };
 
     return (
+        <PrivateRoute requiredPermission="admin"  accessType="admin">
         <div>
             <div className="flex w-full justify-between items-center mb-8">
                 <h1 className="text-3xl font-semibold tracking-wide">EVENTS</h1>
@@ -190,10 +193,11 @@ const page = () => {
                                     <SelectValue placeholder="Event Day" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="D-00">E-Sport</SelectItem>
-                                    <SelectItem value="D-01">Day 01</SelectItem>
-                                    <SelectItem value="D-02">Day 02</SelectItem>
-                                    <SelectItem value="D-03">Day 03</SelectItem>
+                                    {Object.values(SPORT_DAYS).map((day) => (
+                                        <SelectItem key={day.value} value={day.value}>
+                                            {day.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -218,8 +222,8 @@ const page = () => {
                                     <SelectValue placeholder="Gender" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="boys">Boys</SelectItem>
-                                    <SelectItem value="girls">Girls</SelectItem>
+                                    <SelectItem value="male">Male</SelectItem>
+                                    <SelectItem value="female">Female</SelectItem>
                                     <SelectItem value="mixed">Mixed</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -376,6 +380,7 @@ const page = () => {
                 </div>
             )}
         </div>
+        </PrivateRoute>
     )
 }
 

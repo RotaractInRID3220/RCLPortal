@@ -98,6 +98,56 @@ export async function DELETE(request) {
     }
 }
 
+export async function PUT(request) {
+    try {
+        const requestData = await request.json();
+        const { RMIS_ID, sport_id, converted_by } = requestData;
+
+        // Validate required parameters
+        if (!RMIS_ID || !sport_id || !converted_by) {
+            console.log('API: Missing required parameters for PUT:', { RMIS_ID, sport_id, converted_by });
+            return NextResponse.json({ 
+                error: 'Missing required parameters: RMIS_ID, sport_id, and converted_by are required' 
+            }, { status: 400 });
+        }
+
+        console.log(`API: Converting registration for RMIS_ID: ${RMIS_ID}, sport_id: ${sport_id}, converted_by: ${converted_by}`);
+
+        // Update the registration
+        const { data, error } = await supabase
+            .from('registrations')
+            .update({ 
+                status: 5,
+                converted: true,
+                converted_by: converted_by
+                        })
+            .eq('RMIS_ID', RMIS_ID)
+            .eq('sport_id', sport_id)
+            .select('RMIS_ID, sport_id, status, converted, converted_by, updated_at');
+
+        if (error) {
+            console.error('API: Error updating registration:', error);
+            return NextResponse.json({ error: 'Failed to convert registration' }, { status: 500 });
+        }
+
+        if (!data || data.length === 0) {
+            console.log('API: No registration found to update');
+            return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
+        }
+
+        console.log('API: Registration converted successfully');
+        return NextResponse.json({ 
+            success: true,
+            message: 'Registration converted successfully',
+            data: data[0]
+        }, { status: 200 });
+
+    } catch (err) {
+        console.error('API: Exception occurred during PUT:', err);
+        return NextResponse.json({ error: 'Server error converting registration' }, { status: 500 });
+    }
+}
+
 export async function POST(request) {
     const requestData = await request.json();
     const { member, sport_id, isMainPlayer } = requestData;
@@ -109,15 +159,15 @@ export async function POST(request) {
     }
 
     try {
-        // First check if registration already exists
+        // First check if registration already exists - optimized query
         const { data: existingRegistration, error: checkError } = await supabase
             .from('registrations')
-            .select()
+            .select('RMIS_ID, sport_id, main_player, club_id')
             .eq('RMIS_ID', member.membership_id)
             .eq('sport_id', sport_id)
-            .single();
+            .maybeSingle();
         
-        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        if (checkError) {
             console.error('API: Error checking existing registration:', checkError);
             return NextResponse.json({ error: 'Failed to check registration status' }, { status: 500 });
         }
@@ -132,15 +182,16 @@ export async function POST(request) {
             }, { status: 200 });
         }
         
-        // If registration doesn't exist yet, insert a new record
+        // If registration doesn't exist yet, insert a new record - optimized insert
         const { data, error } = await supabase
             .from('registrations')
-            .insert([{ 
-                RMIS_ID : member.membership_id,
-                sport_id : sport_id,
-                main_player : isMainPlayer,
-                club_id : member.club_id
-            }]);
+            .insert({ 
+                RMIS_ID: member.membership_id,
+                sport_id: sport_id,
+                main_player: isMainPlayer,
+                club_id: member.club_id
+            })
+            .select('RMIS_ID, sport_id, main_player, club_id');
 
         if (error) {
             console.error('API: Error registering member:', error);

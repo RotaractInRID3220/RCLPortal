@@ -80,6 +80,11 @@ export async function PUT(request) {
     const body = await request.json();
     const { match_id, ...updateData } = body;
     
+    // Convert empty string start_time to null
+    if (updateData.start_time === '') {
+      updateData.start_time = null;
+    }
+    
     const { data, error } = await supabase
       .from('matches')
       .update(updateData)
