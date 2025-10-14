@@ -55,7 +55,6 @@ export async function GET() {
 
     // Process players by gender
     const playersByGender = playersByGenderResult.data || [];
-    console.log('Gender data sample:', playersByGender.slice(0, 5)); // Debug log
     const malePlayers = playersByGender.filter(p => 
       p.gender && (p.gender.toLowerCase() === 'male' || p.gender.toLowerCase() === 'm')
     ).length;
