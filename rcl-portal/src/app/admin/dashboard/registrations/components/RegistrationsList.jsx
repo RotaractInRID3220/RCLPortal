@@ -478,7 +478,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
                               <Button
                                 variant="outline"
                                 size="sm"
-                                disabled={!registration.players?.status === 1 || registration.players?.converted}
+                                disabled={!(registration.players?.status === 1) || registration.players?.converted}
                                 className={`bg-transparent border border-white/20 text-white/70 hover:bg-white/10 hover:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
                                 onClick={() => handleConvertClick(registration)}
                               >
