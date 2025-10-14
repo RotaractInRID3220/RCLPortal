@@ -82,6 +82,8 @@ export async function GET(request) {
 
         // Calculate eligible sports (≥50% attendance)
         let eligibleSportsCount = 0;
+        const eligibleSportIds = [];
+        
         Object.entries(sportGroups).forEach(([sportId, players]) => {
           const totalPlayers = players.size;
           const attendedPlayers = Array.from(players).filter(rmisId => 
@@ -91,18 +93,26 @@ export async function GET(request) {
           // Check if ≥50% attended
           if (totalPlayers > 0 && (attendedPlayers / totalPlayers) >= 0.5) {
             eligibleSportsCount++;
+            eligibleSportIds.push(parseInt(sportId));
           }
         });
 
-        // Check if points already awarded for this day
-        const { data: existingPoints, error: pointsError } = await supabase
-          .from('club_points')
-          .select('point_id')
-          .eq('club_id', club.club_id)
-          .eq('place', sportDayPlace)
-          .is('sport_id', null);
+        // Check if points already awarded for eligible sports
+        let alreadyAwarded = false;
+        
+        if (eligibleSportIds.length > 0) {
+          const { data: existingPoints, error: pointsError } = await supabase
+            .from('club_points')
+            .select('sport_id')
+            .eq('club_id', club.club_id)
+            .eq('place', sportDayPlace)
+            .in('sport_id', eligibleSportIds);
 
-        if (pointsError) throw pointsError;
+          if (pointsError) throw pointsError;
+
+          // If any eligible sport has been awarded, mark as already awarded
+          alreadyAwarded = existingPoints && existingPoints.length > 0;
+        }
 
         return {
           club_id: club.club_id,
@@ -111,7 +121,7 @@ export async function GET(request) {
           day_registration_count: dayRegistrationCount,
           registered_sports_count: Object.keys(sportGroups).length,
           eligible_sports_count: eligibleSportsCount,
-          already_awarded: existingPoints && existingPoints.length > 0,
+          already_awarded: alreadyAwarded,
         };
       })
     );

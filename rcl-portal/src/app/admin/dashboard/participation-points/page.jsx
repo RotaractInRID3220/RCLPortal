@@ -181,19 +181,21 @@ const ParticipationPointsPage = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-white">Confirm Award Participation Points</AlertDialogTitle>
                 <AlertDialogDescription className="text-gray-300">
-                  This will award <span className="text-cranberry font-semibold">{APP_CONFIG.PARTICIPATION_POINTS_PER_SPORT} points</span> per eligible sport to clubs for <span className="text-white font-semibold">{sportDayLabel}</span>.
-                  <br /><br />
-                  <strong className="text-white">Eligibility Criteria:</strong>
-                  <ul className="list-disc list-inside text-sm mt-2 space-y-1">
-                    <li>Club must have ≥50% of registered players attend on the day</li>
-                    <li>Points will NOT be awarded if already awarded for this day</li>
-                    <li>Total eligible clubs: <span className="text-green-400">{eligibleClubs}</span></li>
-                    <li>Total eligible sports: <span className="text-blue-400">{totalEligibleSports}</span></li>
-                  </ul>
-                  <br />
-                  <span className="text-yellow-400 text-sm">⚠️ This action will insert records into the club_points table and cannot be easily undone.</span>
+                  <span>This will award <span className="text-cranberry font-semibold">{APP_CONFIG.PARTICIPATION_POINTS_PER_SPORT} points</span> per eligible sport to clubs for <span className="text-white font-semibold">{sportDayLabel}</span>.</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="px-6 pb-4">
+                <strong className="text-white">Eligibility Criteria:</strong>
+                <ul className="list-disc list-inside text-sm mt-2 space-y-1 text-gray-300">
+                  <li>Club must have ≥50% of registered players attend on the day</li>
+                  <li>Points will NOT be awarded if already awarded for this day</li>
+                  <li>Total eligible clubs: <span className="text-green-400">{eligibleClubs}</span></li>
+                  <li>Total eligible sports: <span className="text-blue-400">{totalEligibleSports}</span></li>
+                </ul>
+                <div className="mt-4">
+                  <span className="text-yellow-400 text-sm">⚠️ This action will insert records into the club_points table and cannot be easily undone.</span>
+                </div>
+              </div>
               <AlertDialogFooter>
                 <AlertDialogCancel className="bg-gray-700">Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleAwardPoints} className="bg-cranberry hover:bg-cranberry/80">

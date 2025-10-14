@@ -11,7 +11,7 @@ const supabase = createClient(
  * POST /api/admin/participation-points/award
  * 
  * Awards participation points to clubs based on 50%+ attendance criteria.
- * Points are stored in club_points table with sport_id=NULL and place=<sport_day_code>.
+ * Points are stored in club_points table with sport_id for each eligible sport and place=<sport_day_code>.
  */
 export async function POST(request) {
   try {
@@ -49,21 +49,6 @@ export async function POST(request) {
 
     // Process each club
     for (const club of clubs) {
-      // Check if already awarded for this day
-      const { data: existingPoints, error: checkError } = await supabase
-        .from('club_points')
-        .select('point_id')
-        .eq('club_id', club.club_id)
-        .eq('place', sportDayPlace)
-        .is('sport_id', null);
-
-      if (checkError) throw checkError;
-
-      if (existingPoints && existingPoints.length > 0) {
-        clubsSkipped++;
-        continue;
-      }
-
       // Get all sports for this day that the club has registrations for
       const { data: registrations, error: regError } = await supabase
         .from('registrations')
@@ -114,9 +99,10 @@ export async function POST(request) {
 
       const dayRegisteredPlayers = new Set(dayRegs.map(dr => dr.RMIS_ID));
 
-      // Calculate eligible sports (≥50% attendance)
-      let eligibleSportsCount = 0;
-      Object.entries(sportGroups).forEach(([sportId, players]) => {
+      // Calculate eligible sports (≥50% attendance) and award points per sport
+      const eligibleSports = [];
+      
+      for (const [sportId, players] of Object.entries(sportGroups)) {
         const totalPlayers = players.size;
         const attendedPlayers = Array.from(players).filter(rmisId => 
           dayRegisteredPlayers.has(rmisId)
@@ -124,27 +110,47 @@ export async function POST(request) {
 
         // Check if ≥50% attended
         if (totalPlayers > 0 && (attendedPlayers / totalPlayers) >= 0.5) {
-          eligibleSportsCount++;
+          eligibleSports.push(parseInt(sportId));
         }
-      });
+      }
 
-      // Award points if eligible
-      if (eligibleSportsCount > 0) {
-        const totalPoints = eligibleSportsCount * pointsPerSport;
+      // Award points per eligible sport
+      if (eligibleSports.length > 0) {
+        // Check if points already awarded for any of these sports
+        const { data: existingPoints, error: checkError } = await supabase
+          .from('club_points')
+          .select('sport_id')
+          .eq('club_id', club.club_id)
+          .eq('place', sportDayPlace)
+          .in('sport_id', eligibleSports);
+
+        if (checkError) throw checkError;
+
+        // Get sports that haven't been awarded yet
+        const alreadyAwardedSportIds = new Set(existingPoints?.map(p => p.sport_id) || []);
+        const sportsToAward = eligibleSports.filter(sportId => !alreadyAwardedSportIds.has(sportId));
+
+        if (sportsToAward.length === 0) {
+          clubsSkipped++;
+          continue;
+        }
+
+        // Prepare bulk insert for all eligible sports
+        const pointsToInsert = sportsToAward.map(sportId => ({
+          club_id: club.club_id,
+          sport_id: sportId,
+          place: sportDayPlace,
+          points: pointsPerSport,
+        }));
 
         const { error: insertError } = await supabase
           .from('club_points')
-          .insert({
-            club_id: club.club_id,
-            sport_id: null,
-            place: sportDayPlace,
-            points: totalPoints,
-          });
+          .insert(pointsToInsert);
 
         if (insertError) throw insertError;
 
         clubsAwarded++;
-        totalPointsAwarded += totalPoints;
+        totalPointsAwarded += sportsToAward.length * pointsPerSport;
       }
     }
 
