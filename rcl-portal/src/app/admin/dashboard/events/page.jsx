@@ -222,8 +222,8 @@ const page = () => {
                                     <SelectValue placeholder="Gender" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="boys">Boys</SelectItem>
-                                    <SelectItem value="girls">Girls</SelectItem>
+                                    <SelectItem value="male">Male</SelectItem>
+                                    <SelectItem value="female">Female</SelectItem>
                                     <SelectItem value="mixed">Mixed</SelectItem>
                                 </SelectContent>
                             </Select>

@@ -21,7 +21,7 @@ const EventSelector = React.memo(() => {
   // Optimized fetch function with caching
   const fetchAllSports = useCallback(async () => {
     // Check cache validity first
-    if (sportsData.length > 0 && isCacheValid(lastFetchTimestamp.sports, 'sports')) {
+    if (isCacheValid(lastFetchTimestamp.sports, 'sports')) {
       console.log('Using cached sports data');
       return;
     }
@@ -39,7 +39,7 @@ const EventSelector = React.memo(() => {
     } finally {
       setSportsLoading(false)
     }
-  }, [setSportsData, setSportsLoading, setLastFetchTimestamp, sportsData.length, lastFetchTimestamp.sports])
+  }, [setSportsData, setSportsLoading, setLastFetchTimestamp, lastFetchTimestamp.sports])
 
   // Load sports data when component mounts
   useEffect(() => {

@@ -28,7 +28,7 @@ const LeaderboardSportSelector = React.memo(() => {
   const fetchAllSports = useCallback(async (forceRefresh = false) => {
     try {
       // Check cache validity
-      if (!forceRefresh && sportsData.length > 0 && isCacheValid(lastFetchTimestamp.sports)) {
+      if (!forceRefresh && isCacheValid(lastFetchTimestamp.sports, 'sports')) {
         console.log('Using cached sports data')
         return
       }
@@ -45,7 +45,7 @@ const LeaderboardSportSelector = React.memo(() => {
     } finally {
       setSportsLoading(false)
     }
-  }, [sportsData.length, lastFetchTimestamp.sports, setSportsData, setSportsLoading, setLastFetchTimestamp])
+  }, [lastFetchTimestamp.sports, setSportsData, setSportsLoading, setLastFetchTimestamp])
 
   // Load sports data when component mounts
   useEffect(() => {

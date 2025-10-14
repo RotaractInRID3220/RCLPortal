@@ -115,8 +115,8 @@ const SportRegistrationPage = React.memo(() => {
             
             // Filter by gender matching sport requirements
             const sportGender = selectedSportData.gender_type.toLowerCase();
-            return (sportGender === 'boys' && member.gender === 'M') || 
-                   (sportGender === 'girls' && member.gender === 'F') ||
+            return (sportGender === 'male' && member.gender === 'M') || 
+                   (sportGender === 'female' && member.gender === 'F') ||
                    sportGender === 'mixed'; // Allow both for mixed sports
         });
     }, [clubMembers, selectedSportData?.gender_type, registeredPlayers]);
@@ -254,8 +254,8 @@ const SportRegistrationPage = React.memo(() => {
             if (selectedSportData?.gender_type) {
                 const sportGender = selectedSportData.gender_type.toLowerCase();
                 const filteredMembers = clubMembers.filter(member => 
-                    (sportGender === 'boys' && member.gender === 'M') || 
-                    (sportGender === 'girls' && member.gender === 'F')
+                    (sportGender === 'male' && member.gender === 'M') || 
+                    (sportGender === 'female' && member.gender === 'F')
                 );
                 console.log(`Filtered ${filteredMembers.length} ${sportGender} members from ${clubMembers.length} total`);
             }

@@ -239,35 +239,37 @@ const PlayersPage = () => {
         <h1 className="text-3xl font-semibold tracking-wide">PLAYERS</h1>
         <div className="flex gap-3">
           {/* Sync with RMIS Button */}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                disabled={syncingRMIS}
-                className="bg-blue-500/20 border border-blue-500 hover:bg-blue-500/40 text-blue-200 cursor-pointer"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${syncingRMIS ? 'animate-spin' : ''}`} />
-                {syncingRMIS ? 'Syncing...' : 'Sync with RMIS'}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="bg-black-900/60 backdrop-blur-lg border-cranberry/30">
-              <AlertDialogHeader>
-                <AlertDialogTitle className="text-white">Sync with RMIS</AlertDialogTitle>
-                <AlertDialogDescription className="text-gray-300">
-                  This will check and update player statuses (General/Prospective) based on the latest data from the RMIS database.
-                  Are you sure you want to continue?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600 cursor-pointer">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={syncWithRMIS}
-                  className="bg-cranberry hover:bg-cranberry cursor-pointer"
+          {!isAfterDeadline && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  disabled={syncingRMIS}
+                  className="bg-blue-500/20 border border-blue-500 hover:bg-blue-500/40 text-blue-200 cursor-pointer"
                 >
-                  Sync Now
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  <RefreshCw className={`w-4 h-4 mr-2 ${syncingRMIS ? 'animate-spin' : ''}`} />
+                  {syncingRMIS ? 'Syncing...' : 'Sync with RMIS'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-black-900/60 backdrop-blur-lg border-cranberry/30">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-white">Sync with RMIS</AlertDialogTitle>
+                  <AlertDialogDescription className="text-gray-300">
+                    This will check and update player statuses (General/Prospective) based on the latest data from the RMIS database.
+                    Are you sure you want to continue?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="bg-gray-700 hover:bg-gray-600 cursor-pointer">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={syncWithRMIS}
+                    className="bg-cranberry hover:bg-cranberry cursor-pointer"
+                  >
+                    Sync Now
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
 
           {/* Clean Players Button */}
           {!isAfterDeadline && (
@@ -402,7 +404,7 @@ const PlayersPage = () => {
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {paginatedPlayers.map((player) => (
-                    <tr key={player.RMIS_ID} className={`hover:bg-white/5 ${player.converted ? 'bg-red-500/20 border-l-4 border-red-500' : ''}`}>
+                    <tr key={player.RMIS_ID} className={`hover:bg-white/5 ${player.converted ? 'bg-red-500/20 border-l-2 border-red-500' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                         {player.name || 'N/A'}
                       </td>
