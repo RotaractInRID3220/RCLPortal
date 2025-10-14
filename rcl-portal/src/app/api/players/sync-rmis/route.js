@@ -5,18 +5,16 @@ export async function POST(request) {
   try {
     const { club_id } = await request.json();
 
-    if (!club_id) {
-      return NextResponse.json(
-        { error: 'Club ID is required' },
-        { status: 400 }
-      );
+    // Build query based on whether club_id is provided
+    let playersQuery = supabase
+      .from('players')
+      .select('RMIS_ID, status');
+
+    if (club_id) {
+      playersQuery = playersQuery.eq('club_id', club_id);
     }
 
-    // Step 1: Fetch all players for the club from Supabase
-    const { data: players, error: playersError } = await supabase
-      .from('players')
-      .select('RMIS_ID, status')
-      .eq('club_id', club_id);
+    const { data: players, error: playersError } = await playersQuery;
 
     if (playersError) {
       console.error('Error fetching players:', playersError);
@@ -27,9 +25,10 @@ export async function POST(request) {
     }
 
     if (!players || players.length === 0) {
+      const scope = club_id ? 'this club' : 'the system';
       return NextResponse.json({
         success: true,
-        message: 'No players found for this club',
+        message: `No players found for ${scope}`,
         updatedCount: 0
       });
     }
@@ -97,13 +96,19 @@ export async function POST(request) {
     }
 
     // Step 6: Batch update players in Supabase
-    const updatePromises = playersToUpdate.map(player =>
-      supabase
+    const updatePromises = playersToUpdate.map(player => {
+      let updateQuery = supabase
         .from('players')
         .update({ status: player.newStatus })
-        .eq('RMIS_ID', player.RMIS_ID)
-        .eq('club_id', club_id)
-    );
+        .eq('RMIS_ID', player.RMIS_ID);
+
+      // Only filter by club_id if provided (for club-specific sync)
+      if (club_id) {
+        updateQuery = updateQuery.eq('club_id', club_id);
+      }
+
+      return updateQuery;
+    });
 
     const updateResults = await Promise.all(updatePromises);
 

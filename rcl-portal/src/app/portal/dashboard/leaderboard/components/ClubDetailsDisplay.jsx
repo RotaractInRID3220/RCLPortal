@@ -38,7 +38,7 @@ const ClubDetailsDisplay = ({ clubPoints }) => {
         // Combine club points with sport names
         const enrichedPoints = clubPoints.map(point => ({
           ...point,
-          sport: sportMap[point.sport_id] || { sport_name: 'Unknown Sport' }
+          sport: sportMap[point.sport_id] || { sport_name: 'Penalty' }
         }))
 
         // Sort by points descending, then by sport name ascending
@@ -113,7 +113,7 @@ const ClubDetailsDisplay = ({ clubPoints }) => {
             {/* Sport Info */}
             <div className="col-span-1 sm:col-span-2 lg:col-span-2">
               <div className="font-medium text-white">
-                {entry.sport.sport_name}
+                {entry.sport.sport_name || 'Penalty'}
               </div>
               {entry.sport.category && entry.sport.gender_type && (
                 <div className="text-sm text-gray-400 mt-1">

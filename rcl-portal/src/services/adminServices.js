@@ -114,3 +114,28 @@ export const getLeaderboardPreview = async (category = null) => {
     throw error;
   }
 };
+
+/**
+ * Fetches comprehensive administration statistics
+ * @returns {Promise<Object>} Administration statistics including system-wide metrics
+ */
+export const getAdministrationStats = async () => {
+  try {
+    const response = await fetch('/api/admin/administration/stats');
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to fetch administration stats');
+    }
+
+    return result.data;
+  } catch (error) {
+    console.error('Error fetching administration stats:', error);
+    throw error;
+  }
+};
