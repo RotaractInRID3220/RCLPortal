@@ -61,8 +61,6 @@ export async function GET() {
     const femalePlayers = playersByGender.filter(p => 
       p.gender && (p.gender.toLowerCase() === 'female' || p.gender.toLowerCase() === 'f')
     ).length;
-    console.log('Gender counts:', { malePlayers, femalePlayers }); // Debug log
-
     // Process registrations by category (individual vs team sports)
     const eventsData = registrationsByCategoryResult.data || [];
     const individualEvents = eventsData.filter(e => e.sport_type === 'individual').length;
