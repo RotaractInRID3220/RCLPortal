@@ -7,7 +7,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from 'sonner';
 import StatsCard from '@/components/StatsCard';
 import { getAdministrationStats } from '@/services/adminServices';
-import { UserMinus, RefreshCw, Users, UserCheck, Calendar, Trophy, CreditCard, BarChart3, UserCog } from 'lucide-react';
+import { UserMinus, RefreshCw, Users, UserCheck, Calendar, Trophy, CreditCard, BarChart3, UserCog, Award } from 'lucide-react';
+import PrivateRoute from '@/lib/PrivateRoute';
 
 const AdministrationPage = () => {
   const [stats, setStats] = useState(null);
@@ -80,6 +81,7 @@ const AdministrationPage = () => {
   };
 
   return (
+    <PrivateRoute requiredPermission="admin" accessType="admin">
     <div className="min-h-screen">
       {/* Header */}
       <div className="text-center mb-8">
@@ -88,7 +90,7 @@ const AdministrationPage = () => {
       </div>
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 h-32">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 h-40 mb-8">
         {/* Global Clean Players */}
         <Card className="bg-white/5 border-white/20 h-full flex flex-col">
           <CardHeader className="flex-grow">
@@ -105,7 +107,7 @@ const AdministrationPage = () => {
               <AlertDialogTrigger asChild>
                 <Button
                   disabled={cleaningPlayers}
-                  className="w-full bg-red-500/20 border border-red-500 hover:bg-red-500/30 text-red-200"
+                  className="w-full bg-red-500/20 border border-red-500 hover:bg-red-500/30 text-red-200 cursor-pointer"
                 >
                   {cleaningPlayers ? 'Cleaning...' : 'Clean Players Globally'}
                 </Button>
@@ -144,7 +146,7 @@ const AdministrationPage = () => {
               <AlertDialogTrigger asChild>
                 <Button
                   disabled={syncingRMIS}
-                  className="w-full bg-blue-500/20 border border-blue-500 hover:bg-blue-500/30 text-blue-200"
+                  className="w-full bg-blue-500/20 border border-blue-500 hover:bg-blue-500/30 text-blue-200 cursor-pointer"
                 >
                   {syncingRMIS ? 'Syncing...' : 'Sync RMIS Globally'}
                 </Button>
@@ -180,10 +182,31 @@ const AdministrationPage = () => {
           </CardHeader>
           <CardContent className="mt-auto">
             <Button
-              className="w-full bg-purple-500/20 border border-purple-500 hover:bg-purple-500/30 text-purple-200"
+              className="w-full bg-purple-500/20 border border-purple-500 hover:bg-purple-500/30 text-purple-200 cursor-pointer"
               onClick={() => window.location.href = '/admin/dashboard/membership-management'}
             >
               Manage Membership
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Participation Points */}
+        <Card className="bg-white/5 border-white/20 h-full flex flex-col">
+          <CardHeader className="flex-grow">
+            <CardTitle className="text-white flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              Participation Points
+            </CardTitle>
+            <CardDescription className="text-white/70">
+              Award points to clubs based on player attendance for sport days. Track participation and reward consistent attendance.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="mt-auto">
+            <Button
+              className="w-full bg-yellow-500/20 border border-yellow-500 hover:bg-yellow-500/30 text-yellow-200 cursor-pointer"
+              onClick={() => window.location.href = '/admin/dashboard/participation-points'}
+            >
+              Manage Participation
             </Button>
           </CardContent>
         </Card>
@@ -310,6 +333,7 @@ const AdministrationPage = () => {
         </div>
       )}
     </div>
+    </PrivateRoute>
   );
 };
 

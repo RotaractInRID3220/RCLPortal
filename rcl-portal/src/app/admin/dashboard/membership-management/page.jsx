@@ -169,7 +169,7 @@ const MembershipManagementPage = () => {
   }, [membershipData, searchTerm]);
 
   return (
-    <PrivateRoute accessType="admin">
+    <PrivateRoute requiredPermission="admin" accessType="admin">
       <div className="min-h-screen">
         {/* Header */}
         <div className="text-center mb-8">

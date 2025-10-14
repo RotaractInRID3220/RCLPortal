@@ -22,8 +22,8 @@ CREATE TABLE public.day_registrations (
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     RMIS_ID text,
     sport_day text,
-    CONSTRAINT day_registrations_pkey PRIMARY KEY (id),
-    CONSTRAINT day_registrations_RMIS_ID_fkey FOREIGN KEY (RMIS_ID) REFERENCES public.players(RMIS_ID)
+    approved_by text,
+    CONSTRAINT day_registrations_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.events (
     sport_id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -68,6 +68,12 @@ CREATE TABLE public.payment_slips (
     CONSTRAINT payment_slips_pkey PRIMARY KEY (payment_id),
     CONSTRAINT payment_slips_club_id_fkey FOREIGN KEY (club_id) REFERENCES public.clubs(club_id)
 );
+CREATE TABLE public.permissions (
+    RMIS_ID text NOT NULL,
+    permission_level text NOT NULL,
+    card_name text,
+    CONSTRAINT permissions_pkey PRIMARY KEY (RMIS_ID)
+);
 CREATE TABLE public.players (
     RMIS_ID text NOT NULL,
     RI_ID text,
@@ -78,6 +84,8 @@ CREATE TABLE public.players (
     gender text,
     registered_at timestamp with time zone NOT NULL DEFAULT now(),
     status smallint,
+    converted boolean DEFAULT false,
+    converted_by text,
     CONSTRAINT players_pkey PRIMARY KEY (RMIS_ID),
     CONSTRAINT players_club_id_fkey FOREIGN KEY (club_id) REFERENCES public.clubs(club_id)
 );
@@ -112,10 +120,4 @@ CREATE TABLE public.track_events (
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT track_events_pkey PRIMARY KEY (id),
     CONSTRAINT track_events_sport_id_fkey FOREIGN KEY (sport_id) REFERENCES public.events(sport_id)
-);
-CREATE TABLE public.permissions (
-    RMIS_ID text NOT NULL,
-    permission_level text NOT NULL,
-    card_name text,
-    CONSTRAINT permissions_pkey PRIMARY KEY (RMIS_ID)
 );

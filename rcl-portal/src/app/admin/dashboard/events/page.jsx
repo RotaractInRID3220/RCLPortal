@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { useAtom } from 'jotai';
 import { sportsDataAtom, sportsLoadingAtom } from '@/app/state/store';
 import PrivateRoute from '@/lib/PrivateRoute';
+import { SPORT_DAYS } from '@/config/app.config';
 
 const page = () => {
     const[addEvent, setAddEvent] = useState(false);
@@ -192,10 +193,11 @@ const page = () => {
                                     <SelectValue placeholder="Event Day" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="D-00">E-Sport</SelectItem>
-                                    <SelectItem value="D-01">Day 01</SelectItem>
-                                    <SelectItem value="D-02">Day 02</SelectItem>
-                                    <SelectItem value="D-03">Day 03</SelectItem>
+                                    {Object.values(SPORT_DAYS).map((day) => (
+                                        <SelectItem key={day.value} value={day.value}>
+                                            {day.label}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
