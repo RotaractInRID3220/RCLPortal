@@ -154,10 +154,10 @@ export default function EArenaPage() {
                 ) : (
                   <div className="group relative">
                     {/* Animated glowing border effect */}
-                    <div className="absolute -inset-1 bg-gradient-to-r from-cranberry via-pink-500 to-cranberry rounded-xl blur opacity-5 group-hover:opacity-100 animate-pulse"></div>
+                    <div className="absolute -inset-1 bg-gradient-to-r from-cranberry via-pink-500 to-cranberry rounded-xl blur opacity-5 group-hover:opacity-10 animate-pulse "></div>
                     
                     {/* Main box */}
-                    <div className="relative bg-black/70 border-2 border-cranberry rounded-xl px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-4 transition-all duration-300 hover:border-pink-500 hover:shadow-[0_0_30px_rgba(216,27,93,0.2)] hover:scale-105">
+                    <div className="relative bg-black/70 border-2 border-cranberry rounded-xl px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-4 transition-all duration-300 hover:border-pink-500 hover:shadow-[0_0_30px_rgba(216,27,93,0.2)] ">
                       <div className="flex items-center justify-center gap-3 select-none">
                         <FaBolt className="text-cranberry text-xl sm:text-2xl md:text-3xl animate-pulse" />
                         <p className="font-bebas text-cranberry text-xl sm:text-2xl md:text-3xl tracking-wider group-hover:text-white transition-colors duration-300 whitespace-nowrap">
