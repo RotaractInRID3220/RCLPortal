@@ -29,5 +29,10 @@ export const APP_CONFIG = {
   MEMBERSHIP_CUTOFF_DATE: '2025-09-09T20:25:53.000Z', // Set cutoff date as 'YYYY-MM-DDTHH:mm:ss' or leave empty for current date
   REGISTRATION_FEE: 800, // Registration fee per player in Rs.
   PARTICIPATION_POINTS_PER_SPORT: 15, // Points awarded per sport for participation (50%+ attendance)
+  
+  // Tournament Placement Points
+  FIRST_PLACE_POINTS: 50, // Points awarded for 1st place
+  SECOND_PLACE_POINTS: 30, // Points awarded for 2nd place
+  THIRD_PLACE_POINTS: 20, // Points awarded for 3rd place
   // ...other config values
 };
