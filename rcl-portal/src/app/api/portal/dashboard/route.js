@@ -1,6 +1,78 @@
 import { supabase } from '@/lib/supabaseClient';
 import { NextResponse } from 'next/server';
 
+// Import the leaderboard function directly to avoid internal HTTP calls
+async function getOptimizedLeaderboard(category, limit, offset) {
+  try {
+    // First, get clubs with their total points using a single query with aggregation
+    let clubsQuery = supabase
+      .from('clubs')
+      .select(`
+        club_id,
+        club_name,
+        category,
+        club_points!left (
+          points
+        )
+      `)
+      .order('club_name', { ascending: true });
+
+    if (category) {
+      clubsQuery = clubsQuery.eq('category', category);
+    }
+
+    const { data: clubsWithPoints, error: clubsError } = await clubsQuery;
+    if (clubsError) throw clubsError;
+
+    // Process and aggregate the data
+    const processedClubs = clubsWithPoints.map(club => {
+      const totalPoints = club.club_points?.reduce((sum, point) => sum + (point.points || 0), 0) || 0;
+      const entriesCount = club.club_points?.length || 0;
+
+      return {
+        club_id: club.club_id,
+        club_name: club.club_name,
+        category: club.category,
+        total_points: totalPoints,
+        entries_count: entriesCount
+      };
+    });
+
+    // Sort by total points (desc), then by name (asc)
+    processedClubs.sort((a, b) => {
+      if (b.total_points !== a.total_points) {
+        return b.total_points - a.total_points;
+      }
+      return a.club_name.localeCompare(b.club_name);
+    });
+
+    // Add ranking
+    let currentRank = 1;
+    const rankedClubs = processedClubs.map((club, index) => {
+      if (index > 0 && club.total_points !== processedClubs[index - 1].total_points) {
+        currentRank = index + 1;
+      }
+      return { ...club, rank: currentRank };
+    });
+
+    // Apply pagination
+    const total = rankedClubs.length;
+    let paginatedClubs = rankedClubs;
+    
+    if (limit) {
+      const startIndex = parseInt(offset);
+      const endIndex = startIndex + parseInt(limit);
+      paginatedClubs = rankedClubs.slice(startIndex, endIndex);
+    }
+
+    return { clubs: paginatedClubs, total };
+  } catch (error) {
+    console.error('Error in optimized leaderboard:', error);
+    // Return empty result instead of throwing to prevent dashboard failure
+    return { clubs: [], total: 0 };
+  }
+}
+
 // Gets complete dashboard data for portal user including stats and leaderboard
 export async function GET(request) {
   try {
@@ -21,8 +93,7 @@ export async function GET(request) {
       clubResult,
       eventsResult,
       playersResult,
-      pointsResult,
-      leaderboardResult
+      pointsResult
     ] = await Promise.allSettled([
       // Get club information
       supabase
@@ -55,13 +126,11 @@ export async function GET(request) {
           )
         `)
         .eq('club_id', clubId)
-        .single(),
-      
-      // Get leaderboard data by calling internal API
-      fetch(`${request.nextUrl.origin}/api/leaderboard/aggregated?category=${leaderboardCategory}&limit=${leaderboardLimit}`)
-        .then(res => res.json())
-        .catch(err => ({ success: false, error: err.message }))
+        .single()
     ]);
+
+    // Get leaderboard data separately (not in Promise.allSettled since it's a direct call)
+    const leaderboardResult = await getOptimizedLeaderboard(leaderboardCategory, leaderboardLimit, 0);
 
     // Check for errors in club data (most critical)
     if (clubResult.status === 'rejected' || !clubResult.value.data) {
@@ -93,8 +162,8 @@ export async function GET(request) {
     let clubRank = 0;
     let leaderboard = [];
     
-    if (leaderboardResult.status === 'fulfilled' && leaderboardResult.value.success) {
-      leaderboard = leaderboardResult.value.data || [];
+    if (leaderboardResult && leaderboardResult.clubs) {
+      leaderboard = leaderboardResult.clubs;
       
       // Find club rank from the leaderboard data
       const clubIdNum = parseInt(clubId);
@@ -107,14 +176,13 @@ export async function GET(request) {
       if (clubRank === 0) {
         console.log(`Club ${clubIdNum} not found in limited leaderboard, fetching full leaderboard for category: ${clubData.category}`);
         try {
-          const fullLeaderboardResponse = await fetch(`${request.nextUrl.origin}/api/leaderboard/aggregated?category=${clubData.category}`);
-          const fullLeaderboardResult = await fullLeaderboardResponse.json();
+          const fullLeaderboardResult = await getOptimizedLeaderboard(clubData.category, null, 0);
           
-          if (fullLeaderboardResult.success) {
-            clubRank = fullLeaderboardResult.data.findIndex(club => club.club_id === clubIdNum) + 1;
+          if (fullLeaderboardResult && fullLeaderboardResult.clubs) {
+            clubRank = fullLeaderboardResult.clubs.findIndex(club => club.club_id === clubIdNum) + 1;
             console.log(`Club rank from full leaderboard: ${clubRank}`);
           } else {
-            console.error('Full leaderboard fetch failed:', fullLeaderboardResult.error);
+            console.error('Full leaderboard fetch failed');
           }
         } catch (error) {
           console.error('Error fetching full leaderboard for ranking:', error);
