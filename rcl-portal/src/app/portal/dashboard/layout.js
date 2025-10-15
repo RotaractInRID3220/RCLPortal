@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import PrivateRoute from "@/lib/PrivateRoute";
 import PortalSideNav from "./components/PortalSideNav";
 import DeviceCheck from "./components/DeviceCheck";
+import Script from "next/script";
 
 const bebas = Bebas_Neue({
   variable: "--font-bebas",
@@ -25,9 +26,18 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-      <div
-        className={`${bebas.variable} ${poppins.variable} antialiased dark`}
-      >
+      <>
+        {/* Google tag (gtag.js) */}
+        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-9BRFC5JVKB" />
+        <Script>
+          {`window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-9BRFC5JVKB');`}
+        </Script>
+        <div
+          className={`${bebas.variable} ${poppins.variable} antialiased dark`}
+        >
         <div className="flex w-full">
           <div className="lg:w-2/12 h-screen hidden lg:block fixed">
             <PortalSideNav />
@@ -45,5 +55,6 @@ export default function RootLayout({ children }) {
         <div className='w-[700px] h-[500px] fixed -top-80  left-0 right-0 m-auto bg-cranberry/75 -z-10 rounded-full blur-[20rem]'></div>
 
       </div>
+      </>
   );
 }

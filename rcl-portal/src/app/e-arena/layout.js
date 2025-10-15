@@ -146,6 +146,14 @@ export default function EArenaLayout({ children }) {
 
   return (
     <>
+      {/* Google tag (gtag.js) */}
+      <Script async src="https://www.googletagmanager.com/gtag/js?id=G-9BRFC5JVKB" />
+      <Script>
+        {`window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-9BRFC5JVKB');`}
+      </Script>
       <Script
         id="json-ld-e-arena"
         type="application/ld+json"
