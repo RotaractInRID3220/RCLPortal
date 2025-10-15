@@ -1,6 +1,7 @@
 import { Bebas_Neue, Poppins } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import PrivateRoute from "@/lib/PrivateRoute";
+import Script from "next/script";
 
 const bebas = Bebas_Neue({
   variable: "--font-bebas",
@@ -23,9 +24,19 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <div className={`${bebas.variable} ${poppins.variable} antialiased dark`}>
-          {children}
-          <Toaster richColors  />
-    </div>
+    <>
+      {/* Google tag (gtag.js) */}
+      <Script async src="https://www.googletagmanager.com/gtag/js?id=G-9BRFC5JVKB" />
+      <Script>
+        {`window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-9BRFC5JVKB');`}
+      </Script>
+      <div className={`${bebas.variable} ${poppins.variable} antialiased dark`}>
+        {children}
+        <Toaster richColors  />
+      </div>
+    </>
   );
 }
