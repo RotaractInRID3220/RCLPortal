@@ -81,7 +81,7 @@ export default function EArenaPage() {
             <div className="text-center mb-20">
               {/* RCL Text */}
               <h1 className="font-poppins text-white text-3xl md:text-5xl lg:text-5xl font-normal mb-4 tracking-wider leading-0 mt-[8%] select-none">
-                RCL
+                RCL PRESENTS
               </h1>
 
               {/* E-ARENA Main Title */}
