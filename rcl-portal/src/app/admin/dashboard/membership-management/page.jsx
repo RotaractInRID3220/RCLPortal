@@ -14,8 +14,8 @@ const calculateDeductionPoints = (percentage, totalPlayers = 0) => {
   // Don't apply deductions to clubs with no players
   if (totalPlayers === 0) return 0;
 
-  if (percentage >= 67 && percentage <= 69) return -25;
-  if (percentage >= 62 && percentage <= 66) return -50;
+  if (percentage >= 67 && percentage < 70) return -25;
+  if (percentage >= 62 && percentage < 67) return -50;
   if (percentage < 62) return -80;
   return 0;
 };
