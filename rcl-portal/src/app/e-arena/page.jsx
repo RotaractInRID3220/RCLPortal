@@ -21,13 +21,28 @@ export default function EArenaPage() {
     seconds: 0
   })
 
+  const [eventTimeLeft, setEventTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0
+  })
+
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false)
+  const [isRegistrationClosed, setIsRegistrationClosed] = useState(false)
 
   useEffect(() => {
     const calculateTimeLeft = () => {
       const targetDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE)
+      const registrationDeadline = new Date(APP_CONFIG.REGISTRATION_DEADLINE)
+      const eventDay = new Date(APP_CONFIG.EVENT_DAY)
       const now = new Date()
       const difference = targetDate - now
+      const registrationClosed = now > registrationDeadline
+      const eventDifference = eventDay - now
+
+      // Check if registrations are closed
+      setIsRegistrationClosed(registrationClosed)
 
       if (difference > 0) {
         setTimeLeft({
@@ -40,6 +55,18 @@ export default function EArenaPage() {
       } else {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
         setIsRegistrationOpen(true)
+      }
+
+      // Calculate event day countdown
+      if (eventDifference > 0) {
+        setEventTimeLeft({
+          days: Math.floor(eventDifference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((eventDifference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((eventDifference / 1000 / 60) % 60),
+          seconds: Math.floor((eventDifference / 1000) % 60)
+        })
+      } else {
+        setEventTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
       }
     }
 
@@ -118,7 +145,40 @@ export default function EArenaPage() {
 
               {/* Countdown Timer / Registration Open Message */}
               <div className="flex flex-col gap-4 justify-center items-center max-w-4xl absolute md:bottom-30 bottom-20 lg:bottom-20 xl:bottom-10 left-0 right-0 mx-auto px-6 sm:px-0">
-                {!isRegistrationOpen ? (
+                {isRegistrationClosed ? (
+                  <>
+                    <p className="font-bebas text-white text-2xl md:text-2xl tracking-wider animate-pulse">
+                      SEE YOU IN
+                    </p>
+                    <div className="flex gap-3 sm:gap-4 md:gap-5">
+                      {[
+                        { value: eventTimeLeft.days, label: 'DAYS' },
+                        { value: eventTimeLeft.hours, label: 'HOURS' },
+                        { value: eventTimeLeft.minutes, label: 'MINS' },
+                        { value: eventTimeLeft.seconds, label: 'SECS' }
+                      ].map((item, index) => (
+                        <div key={item.label} className="flex items-center gap-3 sm:gap-4 md:gap-4">
+                          {/* Time Unit Box */}
+                          <div className="group relative bg-cranberry/10 border-2 border-cranberry rounded-xl w-[70px] sm:w-[90px] md:w-[100px] py-3 sm:py-4 md:py-3 transition-all duration-300 hover:bg-cranberry/20 hover:border-cranberry hover:shadow-[0_0_20px_rgba(216,27,93,0.4)] hover:scale-105">
+                            <div className="relative z-10 text-center select-none">
+                              <div className="font-poppins text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold text-cranberry group-hover:text-white transition-colors duration-300 tabular-nums">
+                                {String(item.value).padStart(2, '0')}
+                              </div>
+                              <div className="font-bebas text-white/80 text-xs sm:text-sm md:text-base mt-1 tracking-wider group-hover:text-white transition-colors duration-300">
+                                {item.label}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Separator (except after last item) */}
+                          {index < 3 && (
+                            <span className="font-belanosima text-3xl sm:text-4xl md:text-4xl font-bold text-cranberry animate-pulse">:</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : !isRegistrationOpen ? (
                   <>
                     <p className="font-bebas text-white text-2xl md:text-2xl tracking-wider animate-pulse">
                       REGISTRATIONS OPENING IN

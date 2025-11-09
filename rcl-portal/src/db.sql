@@ -121,3 +121,37 @@ CREATE TABLE public.track_events (
     CONSTRAINT track_events_pkey PRIMARY KEY (id),
     CONSTRAINT track_events_sport_id_fkey FOREIGN KEY (sport_id) REFERENCES public.events(sport_id)
 );
+CREATE TABLE public.replacement_players (
+    replacement_id text NOT NULL,
+    name text,
+    status smallint,
+    ri_number text,
+    club_id bigint,
+    gender text,
+    nic text,
+    birthdate timestamp without time zone,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT replacement_players_pkey PRIMARY KEY (replacement_id),
+    CONSTRAINT replacement_players_club_id_fkey FOREIGN KEY (club_id) REFERENCES public.clubs(club_id)
+);
+CREATE TABLE public.replacement_requests (
+    id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+    sport_id bigint NOT NULL,
+    registrations_id bigint NOT NULL,
+    original_player_rmis_id text NOT NULL,
+    replacement_id text NOT NULL,
+    club_id bigint NOT NULL,
+    reason text NOT NULL,
+    supporting_link text,
+    ri_number text,
+    status boolean,
+    requested_by text,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    approved_at timestamp with time zone,
+    approved_by text,
+    CONSTRAINT replacement_requests_pkey PRIMARY KEY (id),
+    CONSTRAINT replacement_requests_sport_id_fkey FOREIGN KEY (sport_id) REFERENCES public.events(sport_id),
+    CONSTRAINT replacement_requests_registrations_id_fkey FOREIGN KEY (registrations_id) REFERENCES public.registrations(id),
+    CONSTRAINT replacement_requests_replacement_id_fkey FOREIGN KEY (replacement_id) REFERENCES public.replacement_players(replacement_id),
+    CONSTRAINT replacement_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES public.clubs(club_id)
+);
