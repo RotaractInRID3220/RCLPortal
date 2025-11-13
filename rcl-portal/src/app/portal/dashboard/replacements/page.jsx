@@ -458,11 +458,11 @@ const ReplacementRequestsPage = () => {
 
   // Deadline checks
   const now = new Date()
-  const registrationDeadline = new Date(APP_CONFIG.REGISTRATION_DEADLINE)
+  const replacementOpening = new Date(APP_CONFIG.REPLACEMENT_OPENING)
   const replacementDeadline = new Date(APP_CONFIG.REPLACEMENT_DEADLINE)
   const eventDay = new Date(APP_CONFIG.EVENT_DAY)
 
-  const isBeforeRegistrationClose = now < registrationDeadline
+  const isBeforeRegistrationClose = now < replacementOpening
   const isAfterReplacementDeadline = now > replacementDeadline
   const isWithinReplacementWindow = !isBeforeRegistrationClose && !isAfterReplacementDeadline
 
@@ -520,7 +520,7 @@ const ReplacementRequestsPage = () => {
               <Calendar className="w-5 h-5 text-amber-200" />
               <div className="text-left">
                 <p className="text-xs text-amber-200/70 uppercase tracking-wide">Replacements open after</p>
-                <p className="text-sm font-semibold text-amber-100">{formatDeadlineDate(registrationDeadline)}</p>
+                <p className="text-sm font-semibold text-amber-100">{formatDeadlineDate(replacementOpening)}</p>
               </div>
             </div>
           </div>
