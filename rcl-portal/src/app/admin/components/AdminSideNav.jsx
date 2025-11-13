@@ -18,6 +18,7 @@ import {
   LogOut,
   Shield,
   Settings,
+  Repeat2,
 } from "lucide-react";
 
 // Navigation items configuration with permission requirements
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { label: "Teams", path: "/admin/dashboard/teams", icon: UsersRound, permission: "admin" },
   { label: "Bracket", path: "/admin/dashboard/bracket", icon: GitBranch, permission: "basic" },
   { label: "Leaderboard", path: "/admin/dashboard/leaderboard", icon: Trophy, permission: "basic" },
+  { label: "Replacements", path: "/admin/dashboard/replacements", icon: Repeat2, permission: "super_admin" },
   { label: "Payments", path: "/admin/dashboard/payments", icon: CreditCard, permission: "super_admin" }, // Requires explicit admin permission
   { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },
   { label: "Administration", path: "/admin/dashboard/administration", icon: Settings, permission: "admin" },

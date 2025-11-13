@@ -11,7 +11,7 @@ export default function NavBar() {
     { name: 'Council portal', href: '/portal/dashboard' },
     { name: 'Player QR', href: '/player' },
     { name: 'Leaderboard', href: '/e-arena/leaderboard' },
-    // { name: 'Handbook', href: '#handbook' },
+    { name: 'RCL Jersey', href: 'https://go.rotaract3220.org/rcl-tshirt' },
   ]
 
   const toggleMobileMenu = () => {
