@@ -509,9 +509,10 @@ const ReplacementRequestsPage = () => {
             <div className="p-3 rounded-full bg-amber-500/20 border border-amber-500/30">
               <Clock className="w-6 h-6 text-amber-200" />
             </div>
-            <div className="space-y-1.5">
-              <h2 className="text-xl font-semibold text-white">Registration Period Active</h2>
-              <p className="text-sm text-white/70 max-w-2xl">
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-semibold text-white">Replacements Window Opening Soon</h2>
+              <p className="text-white/70 max-w-2xl">
                 Player replacement requests will be available after the registration period closes. 
                 Continue registering your players until the deadline.
               </p>
