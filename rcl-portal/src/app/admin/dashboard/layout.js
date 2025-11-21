@@ -42,13 +42,21 @@ export default function RootLayout({ children }) {
           <div className="lg:w-2/12 lg:block hidden h-screen fixed">
             <AdminSideNav />
           </div>
-          <div className="lg:w-10/12 lg:ml-auto lg:py-16 w-screen lg:px-10 py-5 px-3">
-            <PrivateRoute accessType="admin">
-                <DeviceCheck>
-                    {children}
-                </DeviceCheck>
-                <Toaster richColors  />
-            </PrivateRoute>
+          <div className="lg:w-10/12 lg:ml-auto lg:pt-16 w-screen lg:px-10 pt-5 px-3 min-h-screen flex flex-col">
+            <div className="flex-1">
+              <PrivateRoute accessType="admin">
+                  <DeviceCheck>
+                      {children}
+                  </DeviceCheck>
+                  <Toaster richColors  />
+              </PrivateRoute>
+            </div>
+            <footer className="mt-8 text-center pb-5 flex justify-between w-full">
+              <p className="text-xs text-white/40 mb-1">Version 1.2.0</p>
+              <p className="text-xs md:text-xs text-white/40">
+                Tool by <span className='hover:animate-gradient font-bold '><a href="https://www.linkedin.com/in/sandinu-pinnawala-b85b2b20a/" className="hover:text-white/60 transition-colors">WizX Solutions</a></span>
+              </p>
+            </footer>
           </div>
         </div>
 

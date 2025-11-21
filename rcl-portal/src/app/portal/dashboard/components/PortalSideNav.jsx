@@ -14,6 +14,7 @@ import {
   LogOut,
   GitBranch,
   Repeat2,
+  ArrowLeftRight,
 } from "lucide-react";
 
 // Navigation items configuration
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { label: "Registrations", path: "/portal/dashboard/registration", icon: ClipboardList },
   { label: "Players", path: "/portal/dashboard/players", icon: Users },
   { label: "Replacements", path: "/portal/dashboard/replacements", icon: Repeat2 },
+  { label: "Swaps", path: "/portal/dashboard/swaps", icon: ArrowLeftRight },
   { label: "Payment", path: "/portal/dashboard/payment", icon: CreditCard },
   { label: "Brackets", path: "/portal/dashboard/bracket", icon: GitBranch },
   { label: "Leaderboard", path: "/portal/dashboard/leaderboard", icon: Trophy },

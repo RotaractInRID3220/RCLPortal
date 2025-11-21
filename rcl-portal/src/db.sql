@@ -155,3 +155,23 @@ CREATE TABLE public.replacement_requests (
     CONSTRAINT replacement_requests_replacement_id_fkey FOREIGN KEY (replacement_id) REFERENCES public.replacement_players(replacement_id),
     CONSTRAINT replacement_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES public.clubs(club_id)
 );
+CREATE TABLE public.swap_requests (
+    id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+    club_id bigint NOT NULL,
+    player1_registrations_id bigint NOT NULL,
+    player2_registrations_id bigint,
+    sport1_id bigint NOT NULL,
+    sport2_id bigint,
+    requested_by text,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    approved_by text,
+    approved_at timestamp with time zone,
+    status boolean,
+    description text,
+    CONSTRAINT swap_requests_pkey PRIMARY KEY (id),
+    CONSTRAINT swap_requests_club_id_fkey FOREIGN KEY (club_id) REFERENCES public.clubs(club_id),
+    CONSTRAINT swap_requests_player1_registrations_id_fkey FOREIGN KEY (player1_registrations_id) REFERENCES public.registrations(id),
+    CONSTRAINT swap_requests_player2_registrations_id_fkey FOREIGN KEY (player2_registrations_id) REFERENCES public.registrations(id),
+    CONSTRAINT swap_requests_sport1_id_fkey FOREIGN KEY (sport1_id) REFERENCES public.events(sport_id),
+    CONSTRAINT swap_requests_sport2_id_fkey FOREIGN KEY (sport2_id) REFERENCES public.events(sport_id)
+);

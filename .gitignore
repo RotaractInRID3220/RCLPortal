@@ -34,3 +34,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.github/instructions/UIUXGuideline.md
+.github/instructions/ui-opt.chatmode.md
+.github/instructions/gsap_knowledge_base.md
+.github/instructions/api-optimization.chatmode.md
