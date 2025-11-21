@@ -19,38 +19,57 @@ import {
   Shield,
   Settings,
   Repeat2,
-  ArrowLeftRight
+  ArrowLeftRight,
+  ChevronDown,
+  Wrench
 } from "lucide-react";
 
 // Navigation items configuration with permission requirements
-const NAV_ITEMS = [
-  { label: "Overview", path: "/admin/dashboard", icon: LayoutDashboard, permission: "basic" }, // Basic admin access
-  { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users, permission: "super_admin" }, // Requires explicit admin permission
-  { label: "Events", path: "/admin/dashboard/events", icon: Calendar, permission: "admin" },
+const BASE_NAV_ITEMS = [
+  { label: "Overview", path: "/admin/dashboard", icon: LayoutDashboard, permission: "basic" },
   { label: "Registrations", path: "/admin/dashboard/registrations", icon: ClipboardList, permission: "basic" },
   { label: "Teams", path: "/admin/dashboard/teams", icon: UsersRound, permission: "admin" },
   { label: "Bracket", path: "/admin/dashboard/bracket", icon: GitBranch, permission: "basic" },
   { label: "Leaderboard", path: "/admin/dashboard/leaderboard", icon: Trophy, permission: "basic" },
-  { label: "Replacements", path: "/admin/dashboard/replacements", icon: Repeat2, permission: "super_admin" },
-  { label: "Swaps", path: "/admin/dashboard/swaps", icon: ArrowLeftRight, permission: "admin" },
-  { label: "Payments", path: "/admin/dashboard/payments", icon: CreditCard, permission: "super_admin" }, // Requires explicit admin permission
-  { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },
+  { label: "Payments", path: "/admin/dashboard/payments", icon: CreditCard, permission: "super_admin" },
   { label: "Administration", path: "/admin/dashboard/administration", icon: Settings, permission: "admin" },
 ];
 
+const NAV_GROUPS = [
+  {
+    label: "Configurations",
+    icon: Wrench,
+    items: [
+      { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users, permission: "super_admin" },
+      { label: "Events", path: "/admin/dashboard/events", icon: Calendar, permission: "admin" },
+      { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },
+    ],
+  },
+  {
+    label: "Replacements & Swaps",
+    icon: Repeat2,
+    items: [
+      { label: "Replacements", path: "/admin/dashboard/replacements", icon: Repeat2, permission: "super_admin" },
+      { label: "Swaps", path: "/admin/dashboard/swaps", icon: ArrowLeftRight, permission: "admin" },
+    ],
+  },
+];
+
 // Reusable NavLink component
-const NavLink = ({ label, path, icon: Icon, isActive, onClick }) => (
+const NavLink = ({ label, path, icon: Icon, isActive, onClick, className = "" }) => (
   <button
+    type="button"
     onClick={onClick}
     className={`
       group relative w-full flex items-center gap-3 px-4 py-2 rounded-lg
-      text-sm font-medium transition-all duration-200 cursor-pointer
+      text-xs font-medium transition-all duration-200 cursor-pointer
       ${
         isActive
           ? "bg-white/15 border border-white/30 text-white  shadow-white/5"
           : "bg-white/5 border border-white/10 text-white/80 hover:bg-white/10 hover:border-white/20 hover:text-white"
       }
       focus:outline-none 
+      ${className}
     `}
     aria-current={isActive ? "page" : undefined}
   >
@@ -60,6 +79,34 @@ const NavLink = ({ label, path, icon: Icon, isActive, onClick }) => (
       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full" />
     )}
   </button>
+);
+
+const ExpandableGroup = ({ label, icon: Icon, isExpanded, onToggle, children }) => (
+  <div className="w-full">
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`
+        group relative w-full flex items-center gap-3 px-4 py-2 rounded-lg
+        text-xs font-medium transition-all duration-200 cursor-pointer
+        ${isExpanded ? "bg-white/15 border border-white/30 text-white shadow-white/5" : "bg-white/5 border border-white/10 text-white/80 hover:bg-white/10 hover:border-white/20 hover:text-white"}
+        focus:outline-none
+      `}
+      aria-expanded={isExpanded}
+    >
+      <Icon className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? "scale-110" : "group-hover:scale-110"}`} />
+      <span className="flex-1 text-left">{label}</span>
+      <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+    </button>
+    <div
+      className={`overflow-hidden transition-all duration-200 ease-in-out ${isExpanded ? "max-h-64 opacity-100 mt-2" : "max-h-0 opacity-0 pointer-events-none"}`}
+      aria-hidden={!isExpanded}
+    >
+      <div className="flex flex-col space-y-2 pl-4 border-l border-white/10">
+        {children}
+      </div>
+    </div>
+  </div>
 );
 
 const AdminSideNav = () => {
@@ -80,37 +127,61 @@ const AdminSideNav = () => {
   const userPermissionLevel = session?.user?.permission_level;
   const userRoleId = session?.user?.role_id;
   const isBasicAdmin = [1, 2, 3, 4].includes(userRoleId);
-  
-  const filteredNavItems = NAV_ITEMS.filter((item) => {
-    // Basic permission: accessible to all role 1-4 users
-    if (item.permission === "basic" && isBasicAdmin) {
-      return true;
+  const permissionHierarchy = { admin: 1, super_admin: 2 };
+
+  const canAccess = (item) => {
+    if (item.permission === "basic") {
+      return isBasicAdmin;
     }
-    
-    // Admin permission: requires explicit admin or super_admin permission
-    if (item.permission === "admin") {
+
+    if (item.permission === "admin" || item.permission === "super_admin") {
       if (!userPermissionLevel) return false;
-      
-      const permissionHierarchy = { 'admin': 1, 'super_admin': 2 };
-      const requiredLevel = permissionHierarchy[item.permission];
-      const userLevel = permissionHierarchy[userPermissionLevel];
-      
+      const userLevel = permissionHierarchy[userPermissionLevel] || 0;
+      const requiredLevel = permissionHierarchy[item.permission] || Infinity;
       return userLevel >= requiredLevel;
     }
-    
-    // Super admin permission: requires explicit super_admin permission
-    if (item.permission === "super_admin") {
-      if (!userPermissionLevel) return false;
-      
-      const permissionHierarchy = { 'admin': 1, 'super_admin': 2 };
-      const requiredLevel = permissionHierarchy[item.permission];
-      const userLevel = permissionHierarchy[userPermissionLevel];
-      
-      return userLevel >= requiredLevel;
-    }
-    
-    return false; // Fallback
+
+    return false;
+  };
+
+  const filteredNavItems = BASE_NAV_ITEMS.filter(canAccess);
+
+  const filteredGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter(canAccess),
+  })).filter((group) => group.items.length > 0);
+
+  const [expandedGroups, setExpandedGroups] = React.useState(() => {
+    const initialState = {};
+    NAV_GROUPS.forEach((group) => {
+      initialState[group.label] = group.items.some((item) => pathname?.startsWith(item.path));
+    });
+    return initialState;
   });
+
+  React.useEffect(() => {
+    setExpandedGroups((prev) => {
+      const updated = { ...prev };
+      let hasChanges = false;
+
+      NAV_GROUPS.forEach((group) => {
+        const shouldExpand = group.items.some((item) => pathname?.startsWith(item.path));
+        if (prev[group.label] !== shouldExpand) {
+          updated[group.label] = shouldExpand;
+          hasChanges = true;
+        }
+      });
+
+      return hasChanges ? updated : prev;
+    });
+  }, [pathname]);
+
+  const toggleGroup = (label) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
+  };
 
   return (
     <div
@@ -121,10 +192,10 @@ const AdminSideNav = () => {
       <div className="h-full justify-between flex flex-col rounded-r-lg bg-white/8 backdrop-blur-sm w-full p-5">
         {/* Logo Section */}
         <div>
-          <div className="w-full flex items-center justify-center mb-8">
+          <div className="w-full flex items-center justify-center mb-4">
             <img 
               src="/LogoWhite.png" 
-              className="w-5/6 transition-transform duration-300 hover:scale-105" 
+              className="w-9/12 transition-transform duration-300 hover:scale-105" 
               alt="RCL Portal Logo" 
             />
           </div>
@@ -140,6 +211,28 @@ const AdminSideNav = () => {
                 isActive={pathname === item.path}
                 onClick={() => handleNavigation(item.path)}
               />
+            ))}
+
+            {filteredGroups.map((group) => (
+              <ExpandableGroup
+                key={group.label}
+                label={group.label}
+                icon={group.icon}
+                isExpanded={!!expandedGroups[group.label]}
+                onToggle={() => toggleGroup(group.label)}
+              >
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    label={item.label}
+                    path={item.path}
+                    icon={item.icon}
+                    isActive={pathname === item.path}
+                    onClick={() => handleNavigation(item.path)}
+                    className="pl-6"
+                  />
+                ))}
+              </ExpandableGroup>
             ))}
           </nav>
         </div>
