@@ -503,24 +503,24 @@ const ReplacementRequestsPage = () => {
       </div>
 
       {isBeforeRegistrationClose && (
-        <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-900/20 via-amber-800/10 to-transparent p-8">
+        <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-900/20 via-amber-800/10 to-transparent p-6">
           <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl -z-10" />
-          <div className="flex flex-col items-center text-center gap-5">
-            <div className="p-4 rounded-full bg-amber-500/20 border border-amber-500/30">
-              <Clock className="w-8 h-8 text-amber-200" />
+          <div className="flex flex-col items-center text-center gap-4">
+            <div className="p-3 rounded-full bg-amber-500/20 border border-amber-500/30">
+              <Clock className="w-6 h-6 text-amber-200" />
             </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-semibold text-white">Registration Period Active</h2>
-              <p className="text-white/70 max-w-2xl">
+            <div className="space-y-1.5">
+              <h2 className="text-xl font-semibold text-white">Registration Period Active</h2>
+              <p className="text-sm text-white/70 max-w-2xl">
                 Player replacement requests will be available after the registration period closes. 
                 Continue registering your players until the deadline.
               </p>
             </div>
-            <div className="flex items-center gap-3 px-6 py-3 rounded-lg bg-amber-500/15 border border-amber-500/25">
-              <Calendar className="w-5 h-5 text-amber-200" />
+            <div className="flex items-center gap-3 px-5 py-2.5 rounded-lg bg-amber-500/15 border border-amber-500/25">
+              <Calendar className="w-4 h-4 text-amber-200 flex-shrink-0" />
               <div className="text-left">
-                <p className="text-xs text-amber-200/70 uppercase tracking-wide">Replacements open after</p>
-                <p className="text-sm font-semibold text-amber-100">{formatDeadlineDate(replacementOpening)}</p>
+                <p className="text-xs text-amber-200/70 uppercase tracking-wide leading-tight">Replacements open after</p>
+                <p className="text-xs font-semibold text-amber-100">{formatDeadlineDate(replacementOpening)}</p>
               </div>
             </div>
           </div>
@@ -528,24 +528,24 @@ const ReplacementRequestsPage = () => {
       )}
 
       {isAfterReplacementDeadline && (
-        <div className="relative overflow-hidden rounded-xl border border-red-500/30 bg-gradient-to-br from-red-900/20 via-red-800/10 to-transparent p-8">
+        <div className="relative overflow-hidden rounded-xl border border-red-500/30 bg-gradient-to-br from-red-900/20 via-red-800/10 to-transparent p-6">
           <div className="absolute top-0 right-0 w-64 h-64 bg-red-500/10 rounded-full blur-3xl -z-10" />
-          <div className="flex flex-col items-center text-center gap-5">
-            <div className="p-4 rounded-full bg-red-500/20 border border-red-500/30">
-              <AlertCircle className="w-8 h-8 text-red-200" />
+          <div className="flex flex-col items-center text-center gap-4">
+            <div className="p-3 rounded-full bg-red-500/20 border border-red-500/30">
+              <AlertCircle className="w-6 h-6 text-red-200" />
             </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-semibold text-white">Replacement Window Closed</h2>
-              <p className="text-white/70 max-w-2xl">
+            <div className="space-y-1.5">
+              <h2 className="text-xl font-semibold text-white">Replacement Window Closed</h2>
+              <p className="text-sm text-white/70 max-w-2xl">
                 The deadline for player replacement requests has passed. 
                 All teams are now finalized for the upcoming event.
               </p>
             </div>
-            <div className="flex items-center gap-3 px-6 py-3 rounded-lg bg-red-500/15 border border-red-500/25">
-              <Calendar className="w-5 h-5 text-red-200" />
+            <div className="flex items-center gap-3 px-5 py-2.5 rounded-lg bg-red-500/15 border border-red-500/25">
+              <Calendar className="w-4 h-4 text-red-200 flex-shrink-0" />
               <div className="text-left">
-                <p className="text-xs text-red-200/70 uppercase tracking-wide">Event begins</p>
-                <p className="text-sm font-semibold text-red-100">{formatDeadlineDate(eventDay)}</p>
+                <p className="text-xs text-red-200/70 uppercase tracking-wide leading-tight">Event begins</p>
+                <p className="text-xs font-semibold text-red-100">{formatDeadlineDate(eventDay)}</p>
               </div>
             </div>
           </div>
