@@ -178,7 +178,7 @@ const AdminDashboardPage = React.memo(() => {
           <div className="grid grid-cols-2 gap-6 mb-6">
             {/* Top Row - Main Stats */}
             <StatsCard 
-              title="Total Registered Clubs" 
+              title="Total Clubs" 
               value={displayStats.totalClubs}
               indicatorColor="bg-cranberry"
               showIndicator={true}
