@@ -10,6 +10,7 @@ export default function NavBar() {
   const navLinks = [
     { name: 'Council portal', href: '/portal/dashboard' },
     { name: 'Player QR', href: '/player' },
+    { name: 'Schedule', href: '/e-arena/schedule' },
     { name: 'Leaderboard', href: '/e-arena/leaderboard' },
     { name: 'RCL Jersey', href: 'https://go.rotaract3220.org/rcl-tshirt' },
   ]
