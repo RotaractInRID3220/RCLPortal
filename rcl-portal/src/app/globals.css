@@ -217,6 +217,27 @@ body {
   background: rgba(255, 255, 255, 0.5);
 }
 
+/* Scrollbar utilities for schedule pages */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scrollbar-track-white\/5::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.scrollbar-thumb-cranberry\/50::-webkit-scrollbar-thumb {
+  background: rgba(216, 27, 93, 0.5);
+  border-radius: 4px;
+}
+
+.scrollbar-thumb-cranberry\/50:hover::-webkit-scrollbar-thumb,
+.hover\:scrollbar-thumb-cranberry:hover::-webkit-scrollbar-thumb {
+  background: rgba(216, 27, 93, 0.8);
+}
+
 .custom-bracket .bracket-round {
   min-width: 200px;  /* Set minimum column width */
   max-width: 250px;  /* Set maximum column width */

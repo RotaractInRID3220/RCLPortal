@@ -46,7 +46,7 @@ export async function POST(request) {
 
     // Step 3: Fetch data from RMIS in one query using IN clause
     const placeholders = rmisIds.map(() => '?').join(',');
-    const sql = `SELECT membership_id, status FROM club_membership_data WHERE membership_id IN (${placeholders}) AND status IN (1, 3, 5)`;
+    const sql = `SELECT membership_id, status, nic_pp FROM club_membership_data WHERE membership_id IN (${placeholders}) AND status IN (1, 3, 5)`;
 
     const res = await fetch('https://info.rotaract3220.org/api/query', {
       method: 'POST',
@@ -69,20 +69,31 @@ export async function POST(request) {
 
     // Step 4: Create a map for quick lookup and normalize status (3 -> 1)
     const rmisStatusMap = new Map();
+    const rmisNicMap = new Map();
     rmisData.forEach(record => {
       const normalizedStatus = record.status === 3 ? 1 : record.status;
       rmisStatusMap.set(record.membership_id, normalizedStatus);
+      rmisNicMap.set(record.membership_id, record.nic_pp || null);
     });
 
-    // Step 5: Find players that need updating
+    // Step 5: Find players that need updating (status or NIC)
     const playersToUpdate = [];
     players.forEach(player => {
       const rmisStatus = rmisStatusMap.get(player.RMIS_ID);
-      if (rmisStatus !== undefined && rmisStatus !== player.status) {
+      const rmisNic = rmisNicMap.get(player.RMIS_ID);
+      
+      const statusNeedsUpdate = rmisStatus !== undefined && rmisStatus !== player.status;
+      const nicNeedsUpdate = rmisNic !== undefined && rmisNic !== player.NIC && rmisNic !== null;
+      
+      if (statusNeedsUpdate || nicNeedsUpdate) {
         playersToUpdate.push({
           RMIS_ID: player.RMIS_ID,
           oldStatus: player.status,
-          newStatus: rmisStatus
+          newStatus: rmisStatus,
+          oldNic: player.NIC,
+          newNic: rmisNic,
+          updateStatus: statusNeedsUpdate,
+          updateNic: nicNeedsUpdate
         });
       }
     });
@@ -97,9 +108,19 @@ export async function POST(request) {
 
     // Step 6: Batch update players in Supabase
     const updatePromises = playersToUpdate.map(player => {
+      const updateData = {};
+      
+      if (player.updateStatus) {
+        updateData.status = player.newStatus;
+      }
+      
+      if (player.updateNic) {
+        updateData.NIC = player.newNic;
+      }
+
       let updateQuery = supabase
         .from('players')
-        .update({ status: player.newStatus })
+        .update(updateData)
         .eq('RMIS_ID', player.RMIS_ID);
 
       // Only filter by club_id if provided (for club-specific sync)
@@ -126,8 +147,20 @@ export async function POST(request) {
       updatedCount: successfulUpdates,
       updates: playersToUpdate.map(p => ({
         RMIS_ID: p.RMIS_ID,
-        oldStatus: p.oldStatus === 1 ? 'General' : p.oldStatus === 5 ? 'Prospective' : 'Unknown',
-        newStatus: p.newStatus === 1 ? 'General' : p.newStatus === 5 ? 'Prospective' : 'Unknown'
+        changes: {
+          ...(p.updateStatus && {
+            status: {
+              from: p.oldStatus === 1 ? 'General' : p.oldStatus === 5 ? 'Prospective' : 'Unknown',
+              to: p.newStatus === 1 ? 'General' : p.newStatus === 5 ? 'Prospective' : 'Unknown'
+            }
+          }),
+          ...(p.updateNic && {
+            nic: {
+              from: p.oldNic || 'Not set',
+              to: p.newNic || 'Not set'
+            }
+          })
+        }
       }))
     });
 

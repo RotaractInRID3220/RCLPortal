@@ -39,18 +39,34 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
   const itemsPerPage = 8
 
-  // Filter registrations for unique RMIS IDs if toggle is active
+  // Filter registrations based on search term (client-side filtering)
   const filteredRegistrations = useMemo(() => {
-    if (!showUniqueRMIS) return registrations
+    if (!searchTerm.trim()) return registrations
+    
+    const searchLower = searchTerm.toLowerCase().trim()
+    return registrations.filter(registration => {
+      const playerName = registration.players?.name?.toLowerCase() || ''
+      const rmisId = registration.players?.RMIS_ID?.toLowerCase() || ''
+      const clubName = registration.clubs?.club_name?.toLowerCase() || ''
+      
+      return playerName.includes(searchLower) || 
+             rmisId.includes(searchLower) || 
+             clubName.includes(searchLower)
+    })
+  }, [registrations, searchTerm])
+
+  // Filter all registrations for unique RMIS IDs if toggle is active
+  const filteredUniqueRegistrations = useMemo(() => {
+    if (!showUniqueRMIS) return filteredRegistrations
     
     const seenRMIS = new Set()
-    return registrations.filter(registration => {
+    return filteredRegistrations.filter(registration => {
       const rmisId = registration.players?.RMIS_ID
       if (!rmisId || seenRMIS.has(rmisId)) return false
       seenRMIS.add(rmisId)
       return true
     })
-  }, [registrations, showUniqueRMIS])
+  }, [filteredRegistrations, showUniqueRMIS])
 
   // Get all filtered data for export
   const allFilteredRegistrations = useMemo(() => {
@@ -71,7 +87,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
     return adminCheck
   }, [session, userDeets])
 
-  const fetchAllRegistrations = useCallback(async (search = '') => {
+  const fetchAllRegistrations = useCallback(async () => {
     try {
       setLoading(true)
       let filters = {}
@@ -88,8 +104,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
       // Fetch all data at once (reasonable limit to prevent memory issues)
       const result = await getRegistrationsWithPlayerData(filters, {
         page: 1,
-        limit: 5000, // Fetch up to 5000 records for client-side pagination
-        search
+        limit: 5000 // Fetch up to 5000 records for client-side pagination and filtering
       })
       
       if (result.success) {
@@ -125,10 +140,10 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
     }
   }, [event, clubId, sportId, filterType, itemsPerPage])
 
-  // Fetch all data when filters or search changes
+  // Fetch all data when filters change (not when search changes)
   useEffect(() => {
-    fetchAllRegistrations(debouncedSearchTerm)
-  }, [fetchAllRegistrations, debouncedSearchTerm])
+    fetchAllRegistrations()
+  }, [fetchAllRegistrations])
 
   // Handle client-side pagination
   const handlePageChange = useCallback((newPage) => {
@@ -351,8 +366,8 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
         <>
           {/* Stats */}
           <RegistrationStats 
-            registrations={filteredRegistrations} 
-            totalCount={showUniqueRMIS ? allFilteredRegistrations.length : totalCount}
+            registrations={filteredUniqueRegistrations} 
+            totalCount={showUniqueRMIS ? filteredUniqueRegistrations.length : totalCount}
             fullData={allFilteredRegistrations}
           />
 
@@ -385,7 +400,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
 
           {/* Registrations List */}
           <div className="bg-white/5 border border-white/20 rounded-lg overflow-hidden">
-            {filteredRegistrations.length === 0 ? (
+            {filteredUniqueRegistrations.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-400">
                   {searchTerm ? 'No registrations found matching your search.' : 'No registrations found.'}
@@ -425,7 +440,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
-                      {filteredRegistrations.map((registration, index) => (
+                      {filteredUniqueRegistrations.map((registration, index) => (
                         <tr 
                           key={`${registration.RMIS_ID}-${registration.sport_id}-${index}`} 
                           className={`hover:bg-white/5 ${registration.players?.converted ? 'bg-red-500/10 ' : ''}`}

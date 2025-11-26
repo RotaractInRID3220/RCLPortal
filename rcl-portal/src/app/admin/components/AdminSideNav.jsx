@@ -11,6 +11,7 @@ import {
   Calendar,
   Users,
   GitBranch,
+  Grid,
   Trophy,
   ClipboardList,
   UsersRound,
@@ -21,7 +22,8 @@ import {
   Repeat2,
   ArrowLeftRight,
   ChevronDown,
-  Wrench
+  Wrench,
+  Hash
 } from "lucide-react";
 
 // Navigation items configuration with permission requirements
@@ -32,10 +34,25 @@ const BASE_NAV_ITEMS = [
   { label: "Bracket", path: "/admin/dashboard/bracket", icon: GitBranch, permission: "basic" },
   { label: "Leaderboard", path: "/admin/dashboard/leaderboard", icon: Trophy, permission: "basic" },
   { label: "Payments", path: "/admin/dashboard/payments", icon: CreditCard, permission: "super_admin" },
-  { label: "Administration", path: "/admin/dashboard/administration", icon: Settings, permission: "admin" },
 ];
 
 const NAV_GROUPS = [
+  {
+    label: "Replacements & Swaps",
+    icon: Repeat2,
+    items: [
+      { label: "Replacements", path: "/admin/dashboard/replacements", icon: Repeat2, permission: "super_admin" },
+      { label: "Swaps", path: "/admin/dashboard/swaps", icon: ArrowLeftRight, permission: "admin" },
+    ],
+  },
+  {
+    label: "Admin Options",
+    icon: Grid,
+    items: [
+      { label: "Administration", path: "/admin/dashboard/administration", icon: Settings, permission: "admin" },
+      { label: "Player Numbers", path: "/admin/dashboard/player-numbers", icon: Hash, permission: "admin" },
+    ],
+  },
   {
     label: "Configurations",
     icon: Wrench,
@@ -43,14 +60,6 @@ const NAV_GROUPS = [
       { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users, permission: "super_admin" },
       { label: "Events", path: "/admin/dashboard/events", icon: Calendar, permission: "admin" },
       { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },
-    ],
-  },
-  {
-    label: "Replacements & Swaps",
-    icon: Repeat2,
-    items: [
-      { label: "Replacements", path: "/admin/dashboard/replacements", icon: Repeat2, permission: "super_admin" },
-      { label: "Swaps", path: "/admin/dashboard/swaps", icon: ArrowLeftRight, permission: "admin" },
     ],
   },
 ];
