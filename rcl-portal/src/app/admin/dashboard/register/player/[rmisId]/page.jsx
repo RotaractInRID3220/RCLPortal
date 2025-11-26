@@ -2,9 +2,9 @@
 
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getPlayerVerificationData } from '@/services/playerService';
+import { getPlayerVerificationData, generatePlayerNumber } from '@/services/playerService';
 import { registerPlayerForDay } from '@/services/dayRegistrationService';
-import { APP_CONFIG } from '@/config/app.config';
+import { APP_CONFIG, SPORT_DAYS } from '@/config/app.config';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -189,29 +189,46 @@ export default function PlayerVerificationPage({ params }) {
                 </div>
               </div>
 
-              {/* Club Name - Full Width */}
-              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                <div className="flex items-center text-gray-400 text-sm mb-2">
-                  <Building2 className="h-4 w-4 mr-2" />
-                  <span>Club</span>
+              {/* Club Name and Player Number Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Player Number for Current Sport Day */}
+                {sports.length > 0 && sports[0]?.id && (
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <div className="flex items-center text-gray-400 text-sm mb-2">
+                      <Trophy className="h-4 w-4 mr-2" />
+                      <span>Player Number</span>
+                    </div>
+                    <p className="text-white text-lg font-mono font-bold tracking-wider">
+                      {generatePlayerNumber(sports[0]?.events?.sport_day, sports[0]?.id) || '-'}
+                    </p>
+                  </div>
+                )}
+                {/* Club Name */}
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <div className="flex items-center text-gray-400 text-sm mb-2">
+                    <Building2 className="h-4 w-4 mr-2" />
+                    <span>Club</span>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="text-white text-lg font-semibold">
+                      {player.clubs?.club_name || '-'}
+                    </p>
+                    {player.clubs?.category && (
+                      <Badge 
+                        variant="outline" 
+                        className={`${
+                          player.clubs.category === 'community' 
+                            ? 'border-blue-500/40 text-blue-400 bg-blue-500/10' 
+                            : 'border-purple-500/40 text-purple-400 bg-purple-500/10'
+                        } text-xs`}
+                      >
+                        {player.clubs.category}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <p className="text-white text-xl font-semibold">
-                    {player.clubs?.club_name || '-'}
-                  </p>
-                  {player.clubs?.category && (
-                    <Badge 
-                      variant="outline" 
-                      className={`${
-                        player.clubs.category === 'community' 
-                          ? 'border-blue-500/40 text-blue-400 bg-blue-500/10' 
-                          : 'border-purple-500/40 text-purple-400 bg-purple-500/10'
-                      } text-sm`}
-                    >
-                      {player.clubs.category}
-                    </Badge>
-                  )}
-                </div>
+
+
               </div>
             </div>
           </Card>
@@ -232,38 +249,42 @@ export default function PlayerVerificationPage({ params }) {
               </div>
               
               <div className="p-6 space-y-3">
-                {sports.map((sport, index) => (
-                  <div 
-                    key={index}
-                    className="bg-white/5 border border-white/10 rounded-lg p-4 hover:bg-white/10 transition-all"
-                  >
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex-1">
-                        <h4 className="text-white font-semibold text-lg mb-1">
-                          {sport.events?.sport_name || 'Unknown Sport'}
-                        </h4>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {sport.events?.sport_type && (
-                            <Badge variant="outline" className="border-gray-500/40 text-gray-400 bg-gray-500/10 text-xs">
-                              {sport.events.sport_type}
-                            </Badge>
-                          )}
-                          {sport.events?.gender_type && (
-                            <Badge variant="outline" className="border-gray-500/40 text-gray-400 bg-gray-500/10 text-xs">
-                              {sport.events.gender_type}
-                            </Badge>
-                          )}
+                {sports.map((sport, index) => {
+                  const playerNumber = generatePlayerNumber(sport.events?.sport_day, sport.id);
+                  return (
+                    <div 
+                      key={index}
+                      className="bg-white/5 border border-white/10 rounded-lg p-4 hover:bg-white/10 transition-all"
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                        <div className="flex-1">
+                          <h4 className="text-white font-semibold text-lg mb-1">
+                            {sport.events?.sport_name || 'Unknown Sport'}
+                          </h4>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {sport.events?.sport_type && (
+                              <Badge variant="outline" className="border-gray-500/40 text-gray-400 bg-gray-500/10 text-xs">
+                                {sport.events.sport_type}
+                              </Badge>
+                            )}
+                            {sport.events?.gender_type && (
+                              <Badge variant="outline" className="border-gray-500/40 text-gray-400 bg-gray-500/10 text-xs">
+                                {sport.events.gender_type}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
+                        
+                        {sport.main_player && (
+                          <Badge className="bg-cranberry/20 border-cranberry/40 text-cranberry">
+                            Main Player
+                          </Badge>
+                        )}
                       </div>
                       
-                      {sport.main_player && (
-                        <Badge className="bg-cranberry/20 border-cranberry/40 text-cranberry">
-                          Main Player
-                        </Badge>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           )}

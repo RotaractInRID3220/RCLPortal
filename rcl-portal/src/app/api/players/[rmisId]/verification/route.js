@@ -62,6 +62,7 @@ export async function GET(request, { params }) {
       supabase
         .from('registrations')
         .select(`
+          id,
           sport_id,
           main_player,
           created_at,

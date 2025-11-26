@@ -1,7 +1,96 @@
+import { SPORT_DAYS } from '@/config/app.config';
+
 /**
  * Service for player-related operations
  * Handles player search and retrieval operations
  */
+
+/**
+ * Generates a unique player number from registration data
+ * 
+ * Format: {SPORT_DAY_PREFIX}{PADDED_REGISTRATION_ID}
+ * Example: D-00 + 0032 = D-000032
+ * 
+ * The player number is deterministic - same registration ID always produces the same number.
+ * This ensures consistency across the application without storing an additional field.
+ * 
+ * @param {string} sportDayValue - The sport day value (e.g., 'D-00', 'D-01', 'D-02', 'D-03')
+ * @param {number} registrationId - The registration ID from the registrations table
+ * @returns {string} The formatted player number (e.g., 'D-000032')
+ * 
+ * @example
+ * // For E-Sport day with registration ID 32
+ * generatePlayerNumber('D-00', 32) // Returns 'D-000032'
+ * 
+ * @example
+ * // For Day 01 with registration ID 1234
+ * generatePlayerNumber('D-01', 1234) // Returns 'D-011234'
+ */
+export const generatePlayerNumber = (sportDayValue, registrationId) => {
+  if (!sportDayValue || registrationId === undefined || registrationId === null) {
+    return null;
+  }
+  
+  // Validate sport day value
+  const validSportDays = Object.values(SPORT_DAYS).map(d => d.value);
+  if (!validSportDays.includes(sportDayValue)) {
+    console.warn(`Invalid sport day value: ${sportDayValue}`);
+    return null;
+  }
+  
+  // Pad the registration ID to 4 digits
+  const paddedId = String(registrationId).padStart(4, '0');
+  
+  // Combine sport day prefix with padded ID
+  return `${sportDayValue}${paddedId}`;
+};
+
+/**
+ * Gets the sport day label from a sport day value
+ * 
+ * @param {string} sportDayValue - The sport day value (e.g., 'D-00')
+ * @returns {string|null} The label (e.g., 'E-Sport') or null if not found
+ */
+export const getSportDayLabel = (sportDayValue) => {
+  const sportDay = Object.values(SPORT_DAYS).find(d => d.value === sportDayValue);
+  return sportDay ? sportDay.label : null;
+};
+
+/**
+ * Fetches player number data for a specific player and sport day
+ * Returns all registrations for that player on the specified day with player numbers
+ * 
+ * @param {string} rmisId - The RMIS_ID of the player
+ * @param {string} sportDay - The sport day value (e.g., 'D-01')
+ * @returns {Promise<Array>} Array of registration objects with player numbers
+ */
+export const getPlayerNumbersForPlayer = async (rmisId, sportDay) => {
+  try {
+    if (!rmisId || !sportDay) {
+      throw new Error('RMIS_ID and sport day are required');
+    }
+
+    const response = await fetch(
+      `/api/admin/player-numbers?sportDay=${sportDay}&search=${rmisId}&limit=100`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to fetch player numbers');
+    }
+    
+    // Filter to only return records for the specific player
+    return result.data.filter(p => p.rmisId === rmisId);
+  } catch (error) {
+    console.error('Error fetching player numbers:', error);
+    throw error;
+  }
+};
 
 /**
  * Searches for players by name, NIC, or RMIS_ID

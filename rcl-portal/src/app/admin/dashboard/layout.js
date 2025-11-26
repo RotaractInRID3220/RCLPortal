@@ -4,6 +4,10 @@ import PrivateRoute from "@/lib/PrivateRoute";
 import AdminSideNav from "../components/AdminSideNav";
 import DeviceCheck from "../components/DeviceCheck";
 import Script from "next/script";
+import fs from 'fs';
+import path from 'path';
+
+const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
 
 const bebas = Bebas_Neue({
   variable: "--font-bebas",
@@ -52,7 +56,7 @@ export default function RootLayout({ children }) {
               </PrivateRoute>
             </div>
             <footer className="mt-8 text-center pb-5 flex justify-between w-full">
-              <p className="text-xs text-white/40 mb-1">Version 1.2.0</p>
+              <p className="text-xs text-white/40 mb-1">Version {packageJson.version}</p>
               <p className="text-xs md:text-xs text-white/40">
                 Tool by <span className='hover:animate-gradient font-bold '><a href="https://www.linkedin.com/in/sandinu-pinnawala-b85b2b20a/" className="hover:text-white/60 transition-colors">WizX Solutions</a></span>
               </p>

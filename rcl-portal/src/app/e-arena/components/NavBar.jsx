@@ -12,7 +12,7 @@ export default function NavBar() {
     { name: 'Player QR', href: '/player' },
     { name: 'Schedule', href: '/e-arena/schedule' },
     { name: 'Leaderboard', href: '/e-arena/leaderboard' },
-    { name: 'RCL Jersey', href: 'https://go.rotaract3220.org/rcl-tshirt' },
+    // { name: 'RCL Jersey', href: 'https://go.rotaract3220.org/rcl-tshirt' },
   ]
 
   const toggleMobileMenu = () => {
