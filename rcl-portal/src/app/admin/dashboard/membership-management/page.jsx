@@ -11,8 +11,8 @@ import PrivateRoute from '@/lib/PrivateRoute';
 
 // Calculates deduction points based on general member percentage
 const calculateDeductionPoints = (percentage, totalPlayers = 0) => {
-  // Don't apply deductions to clubs with no players
-  if (totalPlayers === 0) return 0;
+  // Don't apply deductions to clubs with less than 5 players
+  if (totalPlayers < 5) return 0;
 
   if (percentage >= 67 && percentage < 70) return -25;
   if (percentage >= 62 && percentage < 67) return -50;
