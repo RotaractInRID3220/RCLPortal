@@ -58,7 +58,7 @@ export default function RootLayout({ children }) {
             <footer className="mt-8 text-center pb-5 flex justify-between w-full">
               <p className="text-xs text-white/40 mb-1">Version {packageJson.version}</p>
               <p className="text-xs md:text-xs text-white/40">
-                Tool by <span className='hover:animate-gradient font-bold '><a href="https://www.linkedin.com/in/sandinu-pinnawala-b85b2b20a/" className="hover:text-white/60 transition-colors">WizX Solutions</a></span>
+                Tool by <span className='hover:animate-gradient font-bold '><a href="https://www.instagram.com/code.techghost_/" className="hover:text-white/60 transition-colors">Code.Techghost</a></span>
               </p>
             </footer>
           </div>
