@@ -24,7 +24,7 @@ export const getSportDayFromPlace = (place) => {
 export const APP_CONFIG = {
   GENERAL_MEMBER_WARNING_THRESHOLD: 70, // % threshold for PieStatCard warning
   REGISTRATION_OPENING_DATE: '2025-10-19T10:00:00', // Date and time from which registration is enabled (YYYY-MM-DDTHH:mm:ss)
-  REGISTRATION_DEADLINE: '2025-11-03T00:30:00', // Date and time after which registration/deletion is disabled (YYYY-MM-DDTHH:mm:ss)
+  // REGISTRATION_DEADLINE: '2025-11-03T00:30:00', // Date and time after which registration/deletion is disabled (YYYY-MM-DDTHH:mm:ss)
   REPLACEMENT_OPENING: '2025-11-22T00:00:00', // Date and time from which replacements are enabled (YYYY-MM-DDTHH:mm:ss)
   REPLACEMENT_DEADLINE: '2025-11-23T23:59:59', // Date and time after which player replacements are disabled (YYYY-MM-DDTHH:mm:ss)
   CURRENT_SPORT_DAY: SPORT_DAYS.E_SPORT.value, // Current sport day for on-the-day registrations

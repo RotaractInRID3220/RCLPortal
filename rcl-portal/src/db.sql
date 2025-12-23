@@ -115,11 +115,13 @@ CREATE TABLE public.track_events (
     id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
     sport_id bigint,
     rmis_id text,
+    team_id bigint,
     score text,
     place integer,
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     CONSTRAINT track_events_pkey PRIMARY KEY (id),
-    CONSTRAINT track_events_sport_id_fkey FOREIGN KEY (sport_id) REFERENCES public.events(sport_id)
+    CONSTRAINT track_events_sport_id_fkey FOREIGN KEY (sport_id) REFERENCES public.events(sport_id),
+    CONSTRAINT track_events_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(team_id)
 );
 CREATE TABLE public.replacement_players (
     replacement_id text NOT NULL,
