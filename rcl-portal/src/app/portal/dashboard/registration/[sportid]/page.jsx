@@ -134,42 +134,63 @@ const SportRegistrationPage = React.memo(() => {
         };
     }, [registeredPlayers, selectedSportData?.max_count, selectedSportData?.reserve_count]);
 
-    // Check if registration/deletion is allowed based on deadline
+    // Check if registration/deletion is allowed based on opening date (from config) and closing date (from sport data)
     const isRegistrationAllowed = useMemo(() => {
         const currentDate = new Date();
         const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
-        const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
+        
+        // Use individual sport's registration_close from database
+        if (!selectedSportData?.registration_close) {
+            // If no close date set, only check opening date
+            return currentDate >= openingDate;
+        }
+        
+        const deadlineDate = new Date(selectedSportData.registration_close);
         return currentDate >= openingDate && currentDate <= deadlineDate;
-    }, []);
+    }, [selectedSportData?.registration_close]);
 
     // Determine registration status for UI display
     const registrationStatus = useMemo(() => {
         const currentDate = new Date();
         const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
-        const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
         
         if (currentDate < openingDate) return 'not-open';
+        
+        // Use individual sport's registration_close from database
+        if (!selectedSportData?.registration_close) {
+            // If no close date set, assume open (since we passed opening date check)
+            return 'open';
+        }
+        
+        const deadlineDate = new Date(selectedSportData.registration_close);
         if (currentDate > deadlineDate) return 'closed';
         return 'open';
-    }, []);
+    }, [selectedSportData?.registration_close]);
 
     // Calculate days until opening/closing for better UX
     const daysInfo = useMemo(() => {
         const currentDate = new Date();
         const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
-        const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
         
         if (currentDate < openingDate) {
             const diffTime = openingDate - currentDate;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             return { days: diffDays, type: 'until-open' };
-        } else if (currentDate <= deadlineDate) {
+        }
+        
+        // Use individual sport's registration_close from database
+        if (!selectedSportData?.registration_close) {
+            return { days: 0, type: 'no-deadline' };
+        }
+        
+        const deadlineDate = new Date(selectedSportData.registration_close);
+        if (currentDate <= deadlineDate) {
             const diffTime = deadlineDate - currentDate;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            return { days: diffDays, type: 'until-close' };
+            return { days: diffDays, type: 'until-close', closeDate: deadlineDate };
         }
-        return { days: 0, type: 'closed' };
-    }, []);
+        return { days: 0, type: 'closed', closeDate: deadlineDate };
+    }, [selectedSportData?.registration_close]);
 
     // Optimized fetch functions with caching
     const fetchAllSports = useCallback(async () => {
@@ -556,18 +577,18 @@ const SportRegistrationPage = React.memo(() => {
                             <h1 className="text-xl font-semibold text-white">Registration Period Closed</h1>
                         </div>
                         <p className="text-white/70 mb-4">
-                            The registration deadline has passed. No further changes can be made to team rosters.
+                            The registration deadline for this event has passed. No further changes can be made to team rosters.
                         </p>
                         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
                             <div className="flex items-center space-x-2">
                                 <X className="w-4 h-4 text-red-400" />
                                 <span className="text-sm text-red-300">
-                                    Registration closed on {new Date(APP_CONFIG.REGISTRATION_DEADLINE).toLocaleDateString('en-US', { 
+                                    Registration closed on {daysInfo.closeDate ? daysInfo.closeDate.toLocaleDateString('en-US', { 
                                         weekday: 'long', 
                                         year: 'numeric', 
                                         month: 'long', 
                                         day: 'numeric' 
-                                    })}
+                                    }) : 'N/A'}
                                 </span>
                             </div>
                         </div>
