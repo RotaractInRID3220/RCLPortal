@@ -33,6 +33,9 @@ export default function DeviceCheck({ children }) {
   if (pathname?.startsWith('/admin/dashboard/player-numbers/mob')) {
     return children;
   }
+  if (pathname?.startsWith('/admin/dashboard/track-events/mob')) {
+    return children;
+  }
 
   if (!isPC) {
     return (
@@ -63,6 +66,12 @@ export default function DeviceCheck({ children }) {
               className="bg-cranberry hover:bg-cranberry/80 text-white border border-cranberry/50"
             >
               Player Lookup
+            </Button>
+            <Button
+              onClick={() => router.push('/admin/dashboard/track-events/mob')}
+              className="bg-cranberry hover:bg-cranberry/80 text-white border border-cranberry/50"
+            >
+              Track Events
             </Button>
           </div>
         </div>
