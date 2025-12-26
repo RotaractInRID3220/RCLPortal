@@ -15,6 +15,7 @@ import {
   GitBranch,
   Repeat2,
   ArrowLeftRight,
+  Medal,
 } from "lucide-react";
 
 // Navigation items configuration
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { label: "Swaps", path: "/portal/dashboard/swaps", icon: ArrowLeftRight },
   { label: "Payment", path: "/portal/dashboard/payment", icon: CreditCard },
   { label: "Brackets", path: "/portal/dashboard/bracket", icon: GitBranch },
+  { label: "Track Events", path: "/portal/dashboard/track-events", icon: Medal },
   { label: "Leaderboard", path: "/portal/dashboard/leaderboard", icon: Trophy },
 ];
 
@@ -114,16 +116,19 @@ const PortalSideNav = () => {
 
           {/* Navigation Links */}
           <nav className="w-full flex flex-col space-y-2" aria-label="Portal navigation">
-            {NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.path}
-                label={item.label}
-                path={item.path}
-                icon={item.icon}
-                isActive={pathname === item.path}
-                onClick={() => handleNavigation(item.path)}
-              />
-            ))}
+            {NAV_ITEMS.map((item) => {
+              const isActive = pathname?.startsWith(item.path);
+              return (
+                <NavLink
+                  key={item.path}
+                  label={item.label}
+                  path={item.path}
+                  icon={item.icon}
+                  isActive={isActive}
+                  onClick={() => handleNavigation(item.path)}
+                />
+              );
+            })}
           </nav>
         </div>
 

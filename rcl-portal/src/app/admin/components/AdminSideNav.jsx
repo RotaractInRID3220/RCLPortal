@@ -23,20 +23,30 @@ import {
   ArrowLeftRight,
   ChevronDown,
   Wrench,
-  Hash
+  Hash,
+  Activity,
+  Volleyball
 } from "lucide-react";
 
 // Navigation items configuration with permission requirements
 const BASE_NAV_ITEMS = [
   { label: "Overview", path: "/admin/dashboard", icon: LayoutDashboard, permission: "basic" },
   { label: "Registrations", path: "/admin/dashboard/registrations", icon: ClipboardList, permission: "basic" },
-  { label: "Teams", path: "/admin/dashboard/teams", icon: UsersRound, permission: "admin" },
-  { label: "Bracket", path: "/admin/dashboard/bracket", icon: GitBranch, permission: "basic" },
   { label: "Leaderboard", path: "/admin/dashboard/leaderboard", icon: Trophy, permission: "basic" },
   { label: "Payments", path: "/admin/dashboard/payments", icon: CreditCard, permission: "super_admin" },
 ];
 
 const NAV_GROUPS = [
+  {
+    label : "Events Section",
+    icon  : Volleyball,
+    items : [
+      { label: "Events", path: "/admin/dashboard/events", icon: Calendar, permission: "admin" },
+      { label: "Teams", path: "/admin/dashboard/teams", icon: UsersRound, permission: "admin" },
+      { label: "Bracket", path: "/admin/dashboard/bracket", icon: GitBranch, permission: "basic" },
+      { label: "Track Events", path: "/admin/dashboard/track-events", icon: Activity, permission: "admin" }
+    ]
+  },
   {
     label: "Replacements & Swaps",
     icon: Repeat2,
@@ -58,7 +68,6 @@ const NAV_GROUPS = [
     icon: Wrench,
     items: [
       { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users, permission: "super_admin" },
-      { label: "Events", path: "/admin/dashboard/events", icon: Calendar, permission: "admin" },
       { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },
     ],
   },
