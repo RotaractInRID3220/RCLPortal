@@ -28,7 +28,7 @@ const EventSelector = React.memo(() => {
 
     try {
       setSportsLoading(true)
-      const result = await getAllEvents({ type: ["team", "individual"] })
+      const result = await getAllEvents({ type: ["team", "individual", "trackIndividual", "trackTeam"] })
       if (result.success) {
         setSportsData(result.data)
         setLastFetchTimestamp(prev => ({ ...prev, sports: Date.now() }))
