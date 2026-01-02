@@ -152,7 +152,7 @@ export async function GET(request) {
         const sportDay = searchParams.get('day');
         const sportType = searchParams.get('type');
         const genderType = searchParams.get('gender');
-        const limit = parseInt(searchParams.get('limit')) || 20;
+        const limit = parseInt(searchParams.get('limit')) || 50;
         const offset = parseInt(searchParams.get('offset')) || 0;
 
         // Build query based on parameters
