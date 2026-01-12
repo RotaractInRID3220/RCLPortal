@@ -58,9 +58,8 @@ const Combobox = React.forwardRef(({
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  onSelect={(currentValue) => {
-                    const selectedOption = options.find(opt => opt.label === currentValue)
-                    const newValue = selectedOption ? selectedOption.value : ""
+                  onSelect={() => {
+                    const newValue = option.value
                     onValueChange(newValue === value ? "" : newValue)
                     setOpen(false)
                   }}
