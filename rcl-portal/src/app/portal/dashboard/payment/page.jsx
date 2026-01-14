@@ -297,7 +297,7 @@ const PaymentPage = () => {
     <div className="space-y-6">
       <div className="flex w-full justify-between items-center mb-8">
         <h1 className="text-2xl font-semibold tracking-wide">PAYMENT MANAGEMENT</h1>
-        {!isAfterDeadline && (
+        {/* {!isAfterDeadline && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" disabled={cleaningPlayers || dataLoading} className="cursor-pointer">
@@ -330,7 +330,7 @@ const PaymentPage = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        )}
+        )} */}
       </div>
 
       {/* Payment Statistics */}
