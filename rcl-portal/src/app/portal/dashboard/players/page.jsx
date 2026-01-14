@@ -272,7 +272,7 @@ const PlayersPage = () => {
           )}
 
           {/* Clean Players Button */}
-          {!isAfterDeadline && (
+          {/* {!isAfterDeadline && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -302,7 +302,7 @@ const PlayersPage = () => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          )}
+          )} */}
         </div>
       </div>
 

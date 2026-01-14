@@ -106,7 +106,8 @@ const AdministrationPage = () => {
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  disabled={cleaningPlayers}
+                  // disabled={cleaningPlayers}
+                  disabled={true}
                   className="w-full bg-red-500/20 border border-red-500 hover:bg-red-500/30 text-red-200 cursor-pointer"
                 >
                   {cleaningPlayers ? 'Cleaning...' : 'Clean Players Globally'}
