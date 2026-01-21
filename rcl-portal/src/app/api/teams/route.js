@@ -1,6 +1,45 @@
 import { supabase } from '../../../lib/supabaseClient';
 import { NextResponse } from 'next/server';
 
+// Helper function to fetch all records with pagination (Supabase default limit is 1000)
+async function fetchAllRecords(table, selectColumns, options = {}) {
+  const allRecords = [];
+  const pageSize = 1000;
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    let query = supabase
+      .from(table)
+      .select(selectColumns)
+      .range(offset, offset + pageSize - 1);
+    
+    // Apply any filters if provided
+    if (options.eq) {
+      for (const [column, value] of Object.entries(options.eq)) {
+        query = query.eq(column, value);
+      }
+    }
+
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error(`Error fetching from ${table}:`, error);
+      throw error;
+    }
+
+    if (data && data.length > 0) {
+      allRecords.push(...data);
+      offset += pageSize;
+      hasMore = data.length === pageSize; // If we got a full page, there might be more
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allRecords;
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -296,61 +335,52 @@ export async function POST(request) {
     }
 
     // OPTIMIZATION: Batch fetch all data in parallel instead of per-sport queries
-    const sportIds = sportsToProcess.map(s => s.sport_id);
+    // NOTE: Using pagination helper for registrations to ensure ALL records are fetched
+    const sportIds = new Set(sportsToProcess.map(s => s.sport_id));
     
-    const [existingTeamsResult, registrationsResult, playersResult, clubsResult] = await Promise.all([
-      // Get all existing teams for these sports
-      supabase
-        .from('teams')
-        .select('club_id, sport_id')
-        .in('sport_id', sportIds),
+    // Fetch registrations with pagination to get ALL records
+    const [existingTeamsData, registrationsData, clubsData] = await Promise.all([
+      // Get ALL existing teams
+      fetchAllRecords('teams', 'club_id, sport_id'),
       
-      // Get all registrations for these sports
-      supabase
-        .from('registrations')
-        .select('RMIS_ID, sport_id')
-        .in('sport_id', sportIds),
-      
-      // Get all players
-      supabase
-        .from('players')
-        .select('RMIS_ID, club_id, name'),
+      // Get ALL registrations with pagination - this is critical!
+      fetchAllRecords('registrations', 'RMIS_ID, sport_id, club_id'),
       
       // Get all clubs
-      supabase
-        .from('clubs')
-        .select('club_id, club_name, category')
+      fetchAllRecords('clubs', 'club_id, club_name, category')
     ]);
 
     // OPTIMIZATION: Create lookup maps for O(1) access
     const existingTeamsMap = new Map();
     const registrationsMap = new Map();
-    const playersMap = new Map();
     const clubsMap = new Map();
 
-    // Build existing teams lookup (sport_id -> Set of club_ids)
-    (existingTeamsResult.data || []).forEach(team => {
+    // Build existing teams lookup (sport_id -> Set of club_ids) - filter by our sportIds
+    (existingTeamsData || []).forEach(team => {
+      if (!sportIds.has(team.sport_id)) return; // Skip teams for sports we're not processing
       if (!existingTeamsMap.has(team.sport_id)) {
         existingTeamsMap.set(team.sport_id, new Set());
       }
       existingTeamsMap.get(team.sport_id).add(team.club_id);
     });
 
-    // Build registrations lookup (sport_id -> array of RMIS_IDs)
-    (registrationsResult.data || []).forEach(reg => {
+    // Build registrations lookup (sport_id -> array of registration objects with club_id)
+    // Filter by our sportIds in code
+    let totalRegsForSports = 0;
+    (registrationsData || []).forEach(reg => {
+      if (!sportIds.has(reg.sport_id)) return; // Skip registrations for sports we're not processing
+      totalRegsForSports++;
       if (!registrationsMap.has(reg.sport_id)) {
         registrationsMap.set(reg.sport_id, []);
       }
-      registrationsMap.get(reg.sport_id).push(reg.RMIS_ID);
-    });
-
-    // Build players lookup (RMIS_ID -> player object)
-    (playersResult.data || []).forEach(player => {
-      playersMap.set(player.RMIS_ID, player);
+      registrationsMap.get(reg.sport_id).push({
+        RMIS_ID: reg.RMIS_ID,
+        club_id: reg.club_id
+      });
     });
 
     // Build clubs lookup (club_id -> club object)
-    (clubsResult.data || []).forEach(club => {
+    (clubsData || []).forEach(club => {
       clubsMap.set(club.club_id, club);
     });
 
@@ -363,32 +393,22 @@ export async function POST(request) {
       try {
         // Use lookup maps instead of database queries
         const existingClubIds = existingTeamsMap.get(sport.sport_id) || new Set();
-        const registrationIds = registrationsMap.get(sport.sport_id) || [];
+        const registrations = registrationsMap.get(sport.sport_id) || [];
 
-        // Get player details using lookup map
-        const playersData = registrationIds
-          .map(rmisId => playersMap.get(rmisId))
-          .filter(Boolean);
-
-        // Get club details and filter by category using lookup map
-        const uniqueClubIds = [...new Set(playersData.map(p => p.club_id))];
-        const clubsData = uniqueClubIds
-          .map(clubId => clubsMap.get(clubId))
-          .filter(club => club && club.category === sport.category);
-
-        // Group registrations by club_id and count
+        // Group registrations by club_id and count - using club_id directly from registration
         const clubCounts = {};
-        playersData.forEach(player => {
-          const club = clubsData.find(c => c.club_id === player.club_id);
-          if (club) { // Only count if club matches sport category
-            if (!clubCounts[player.club_id]) {
-              clubCounts[player.club_id] = {
+        registrations.forEach(reg => {
+          const club = clubsMap.get(reg.club_id);
+          // Only count if club exists and matches sport category
+          if (club && club.category === sport.category) {
+            if (!clubCounts[reg.club_id]) {
+              clubCounts[reg.club_id] = {
                 count: 0,
                 club_name: club.club_name,
-                club_id: player.club_id
+                club_id: reg.club_id
               };
             }
-            clubCounts[player.club_id].count++;
+            clubCounts[reg.club_id].count++;
           }
         });
 
@@ -457,7 +477,15 @@ export async function POST(request) {
       message: `Created ${totalCreated} teams, skipped ${totalSkipped} existing teams`,
       total_created: totalCreated,
       total_skipped: totalSkipped,
-      results
+      results,
+      // Debug info to verify data fetch completeness
+      _debug: {
+        sports_processed: sportsToProcess.length,
+        total_registrations_fetched: registrationsData?.length || 0,
+        registrations_for_target_sports: totalRegsForSports,
+        total_existing_teams_fetched: existingTeamsData?.length || 0,
+        total_clubs_fetched: clubsData?.length || 0
+      }
     });
 
   } catch (error) {
