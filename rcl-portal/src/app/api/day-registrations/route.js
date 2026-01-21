@@ -2,6 +2,33 @@ import { supabase } from '@/lib/supabaseClient';
 import { NextResponse } from 'next/server';
 
 /**
+ * Helper function to check if portal is open
+ */
+async function isPortalOpen() {
+  try {
+    const { data, error } = await supabase
+      .from('portal_settings')
+      .select('is_enabled')
+      .eq('setting_key', 'registration_portal_open')
+      .single();
+
+    if (error) {
+      // If no record exists, default to closed for security
+      if (error.code === 'PGRST116') {
+        return false;
+      }
+      console.error('Error checking portal status:', error);
+      return false;
+    }
+
+    return data?.is_enabled === true;
+  } catch (error) {
+    console.error('Error checking portal status:', error);
+    return false;
+  }
+}
+
+/**
  * Registers a player for a specific sport day
  * POST /api/day-registrations
  */
@@ -14,6 +41,19 @@ export async function POST(request) {
       return NextResponse.json(
         { success: false, error: 'RMIS_ID and sport_day are required' },
         { status: 400 }
+      );
+    }
+
+    // SECURITY CHECK: Verify portal is open before allowing registration
+    const portalOpen = await isPortalOpen();
+    if (!portalOpen) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Registration portal is currently closed',
+          portalClosed: true 
+        },
+        { status: 403 }
       );
     }
 
