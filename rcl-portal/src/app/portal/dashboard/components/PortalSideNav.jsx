@@ -16,12 +16,14 @@ import {
   Repeat2,
   ArrowLeftRight,
   Medal,
+  Eye,
 } from "lucide-react";
 
 // Navigation items configuration
 const NAV_ITEMS = [
   { label: "Overview", path: "/portal/dashboard", icon: LayoutDashboard },
   { label: "Registrations", path: "/portal/dashboard/registration", icon: ClipboardList },
+  { label: "Club Registrations", path: "/portal/dashboard/club-registrations", icon: Eye },
   { label: "Players", path: "/portal/dashboard/players", icon: Users },
   { label: "Replacements", path: "/portal/dashboard/replacements", icon: Repeat2 },
   { label: "Swaps", path: "/portal/dashboard/swaps", icon: ArrowLeftRight },
@@ -37,7 +39,7 @@ const NavLink = ({ label, path, icon: Icon, isActive, onClick }) => (
     onClick={onClick}
     className={`
       group relative w-full flex items-center gap-3 px-4 py-2 rounded-lg
-      text-sm font-medium transition-all duration-200 cursor-pointer
+      text-xs font-medium transition-all duration-200 cursor-pointer
       ${
         isActive
           ? "bg-white/15 border border-white/30 text-white  shadow-white/5"
