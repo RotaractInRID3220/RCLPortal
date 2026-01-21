@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import Link from 'next/link'
 import { toast } from 'sonner'
-import { Search, Eye, Download, CheckCircle, XCircle, Clock, Receipt, Users, DollarSign } from 'lucide-react'
+import { Search, Eye, Download, CheckCircle, XCircle, Clock, Receipt, Users, DollarSign, TrendingUp, Wallet, Building2 } from 'lucide-react'
 import PrivateRoute from '@/lib/PrivateRoute'
 
 const AdminPaymentsPage = () => {
@@ -28,11 +29,44 @@ const AdminPaymentsPage = () => {
   const [rejectingId, setRejectingId] = useState(null)
   const [componentLoading, setComponentLoading] = useState(false)
 
+  // Stats state
+  const [stats, setStats] = useState({
+    totalPlayers: 0,
+    totalIncome: 0,
+    totalPaymentsReceived: 0,
+    amountYetToCome: 0
+  })
+  const [statsLoading, setStatsLoading] = useState(true)
+
   const itemsPerPage = 10
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
 
   useEffect(() => {
     fetchPayments()
   }, [activeTab, currentPage, searchTerm])
+
+  const fetchStats = async () => {
+    try {
+      setStatsLoading(true)
+      const response = await fetch('/api/admin/payments/stats')
+      if (response.ok) {
+        const data = await response.json()
+        setStats({
+          totalPlayers: data.totalPlayers || 0,
+          totalIncome: data.totalIncome || 0,
+          totalPaymentsReceived: data.totalPaymentsReceived || 0,
+          amountYetToCome: data.amountYetToCome || 0
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+    } finally {
+      setStatsLoading(false)
+    }
+  }
 
   const fetchPayments = async () => {
     try {
@@ -271,6 +305,75 @@ const AdminPaymentsPage = () => {
       {/* Header */}
       <div className="flex w-full justify-between items-center mb-8">
         <h1 className="text-2xl font-semibold tracking-wide">PAYMENT MANAGEMENT</h1>
+        <Link href="/admin/dashboard/payments/clubs-summary">
+          <Button
+            variant="outline"
+            className="cursor-pointer"
+          >
+            <Building2 className="w-4 h-4 mr-2" />
+            Clubs Summary
+          </Button>
+        </Link>
+      </div>
+
+      {/* Stats Bar */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-white/5">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 rounded-full bg-blue-500/20">
+                <TrendingUp className="w-6 h-6 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Total Expected Income</p>
+                {statsLoading ? (
+                  <div className="h-7 w-24 bg-white/10 animate-pulse rounded" />
+                ) : (
+                  <p className="text-xl font-bold">Rs. {stats.totalIncome.toLocaleString()}</p>
+                )}
+                <p className="text-xs text-gray-500">{stats.totalPlayers} players × Rs. 800</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/5">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 rounded-full bg-green-500/20">
+                <Wallet className="w-6 h-6 text-green-500" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Total Payments Received</p>
+                {statsLoading ? (
+                  <div className="h-7 w-24 bg-white/10 animate-pulse rounded" />
+                ) : (
+                  <p className="text-xl font-bold text-green-500">Rs. {stats.totalPaymentsReceived.toLocaleString()}</p>
+                )}
+                <p className="text-xs text-gray-500">Approved payments</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-white/5">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 rounded-full bg-orange-500/20">
+                <Clock className="w-6 h-6 text-orange-500" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Amount Yet to Come</p>
+                {statsLoading ? (
+                  <div className="h-7 w-24 bg-white/10 animate-pulse rounded" />
+                ) : (
+                  <p className="text-xl font-bold text-orange-500">Rs. {stats.amountYetToCome.toLocaleString()}</p>
+                )}
+                <p className="text-xs text-gray-500">Pending collection</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tabs and Search */}
@@ -550,6 +653,7 @@ const AdminPaymentsPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
     </div>
     </PrivateRoute>
   )
