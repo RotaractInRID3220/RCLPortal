@@ -25,7 +25,8 @@ import {
   Wrench,
   Hash,
   Activity,
-  Volleyball
+  Volleyball,
+  ScanLine
 } from "lucide-react";
 
 // Navigation items configuration with permission requirements
@@ -67,6 +68,7 @@ const NAV_GROUPS = [
     label: "Configurations",
     icon: Wrench,
     items: [
+      { label: "Portal Settings", path: "/admin/dashboard/portal-settings", icon: ScanLine, permission: "super_admin" },
       { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users, permission: "super_admin" },
       { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },
     ],

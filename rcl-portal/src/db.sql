@@ -89,6 +89,13 @@ CREATE TABLE public.players (
     CONSTRAINT players_pkey PRIMARY KEY (RMIS_ID),
     CONSTRAINT players_club_id_fkey FOREIGN KEY (club_id) REFERENCES public.clubs(club_id)
 );
+CREATE TABLE public.portal_settings (
+    setting_key text NOT NULL,
+    is_enabled boolean NOT NULL DEFAULT false,
+    updated_by text,
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT portal_settings_pkey PRIMARY KEY (setting_key)
+);
 CREATE TABLE public.registrations (
     id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
     RMIS_ID text,
