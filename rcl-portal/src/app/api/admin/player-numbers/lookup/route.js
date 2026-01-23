@@ -2,18 +2,20 @@ import { supabase } from '@/lib/supabaseClient';
 import { NextResponse } from 'next/server';
 
 /**
- * Player Lookup API - Search by Player Number or RMIS ID
+ * Player Lookup API - Search by Player Number, RMIS ID, or NIC
  * 
- * GET /api/admin/player-numbers/lookup?query=D-010032
- * GET /api/admin/player-numbers/lookup?query=RMIS123456
+ * GET /api/admin/player-numbers/lookup?query=D-010032&searchType=playerNumber
+ * GET /api/admin/player-numbers/lookup?query=RMIS123456&searchType=rmisId
+ * GET /api/admin/player-numbers/lookup?query=200012345678&searchType=nic
  * 
- * Returns player data with registration info for the queried player number or RMIS ID
+ * Returns player data with registration info for the queried parameter
  */
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('query');
     const sportDay = searchParams.get('sportDay');
+    const searchType = searchParams.get('searchType') || 'auto'; // playerNumber, rmisId, nic, or auto
 
     // Validate input
     if (!query || !query.trim()) {
@@ -30,20 +32,28 @@ export async function GET(request) {
       );
     }
 
-    const trimmedQuery = query.trim().toUpperCase();
+    const trimmedQuery = query.trim();
+    const upperQuery = trimmedQuery.toUpperCase();
+    const normalizedSportDay = sportDay.trim();
 
-    // Determine if query is a player number (format: D-XXXXXX) or RMIS ID
-    const isPlayerNumber = /^D-\d+$/.test(trimmedQuery);
+    // Determine search type
+    let effectiveSearchType = searchType;
+    if (searchType === 'auto') {
+      // Auto-detect based on format
+      if (/^D-\d+$/.test(upperQuery)) {
+        effectiveSearchType = 'playerNumber';
+      } else {
+        effectiveSearchType = 'rmisId';
+      }
+    }
 
     let playerData = null;
 
-    if (isPlayerNumber) {
+    if (effectiveSearchType === 'playerNumber') {
       // Query by player number
-      // Extract sport day and registration ID from player number
-      // Format: D-XXXXXX where first 3 chars after D- are sport day index, rest is registration ID
-      const numberPart = trimmedQuery.substring(2); // Remove "D-"
-      const sportDayIndex = numberPart.substring(0, 2); // First 2 digits
-      const registrationId = parseInt(numberPart.substring(2)); // Remaining digits
+      // Format: D-XXXXXX where first 2 chars after D- are sport day index, rest is registration ID
+      const numberPart = upperQuery.substring(2); // Remove "D-"
+      const registrationId = parseInt(numberPart.substring(2)); // Skip first 2 digits (sport day), remaining is reg ID
 
       if (isNaN(registrationId)) {
         return NextResponse.json(
@@ -53,6 +63,7 @@ export async function GET(request) {
       }
 
       // Fetch registration with related data
+      // Use !inner join to ensure events filter actually filters registrations
       const { data, error } = await supabase
         .from('registrations')
         .select(`
@@ -71,7 +82,7 @@ export async function GET(request) {
               category
             )
           ),
-          events (
+          events!inner (
             sport_name,
             sport_type,
             gender_type,
@@ -80,7 +91,7 @@ export async function GET(request) {
           )
         `)
         .eq('id', registrationId)
-        .eq('events.sport_day', sportDay)
+        .eq('events.sport_day', normalizedSportDay)
         .single();
 
       if (error) {
@@ -94,9 +105,71 @@ export async function GET(request) {
       }
 
       playerData = data;
+    } else if (effectiveSearchType === 'nic') {
+      // Query by NIC - first find player, then their registrations
+      const { data: playerRecord, error: playerError } = await supabase
+        .from('players')
+        .select('RMIS_ID')
+        .ilike('NIC', trimmedQuery)
+        .single();
+
+      if (playerError) {
+        if (playerError.code === 'PGRST116') {
+          return NextResponse.json(
+            { success: false, error: 'Player with this NIC not found' },
+            { status: 404 }
+          );
+        }
+        throw playerError;
+      }
+
+      // Now fetch their registration for this sport day
+      // Use !inner join to ensure events filter actually filters registrations
+      const { data: registrationRecords, error: regError } = await supabase
+        .from('registrations')
+        .select(`
+          id,
+          RMIS_ID,
+          sport_id,
+          main_player,
+          created_at,
+          players (
+            RMIS_ID,
+            name,
+            NIC,
+            club_id,
+            clubs (
+              club_name,
+              category
+            )
+          ),
+          events!inner (
+            sport_name,
+            sport_type,
+            gender_type,
+            sport_day,
+            category
+          )
+        `)
+        .eq('RMIS_ID', playerRecord.RMIS_ID)
+        .eq('events.sport_day', normalizedSportDay)
+        .limit(1);
+
+      if (regError) {
+        throw regError;
+      }
+
+      if (!registrationRecords || registrationRecords.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'Player not registered for this sport day' },
+          { status: 404 }
+        );
+      }
+
+      playerData = registrationRecords[0];
     } else {
-      // Query by RMIS ID
-      // Fetch player with their registrations for the specific sport day
+      // Query by RMIS ID (default)
+      // Use !inner join to ensure events filter actually filters registrations
       const { data: playerRecords, error: playerError } = await supabase
         .from('registrations')
         .select(`
@@ -115,7 +188,7 @@ export async function GET(request) {
               category
             )
           ),
-          events (
+          events!inner (
             sport_name,
             sport_type,
             gender_type,
@@ -123,8 +196,8 @@ export async function GET(request) {
             category
           )
         `)
-        .eq('RMIS_ID', trimmedQuery)
-        .eq('events.sport_day', sportDay)
+        .ilike('RMIS_ID', trimmedQuery)
+        .eq('events.sport_day', normalizedSportDay)
         .limit(1);
 
       if (playerError) {
@@ -156,6 +229,20 @@ export async function GET(request) {
       created_at: playerData.created_at,
     };
     const sport = playerData.events;
+
+    if (!sport || !sport.sport_day) {
+      return NextResponse.json(
+        { success: false, error: 'Sport data missing for this registration' },
+        { status: 404 }
+      );
+    }
+
+    if (!player) {
+      return NextResponse.json(
+        { success: false, error: 'Player profile missing for this registration' },
+        { status: 404 }
+      );
+    }
 
     // Generate player number
     const playerNumber = `${sport.sport_day}${String(playerData.id).padStart(4, '0')}`;

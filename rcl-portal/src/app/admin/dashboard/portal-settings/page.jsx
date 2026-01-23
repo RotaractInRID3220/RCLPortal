@@ -41,7 +41,7 @@ export default function PortalSettingsPage() {
   const [updating, setUpdating] = useState(false);
 
   // Check if user is super_admin - userDeets comes from club_membership_data table
-  const isSuperAdmin = session?.user?.permission_level === 'super_admin' || userDeets?.permission_level === 'super_admin';
+  const isSuperAdmin = session?.user?.permission_level === 'administrator' || userDeets?.permission_level === 'administrator';
   // The RMIS_ID is stored as 'membership_id' in the club_membership_data table
   const userRmisId = userDeets?.card_name || session?.user?.userDeets?.card_name;
 

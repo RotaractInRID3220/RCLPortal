@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,31 +17,33 @@ import {
   Trophy,
   AlertCircle,
   Loader2,
-  CheckCircle2,
+  IdCard,
 } from 'lucide-react';
 import { APP_CONFIG } from '@/config/app.config';
 
 export default function PlayerNumberMobileLookupage() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [playerNumberQuery, setPlayerNumberQuery] = useState('');
+  const [nicQuery, setNicQuery] = useState('');
+  const [rmisIdQuery, setRmisIdQuery] = useState('');
+  const [loading, setLoading] = useState(null); // Track which field is loading
   const [playerData, setPlayerData] = useState(null);
   const [error, setError] = useState(null);
 
-  // Search for player by number or RMIS ID
-  const handleSearch = async (query = searchQuery) => {
+  // Search for player by specific type
+  const handleSearch = async (searchType, query) => {
     if (!query.trim()) {
-      toast.error('Please enter player number or RMIS ID');
+      toast.error(`Please enter ${searchType === 'playerNumber' ? 'player number' : searchType === 'nic' ? 'NIC' : 'RMIS ID'}`);
       return;
     }
 
     try {
-      setLoading(true);
+      setLoading(searchType);
       setError(null);
       setPlayerData(null);
 
       const response = await fetch(
-        `/api/admin/player-numbers/lookup?query=${encodeURIComponent(query)}&sportDay=${APP_CONFIG.CURRENT_SPORT_DAY}`
+        `/api/admin/player-numbers/lookup?query=${encodeURIComponent(query)}&searchType=${searchType}&sportDay=${APP_CONFIG.CURRENT_SPORT_DAY}`
       );
 
       if (!response.ok) {
@@ -62,14 +64,14 @@ export default function PlayerNumberMobileLookupage() {
       setError(err.message || 'Error fetching player data');
       toast.error(err.message || 'Player not found');
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   };
 
-  // Handle Enter key press
-  const handleKeyPress = (e) => {
+  // Handle Enter key press for specific field
+  const handleKeyPress = (e, searchType, query) => {
     if (e.key === 'Enter') {
-      handleSearch();
+      handleSearch(searchType, query);
     }
   };
 
@@ -92,48 +94,107 @@ export default function PlayerNumberMobileLookupage() {
             Player Lookup
           </h1>
           <p className="text-gray-400 text-sm">
-            Search by player number or RMIS ID for {APP_CONFIG.CURRENT_SPORT_DAY}
+            Search by player number, NIC, or RMIS ID for {APP_CONFIG.CURRENT_SPORT_DAY}
           </p>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col gap-6">
-        {/* Manual Search Card */}
-        <Card className="bg-cranberry/10 border border-cranberry/40 p-6 backdrop-blur-lg">
-          <div className="flex items-center gap-2 mb-4">
-            <Search className="h-5 w-5 text-cranberry" />
-            <h2 className="text-xl font-semibold text-white">Manual Search</h2>
+      <div className="flex-1 flex flex-col gap-4">
+        {/* Player Number Search */}
+        <Card className="bg-cranberry/10 border border-cranberry/40 p-4 backdrop-blur-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <Hash className="h-5 w-5 text-cranberry" />
+            <h2 className="text-lg font-semibold text-white">Player Number</h2>
           </div>
-
-          <div className="space-y-3">
+          <div className="flex gap-2">
             <Input
               type="text"
-              placeholder="Enter player number (D-010032) or RMIS ID"
-              value={searchQuery}
+              placeholder="e.g., D-010032"
+              value={playerNumberQuery}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
+                setPlayerNumberQuery(e.target.value);
                 setError(null);
               }}
-              onKeyPress={handleKeyPress}
-              disabled={loading}
-              className="h-12 bg-white/5 border-white/20 text-white placeholder:text-gray-500 focus:border-cranberry focus:ring-2 focus:ring-cranberry/20 transition-all disabled:opacity-50"
+              onKeyPress={(e) => handleKeyPress(e, 'playerNumber', playerNumberQuery)}
+              disabled={loading !== null}
+              className="h-11 bg-white/5 border-white/20 text-white placeholder:text-gray-500 focus:border-cranberry focus:ring-2 focus:ring-cranberry/20 transition-all disabled:opacity-50"
             />
             <Button
-              onClick={() => handleSearch()}
-              disabled={loading}
-              className="w-full h-12 bg-cranberry hover:bg-cranberry/80 text-white font-semibold transition-all disabled:opacity-50"
+              onClick={() => handleSearch('playerNumber', playerNumberQuery)}
+              disabled={loading !== null}
+              className="h-11 px-4 bg-cranberry hover:bg-cranberry/80 text-white font-semibold transition-all disabled:opacity-50"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Searching...
-                </>
+              {loading === 'playerNumber' ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <>
-                  <Search className="mr-2 h-5 w-5" />
-                  Search
-                </>
+                <Search className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
+        </Card>
+
+        {/* NIC Search */}
+        <Card className="bg-blue-500/10 border border-blue-500/40 p-4 backdrop-blur-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <IdCard className="h-5 w-5 text-blue-400" />
+            <h2 className="text-lg font-semibold text-white">NIC Number</h2>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="e.g., 200012345678"
+              value={nicQuery}
+              onChange={(e) => {
+                setNicQuery(e.target.value);
+                setError(null);
+              }}
+              onKeyPress={(e) => handleKeyPress(e, 'nic', nicQuery)}
+              disabled={loading !== null}
+              className="h-11 bg-white/5 border-white/20 text-white placeholder:text-gray-500 focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition-all disabled:opacity-50"
+            />
+            <Button
+              onClick={() => handleSearch('nic', nicQuery)}
+              disabled={loading !== null}
+              className="h-11 px-4 bg-blue-500 hover:bg-blue-500/80 text-white font-semibold transition-all disabled:opacity-50"
+            >
+              {loading === 'nic' ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Search className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
+        </Card>
+
+        {/* RMIS ID Search */}
+        <Card className="bg-purple-500/10 border border-purple-500/40 p-4 backdrop-blur-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <User className="h-5 w-5 text-purple-400" />
+            <h2 className="text-lg font-semibold text-white">RMIS ID</h2>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              placeholder="e.g., RMIS12345"
+              value={rmisIdQuery}
+              onChange={(e) => {
+                setRmisIdQuery(e.target.value);
+                setError(null);
+              }}
+              onKeyPress={(e) => handleKeyPress(e, 'rmisId', rmisIdQuery)}
+              disabled={loading !== null}
+              className="h-11 bg-white/5 border-white/20 text-white placeholder:text-gray-500 focus:border-purple-400 focus:ring-2 focus:ring-purple-400/20 transition-all disabled:opacity-50"
+            />
+            <Button
+              onClick={() => handleSearch('rmisId', rmisIdQuery)}
+              disabled={loading !== null}
+              className="h-11 px-4 bg-purple-500 hover:bg-purple-500/80 text-white font-semibold transition-all disabled:opacity-50"
+            >
+              {loading === 'rmisId' ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Search className="h-5 w-5" />
               )}
             </Button>
           </div>

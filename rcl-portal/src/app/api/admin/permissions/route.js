@@ -27,7 +27,7 @@ export async function POST(request) {
             return NextResponse.json({ error: "RMIS_ID and permission_level are required" }, { status: 400 });
         }
 
-        if (!['super_admin', 'admin'].includes(permission_level)) {
+            if (!['administrator', 'super_admin', 'admin'].includes(permission_level)) {
             return NextResponse.json({ error: "Invalid permission_level" }, { status: 400 });
         }
 

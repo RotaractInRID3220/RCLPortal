@@ -54,6 +54,7 @@ const NAV_GROUPS = [
     items: [
       { label: "Replacements", path: "/admin/dashboard/replacements", icon: Repeat2, permission: "super_admin" },
       { label: "Swaps", path: "/admin/dashboard/swaps", icon: ArrowLeftRight, permission: "admin" },
+      { label: "Admin Changes", path: "/admin/dashboard/player-changes", icon: Shield, permission: "administrator" },
     ],
   },
   {
@@ -68,7 +69,7 @@ const NAV_GROUPS = [
     label: "Configurations",
     icon: Wrench,
     items: [
-      { label: "Portal Settings", path: "/admin/dashboard/portal-settings", icon: ScanLine, permission: "super_admin" },
+      { label: "Portal Settings", path: "/admin/dashboard/portal-settings", icon: ScanLine, permission: "administrator" },
       { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users, permission: "super_admin" },
       { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },
     ],
@@ -147,14 +148,14 @@ const AdminSideNav = () => {
   const userPermissionLevel = session?.user?.permission_level;
   const userRoleId = session?.user?.role_id;
   const isBasicAdmin = [1, 2, 3, 4].includes(userRoleId);
-  const permissionHierarchy = { admin: 1, super_admin: 2 };
+  const permissionHierarchy = { admin: 1, super_admin: 2, administrator: 3 };
 
   const canAccess = (item) => {
     if (item.permission === "basic") {
       return isBasicAdmin;
     }
 
-    if (item.permission === "admin" || item.permission === "super_admin") {
+    if (item.permission === "admin" || item.permission === "super_admin" || item.permission === "administrator") {
       if (!userPermissionLevel) return false;
       const userLevel = permissionHierarchy[userPermissionLevel] || 0;
       const requiredLevel = permissionHierarchy[item.permission] || Infinity;

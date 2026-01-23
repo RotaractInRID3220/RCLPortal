@@ -31,7 +31,7 @@ export default function PermissionsPage() {
       return
     }
     // Allow access for role_id=1 (super admin role) or if user has super_admin permission
-    const hasAccess = session.user.role_id === 1 || session.user.permission_level === 'super_admin'
+    const hasAccess = session.user.role_id === 1 || session.user.permission_level === 'administrator'
     if (!hasAccess) {
       router.push('/unauthorized')
       return
@@ -135,7 +135,7 @@ export default function PermissionsPage() {
   }
 
   return (
-    <PrivateRoute requiredPermission="super_admin"  accessType="admin">
+    <PrivateRoute requiredPermission="administrator"  accessType="admin">
     <div className="">
       <div className="flex w-full justify-between items-center mb-8">
         <h1 className="text-3xl font-semibold tracking-wide">PERMISSIONS MANAGEMENT</h1>
@@ -183,6 +183,7 @@ export default function PermissionsPage() {
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="super_admin">Super Admin</SelectItem>
+                          <SelectItem value="administrator">Administrator</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
@@ -207,7 +208,7 @@ export default function PermissionsPage() {
       {/* Current Permissions Section */}
       <div className="bg-white/5 rounded-lg p-8">
         <h2 className="text-xl font-semibold mb-4 text-white">Current Permissions</h2>
-        <p className="text-white/60 mb-6">Manage existing user permissions. Super Admin has higher privileges than Admin.</p>
+        <p className="text-white/60 mb-6">Manage existing user permissions. Administrator - Super Admin - Admin.</p>
 
         {loading ? (
           <div className="text-center py-8">
@@ -227,11 +228,17 @@ export default function PermissionsPage() {
                     <p className="text-sm text-white/60">
                       RMIS ID: {perm.RMIS_ID} |
                       <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
-                        perm.permission_level === 'super_admin'
-                          ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                          : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        perm.permission_level === 'administrator'
+                          ? 'bg-amber-500/20 text-amber-200 border border-amber-500/30'
+                          : perm.permission_level === 'super_admin'
+                            ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                            : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                       }`}>
-                        {perm.permission_level === 'super_admin' ? 'Super Admin' : 'Admin'}
+                        {perm.permission_level === 'administrator'
+                          ? 'Administrator'
+                          : perm.permission_level === 'super_admin'
+                            ? 'Super Admin'
+                            : 'Admin'}
                       </span>
                     </p>
                   </div>
