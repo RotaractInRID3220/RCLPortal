@@ -168,22 +168,11 @@ export default function AdminPlayerChangesPage() {
         });
     };
 
-    // Filter out already registered members for replacement
+    // Return all club members for replacement selection
+    // Backend will validate same-day registration conflicts
     const getAvailableReplacementMembers = () => {
         if (!clubMembers.length) return [];
-
-        // Get all registered RMIS IDs across all sports
-        const registeredRmisIds = new Set();
-        if (contextData?.sportRegistrations) {
-            Object.values(contextData.sportRegistrations).forEach(registrations => {
-                registrations.forEach(reg => {
-                    registeredRmisIds.add(reg.RMIS_ID);
-                });
-            });
-        }
-
-        // Filter members: use membership_id (RMIS ID) to check if already registered
-        return clubMembers.filter(member => !registeredRmisIds.has(member.membership_id));
+        return clubMembers;
     };
 
     // Handle replacement submission

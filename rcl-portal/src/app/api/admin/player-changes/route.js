@@ -251,10 +251,16 @@ async function handleReplacement(payload, adminId, adminName) {
   const cleanedReason = reason.trim();
   const newPlayerRMIS = replacement_member.membership_id;
 
-  // Get current player RMIS from registration
+  // Get current player RMIS and sport details from registration
   const { data: currentRegistration, error: regFetchError } = await supabase
     .from('registrations')
-    .select('RMIS_ID')
+    .select(`
+      RMIS_ID,
+      events:sport_id(
+        sport_id,
+        sport_day
+      )
+    `)
     .eq('id', registrations_id)
     .single();
 
@@ -264,6 +270,48 @@ async function handleReplacement(payload, adminId, adminName) {
       { success: false, error: 'Failed to fetch current player information' },
       { status: 500 }
     );
+  }
+
+  const targetSportDay = currentRegistration.events?.sport_day;
+
+  // Check if replacement player is already registered for another sport on the same day
+  if (targetSportDay) {
+    const { data: existingRegistrations, error: conflictCheckError } = await supabase
+      .from('registrations')
+      .select(`
+        id,
+        sport_id,
+        events:sport_id(
+          sport_id,
+          sport_name,
+          sport_day
+        )
+      `)
+      .eq('RMIS_ID', newPlayerRMIS)
+      .eq('club_id', club_id);
+
+    if (conflictCheckError) {
+      console.error('Error checking existing registrations:', conflictCheckError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to check existing registrations' },
+        { status: 500 }
+      );
+    }
+
+    // Check for same-day conflicts (excluding the current sport being replaced into)
+    const sameDayConflict = existingRegistrations?.find(
+      (reg) => reg.events?.sport_day === targetSportDay && reg.sport_id !== sport_id
+    );
+
+    if (sameDayConflict) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This member is already registered for "${sameDayConflict.events?.sport_name}" on the same day (${targetSportDay}). A player cannot participate in multiple sports on the same day.`,
+        },
+        { status: 400 }
+      );
+    }
   }
 
   // Step 1: Upsert replacement player record
