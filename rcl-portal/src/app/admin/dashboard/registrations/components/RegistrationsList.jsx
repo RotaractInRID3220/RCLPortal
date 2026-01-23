@@ -83,7 +83,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
 
   // Check if user has admin permissions
   const isAdmin = useMemo(() => {
-    const adminCheck = session?.user?.hasAdminAccess || userDeets?.permission_level === 'admin' || userDeets?.permission_level === 'super_admin'
+    const adminCheck = session?.user?.hasAdminAccess || userDeets?.permission_level === 'admin' || userDeets?.permission_level === 'super_admin' || userDeets?.permission_level === 'administrator'
     return adminCheck
   }, [session, userDeets])
 

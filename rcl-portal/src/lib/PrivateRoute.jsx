@@ -56,7 +56,7 @@ const PrivateRoute = ({
       }
       
       // Permission hierarchy: super_admin > admin
-      const permissionHierarchy = { 'admin': 1, 'super_admin': 2 };
+      const permissionHierarchy = { 'admin': 1, 'super_admin': 2, 'administrator': 3 };
       const requiredLevel = permissionHierarchy[requiredPermission];
       const userPermissionLevel = permissionHierarchy[userLevel];
       
@@ -112,7 +112,7 @@ const PrivateRoute = ({
     }
     
     // Permission hierarchy: super_admin > admin
-    const permissionHierarchy = { 'admin': 1, 'super_admin': 2 };
+    const permissionHierarchy = { 'admin': 1, 'super_admin': 2, 'administrator': 3 };
     const requiredLevel = permissionHierarchy[requiredPermission];
     const userPermissionLevel = permissionHierarchy[userLevel];
     
