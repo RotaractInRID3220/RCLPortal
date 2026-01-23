@@ -54,6 +54,7 @@ const NAV_GROUPS = [
     items: [
       { label: "Replacements", path: "/admin/dashboard/replacements", icon: Repeat2, permission: "super_admin" },
       { label: "Swaps", path: "/admin/dashboard/swaps", icon: ArrowLeftRight, permission: "admin" },
+      { label: "Admin Changes", path: "/admin/dashboard/player-changes", icon: Shield, permission: "administrator" },
     ],
   },
   {
