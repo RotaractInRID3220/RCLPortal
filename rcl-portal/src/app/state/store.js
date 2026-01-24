@@ -16,6 +16,8 @@ export const lastFetchTimestampAtom = atomWithStorage('lastFetchTimestamp', {
   sports: 0,
   clubs: 0,
   leaderboard: 0,
+  leaderboardCommunity: 0,
+  leaderboardInstitute: 0,
   clubPoints: 0,
   adminDashboard: 0,
   portalDashboard: 0
@@ -26,6 +28,8 @@ export const CACHE_DURATION = {
   sports: 2 * 60 * 1000,          // 2 minutes for sports data
   clubs: 10 * 60 * 1000,         // 10 minutes for clubs data
   leaderboard: 2 * 60 * 1000,    // 2 minutes for leaderboard data (frequently updated)
+  leaderboardCommunity: 2 * 60 * 1000,    // 2 minutes for community leaderboard
+  leaderboardInstitute: 2 * 60 * 1000,    // 2 minutes for institute leaderboard
   clubPoints: 2 * 60 * 1000,     // 2 minutes for club points
   adminDashboard: 1 * 60 * 1000, // 1 minute for admin dashboard (high priority data)
   portalDashboard: 2 * 60 * 1000 // 2 minutes for portal dashboard (user-specific data)

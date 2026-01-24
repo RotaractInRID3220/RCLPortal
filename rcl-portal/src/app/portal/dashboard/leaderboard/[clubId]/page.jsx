@@ -9,8 +9,7 @@ import { fetchClubDetails } from '@/services/leaderboardServices'
 import { 
   clubPointsDataAtom, 
   clubPointsLoadingAtom, 
-  lastFetchTimestampAtom, 
-  isCacheValid 
+  lastFetchTimestampAtom
 } from '@/app/state/store'
 
 const page = () => {
@@ -36,58 +35,70 @@ const page = () => {
     }
   }, [clubDetailsData])
 
-  // Optimized club details fetching with caching
-  const fetchClubDetailsData = useCallback(async (forceRefresh = false) => {
+  // Fetch club details data - using useEffect directly to avoid stale closure issues
+  useEffect(() => {
     if (!clubId) {
       console.log('No clubId provided')
       return
     }
 
-    try {
-      // Check cache validity
+    const fetchData = async () => {
+      // Get club-specific cache key and timestamp
       const cacheKey = `club_${clubId}`
-      if (!forceRefresh && clubPointsData[cacheKey] && isCacheValid(lastFetchTimestamp.clubPoints)) {
+      const clubTimestampKey = `clubPoints_${clubId}`
+      const cachedData = clubPointsData[cacheKey]
+      const clubTimestamp = lastFetchTimestamp[clubTimestampKey] || 0
+
+      // Check cache validity for this specific club (2 minute cache)
+      const cacheValid = cachedData && 
+        (Date.now() - clubTimestamp < 2 * 60 * 1000)
+
+      if (cacheValid) {
         console.log('Using cached club details for clubId:', clubId)
-        setClubDetailsData(clubPointsData[cacheKey])
+        setClubDetailsData(cachedData)
         return
       }
 
-      setLoading(true)
-      console.log('Fetching optimized data for clubId:', clubId)
-      
-      const result = await fetchClubDetails(clubId)
-      
-      if (result.success) {
-        setClubDetailsData(result.data)
+      try {
+        setLoading(true)
+        console.log('Fetching optimized data for clubId:', clubId)
         
-        // Cache the result
-        setClubPointsData(prev => ({
-          ...prev,
-          [cacheKey]: result.data
-        }))
-        setLastFetchTimestamp(prev => ({ ...prev, clubPoints: Date.now() }))
+        // Add cache-busting timestamp
+        const result = await fetchClubDetails(clubId, Date.now())
         
-        console.log('Club details loaded and cached:', result.data)
-      } else {
-        if (result.error === 'Club not found') {
-          console.error('Club not found for ID:', clubId)
-          toast.error('Club not found')
-          router.push('/portal/dashboard/leaderboard')
-          return
+        if (result.success) {
+          setClubDetailsData(result.data)
+          
+          // Cache the result with club-specific timestamp
+          setClubPointsData(prev => ({
+            ...prev,
+            [cacheKey]: result.data
+          }))
+          setLastFetchTimestamp(prev => ({ 
+            ...prev, 
+            [clubTimestampKey]: Date.now() 
+          }))
+          
+          console.log('Club details loaded and cached:', result.data)
+        } else {
+          if (result.error === 'Club not found') {
+            console.error('Club not found for ID:', clubId)
+            toast.error('Club not found')
+            router.push('/portal/dashboard/leaderboard')
+            return
+          }
+          toast.error(result.error || 'Failed to load club details')
         }
-        toast.error(result.error || 'Failed to load club details')
+      } catch (error) {
+        console.error('Error fetching club details:', error)
+        toast.error('Failed to load club details')
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('Error fetching club details:', error)
-      toast.error('Failed to load club details')
-    } finally {
-      setLoading(false)
     }
-  }, [clubId, clubPointsData, lastFetchTimestamp.clubPoints, setClubPointsData, setLastFetchTimestamp, setLoading, router])
 
-  useEffect(() => {
-    fetchClubDetailsData()
-  }, [fetchClubDetailsData])
+    fetchData()
+  }, [clubId, clubPointsData, lastFetchTimestamp, setClubPointsData, setLastFetchTimestamp, setLoading, router])
 
   // Rest of the component logic remains the same but uses optimized data
   const handleBackToLeaderboard = useCallback(() => {

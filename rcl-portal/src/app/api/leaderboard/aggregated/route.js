@@ -19,6 +19,7 @@ export async function GET(request) {
     // Use optimized Supabase queries instead of RPC
     const optimizedData = await getOptimizedLeaderboard(category, limit, offset);
     
+    // Return with no-cache headers to prevent stale data
     return NextResponse.json({
       success: true,
       data: optimizedData.clubs,
@@ -27,6 +28,12 @@ export async function GET(request) {
         limit: limit ? parseInt(limit) : null,
         offset: parseInt(offset),
         hasMore: limit ? (parseInt(offset) + parseInt(limit)) < optimizedData.total : false
+      }
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     });
 

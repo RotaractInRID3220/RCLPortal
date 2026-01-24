@@ -13,14 +13,22 @@
  */
 export const fetchLeaderboardData = async (options = {}) => {
   try {
-    const { category, limit, offset = 0 } = options;
+    const { category, limit, offset = 0, _t } = options;
     
     const params = new URLSearchParams();
     if (category) params.append('category', category);
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
+    // Add cache-busting timestamp to prevent browser/CDN caching
+    params.append('_t', _t || Date.now().toString());
 
-    const response = await fetch(`/api/leaderboard/aggregated?${params}`);
+    const response = await fetch(`/api/leaderboard/aggregated?${params}`, {
+      cache: 'no-store', // Prevent browser caching
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: Failed to fetch leaderboard data`);
@@ -52,15 +60,26 @@ export const fetchLeaderboardData = async (options = {}) => {
 /**
  * Fetch detailed club information with points breakdown
  * @param {string|number} clubId - Club ID
+ * @param {number} _t - Cache-busting timestamp (optional)
  * @returns {Promise<Object>} Club details with points breakdown
  */
-export const fetchClubDetails = async (clubId) => {
+export const fetchClubDetails = async (clubId, _t) => {
   try {
     if (!clubId) {
       throw new Error('Club ID is required');
     }
 
-    const response = await fetch(`/api/leaderboard/club-details/${clubId}`);
+    // Add cache-busting timestamp
+    const params = new URLSearchParams();
+    params.append('_t', _t || Date.now().toString());
+
+    const response = await fetch(`/api/leaderboard/club-details/${clubId}?${params}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
     
     if (!response.ok) {
       if (response.status === 404) {
