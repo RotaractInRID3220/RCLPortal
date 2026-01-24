@@ -34,8 +34,8 @@ export const APP_CONFIG = {
   EVENT_DAY: '2025-11-30T07:00:00', // Date and time of the main event (YYYY-MM-DDTHH:mm:ss)
 
   // Tournament Placement Points
-  FIRST_PLACE_POINTS: 50, // Points awarded for 1st place
-  SECOND_PLACE_POINTS: 30, // Points awarded for 2nd place
-  THIRD_PLACE_POINTS: 20, // Points awarded for 3rd place
+  FIRST_PLACE_POINTS: 100, // Points awarded for 1st place
+  SECOND_PLACE_POINTS: 75, // Points awarded for 2nd place
+  THIRD_PLACE_POINTS: 50, // Points awarded for 3rd place
   // ...other config values
 };
