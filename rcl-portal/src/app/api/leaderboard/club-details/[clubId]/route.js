@@ -107,6 +107,12 @@ export async function GET(request, { params }) {
     return NextResponse.json({
       success: true,
       data: result
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
 
   } catch (error) {

@@ -148,6 +148,7 @@ export async function POST(request) {
 export async function GET(request) {
     try {
         const { searchParams } = new URL(request.url);
+        const sportId = searchParams.get('sport_id');
         const category = searchParams.get('category');
         const sportDay = searchParams.get('day');
         const sportType = searchParams.get('type');
@@ -161,6 +162,10 @@ export async function GET(request) {
             .select('*', { count: 'exact' });
 
         // Add filters if parameters are provided
+        if (sportId) {
+            query = query.eq('sport_id', parseInt(sportId));
+        }
+
         if (category) {
             query = query.eq('category', category);
         }

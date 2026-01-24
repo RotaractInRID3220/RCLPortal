@@ -9,8 +9,7 @@ import { fetchLeaderboardData } from '@/services/leaderboardServices'
 import { 
   leaderboardDataAtom, 
   leaderboardLoadingAtom, 
-  lastFetchTimestampAtom, 
-  isCacheValid 
+  lastFetchTimestampAtom
 } from '@/app/state/store'
 
 const PortalLeaderboard = React.memo(({ category }) => {
@@ -32,41 +31,53 @@ const PortalLeaderboard = React.memo(({ category }) => {
     return Math.ceil(categoryData.length / itemsPerPage)
   }, [categoryData.length])
 
-  // Optimized data fetching with caching
-  const fetchLeaderboardDataOptimized = useCallback(async (forceRefresh = false) => {
-    try {
-      // Check cache validity
-      if (!forceRefresh && categoryData.length > 0 && isCacheValid(lastFetchTimestamp.leaderboard)) {
+  // Fetch data for category - using useEffect directly to avoid stale closure issues
+  useEffect(() => {
+    const fetchData = async () => {
+      // Get category-specific timestamp key
+      const timestampKey = category === 'institute' ? 'leaderboardInstitute' : 'leaderboardCommunity'
+      const currentCategoryData = leaderboardData[category] || []
+      const categoryTimestamp = lastFetchTimestamp[timestampKey] || 0
+
+      // Check cache validity for this specific category
+      const cacheValid = currentCategoryData.length > 0 && 
+        (Date.now() - categoryTimestamp < 2 * 60 * 1000) // 2 minute cache
+
+      if (cacheValid) {
         console.log('Using cached leaderboard data for category:', category)
         return
       }
 
-      setLoading(true)
-      const result = await fetchLeaderboardData({ category })
-      
-      if (result.success) {
-        // Update cache for this category
-        setLeaderboardData(prev => ({
-          ...prev,
-          [category]: result.data
-        }))
-        setLastFetchTimestamp(prev => ({ ...prev, leaderboard: Date.now() }))
-        console.log(`Leaderboard data loaded and cached for ${category}:`, result.data.length, 'clubs')
-      } else {
-        toast.error(result.error || 'Failed to load leaderboard')
+      try {
+        setLoading(true)
+        // Add cache-busting timestamp to prevent browser caching
+        const result = await fetchLeaderboardData({ category, _t: Date.now() })
+        
+        if (result.success) {
+          // Update cache for this category
+          setLeaderboardData(prev => ({
+            ...prev,
+            [category]: result.data
+          }))
+          setLastFetchTimestamp(prev => ({ 
+            ...prev, 
+            [timestampKey]: Date.now() 
+          }))
+          console.log(`Leaderboard data loaded and cached for ${category}:`, result.data.length, 'clubs')
+        } else {
+          toast.error(result.error || 'Failed to load leaderboard')
+        }
+      } catch (error) {
+        console.error('Error fetching leaderboard data:', error)
+        toast.error('Failed to load leaderboard')
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('Error fetching leaderboard data:', error)
-      toast.error('Failed to load leaderboard')
-    } finally {
-      setLoading(false)
     }
-  }, [category, categoryData.length, lastFetchTimestamp.leaderboard, setLeaderboardData, setLoading, setLastFetchTimestamp])
 
-  useEffect(() => {
-    fetchLeaderboardDataOptimized()
+    fetchData()
     setCurrentPage(1) // Reset to first page when category changes
-  }, [fetchLeaderboardDataOptimized])
+  }, [category, leaderboardData, lastFetchTimestamp, setLeaderboardData, setLastFetchTimestamp, setLoading])
 
   const handleClubClick = useCallback((club) => {
     console.log('Clicking on club:', club)
