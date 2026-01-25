@@ -54,3 +54,32 @@ export const checkPlayerRegistration = async (rmisId, sportDay) => {
     throw error;
   }
 };
+
+/**
+ * Fetches day registrations grouped by event
+ * @param {string} sportDay - Optional sport day filter (e.g., 'D-01')
+ * @param {number} sportId - Optional sport/event ID filter
+ * @returns {Promise<Object>} Event-wise registrations data
+ */
+export const fetchDayRegistrationsByEvent = async (sportDay = null, sportId = null) => {
+  try {
+    const params = new URLSearchParams();
+    if (sportDay) params.append('sportDay', sportDay);
+    if (sportId) params.append('sportId', sportId);
+
+    const queryString = params.toString();
+    const url = `/api/admin/day-registrations${queryString ? `?${queryString}` : ''}`;
+
+    const response = await fetch(url);
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to fetch day registrations');
+    }
+
+    return result.data;
+  } catch (error) {
+    console.error('Error fetching day registrations:', error);
+    throw error;
+  }
+};
