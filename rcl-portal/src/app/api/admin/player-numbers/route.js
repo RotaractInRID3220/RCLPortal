@@ -17,6 +17,39 @@ const generatePlayerNumber = (sportDayValue, registrationId) => {
   return `${sportDayValue}${paddedId}`;
 };
 
+/**
+ * Fetches all day registrations for a sport day (handles 1000 row limit)
+ */
+const fetchAllDayRegistrations = async (sportDay) => {
+  let allDayRegs = [];
+  let page = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('day_registrations')
+      .select('RMIS_ID')
+      .eq('sport_day', sportDay)
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+
+    if (error) {
+      console.error('Error fetching day registrations:', error);
+      return new Set();
+    }
+
+    if (data && data.length > 0) {
+      allDayRegs = [...allDayRegs, ...data];
+      hasMore = data.length === pageSize;
+      page++;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return new Set(allDayRegs.map(dr => dr.RMIS_ID));
+};
+
 // Fetches player numbers for a specific sport day
 // If no search term, returns all data for client-side filtering
 // If search term provided, returns filtered and paginated data
@@ -35,6 +68,9 @@ export async function GET(request) {
         { status: 400 }
       );
     }
+
+    // Fetch day registrations in parallel with registrations query
+    const dayRegistrationsPromise = fetchAllDayRegistrations(sportDay);
 
     // Build optimized query with JOINs
     let query = supabase
@@ -72,7 +108,10 @@ export async function GET(request) {
       query = query.range(offset, offset + limit - 1);
     }
 
-    const { data: registrations, error, count } = await query;
+    const [{ data: registrations, error, count }, dayRegisteredSet] = await Promise.all([
+      query,
+      dayRegistrationsPromise
+    ]);
 
     if (error) {
       console.error('Error fetching player numbers:', error);
@@ -92,7 +131,7 @@ export async function GET(request) {
       });
     }
 
-    // Transform data and generate player numbers
+    // Transform data and generate player numbers with day registration status
     const playerNumbers = registrations.map(reg => ({
       playerNumber: generatePlayerNumber(sportDay, reg.id),
       registrationId: reg.id,
@@ -102,7 +141,8 @@ export async function GET(request) {
       clubId: reg.players?.clubs?.club_id || null,
       sportName: reg.events?.sport_name || '-',
       sportId: reg.sport_id,
-      isMainPlayer: reg.main_player
+      isMainPlayer: reg.main_player,
+      isDayRegistered: dayRegisteredSet.has(reg.RMIS_ID)
     }));
 
     // Sort by club name alphabetically
