@@ -20,11 +20,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Search, Download, Hash, Smartphone } from 'lucide-react';
+import { Loader2, Search, Download, Hash, Smartphone, CalendarCheck, Users, Check, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import PrivateRoute from '@/lib/PrivateRoute';
 import { SPORT_DAYS } from '@/config/app.config';
 import useDebounce from '@/hooks/useDebounce';
+import { Badge } from '@/components/ui/badge';
 
 export default function PlayerNumbersPage() {
   const router = useRouter();
@@ -37,6 +38,8 @@ export default function PlayerNumbersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [dayStats, setDayStats] = useState([]);
+  const [dayStatsLoading, setDayStatsLoading] = useState(true);
 
   const itemsPerPage = 10;
   const debouncedSearch = useDebounce(searchTerm, 300);
@@ -113,6 +116,25 @@ export default function PlayerNumbersPage() {
     // Keep totalCount as the full dataset count for display
   }, [allPlayers, debouncedSearch, currentPage, filterAndPaginateData]);
 
+  // Fetches day registration stats for all sport days
+  const fetchDayRegistrationStats = useCallback(async () => {
+    try {
+      setDayStatsLoading(true);
+      const response = await fetch('/api/admin/player-numbers/day-stats');
+      const result = await response.json();
+
+      if (result.success) {
+        setDayStats(result.data);
+      } else {
+        console.error('Failed to fetch day registration stats:', result.error);
+      }
+    } catch (error) {
+      console.error('Error fetching day registration stats:', error);
+    } finally {
+      setDayStatsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAllPlayerNumbers(activeDay);
     setCurrentPage(1);
@@ -122,6 +144,11 @@ export default function PlayerNumbersPage() {
   useEffect(() => {
     updateDisplayedData();
   }, [updateDisplayedData]);
+
+  // Fetch day registration stats on mount
+  useEffect(() => {
+    fetchDayRegistrationStats();
+  }, [fetchDayRegistrationStats]);
 
   // Handle tab change
   const handleDayChange = (day) => {
@@ -152,13 +179,14 @@ export default function PlayerNumbersPage() {
       }
 
       // Create CSV content from allPlayers (already sorted)
-      const headers = ['Player Number', 'RMIS ID', 'Name', 'Club Name', 'Sport'];
+      const headers = ['Player Number', 'RMIS ID', 'Name', 'Club Name', 'Sport', 'Checked In'];
       const rows = allPlayers.map(player => [
         player.playerNumber,
         player.rmisId,
         player.playerName,
         player.clubName,
-        player.sportName
+        player.sportName,
+        player.isDayRegistered ? 'Yes' : 'No'
       ]);
 
       const csvContent = [
@@ -325,6 +353,7 @@ export default function PlayerNumbersPage() {
                           <TableHead className="text-white/60">Name</TableHead>
                           <TableHead className="text-white/60">Club Name</TableHead>
                           <TableHead className="text-white/60">Sport</TableHead>
+                          <TableHead className="text-white/60 text-center w-[100px]">Checked In</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -348,6 +377,19 @@ export default function PlayerNumbersPage() {
                             <TableCell className="text-white/80">
                               {player.sportName}
                             </TableCell>
+                            <TableCell className="text-center">
+                              {player.isDayRegistered ? (
+                                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30">
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Yes
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30">
+                                  <X className="h-3 w-3 mr-1" />
+                                  No
+                                </Badge>
+                              )}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -359,6 +401,97 @@ export default function PlayerNumbersPage() {
             </CardContent>
           </Card>
         </Tabs>
+
+        {/* Day Registration Stats Section */}
+        <Card className="mt-8 bg-white/5 border-white/10">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold tracking-wide uppercase flex items-center gap-2">
+              <CalendarCheck className="h-5 w-5 text-green-400" />
+              Day Registration Overview
+            </CardTitle>
+            <CardDescription className="text-white/60">
+              Players registered on the day vs total registered players per sport day
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {dayStatsLoading ? (
+              <div className="flex flex-col items-center justify-center py-10 text-white/60">
+                <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                <p className="text-sm">Loading day registration stats…</p>
+              </div>
+            ) : dayStats.length === 0 ? (
+              <div className="text-center py-10 text-white/60 text-sm">
+                No day registration data available
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {dayStats.map((stat) => (
+                  <div
+                    key={stat.sportDay}
+                    className="relative rounded-xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-4 overflow-hidden"
+                  >
+                    {/* Sport Day Label */}
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-white">{stat.label}</h3>
+                      <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/60">
+                        {stat.dayRegistrationRate}% checked in
+                      </span>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-white/60 flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Total Players
+                        </span>
+                        <span className="font-mono font-semibold text-white">
+                          {stat.uniquePlayers}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-green-400/80 flex items-center gap-2">
+                          <CalendarCheck className="h-4 w-4" />
+                          Day Registered
+                        </span>
+                        <span className="font-mono font-semibold text-green-400">
+                          {stat.dayRegistered}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-amber-400/80 flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Not Checked In
+                        </span>
+                        <span className="font-mono font-semibold text-amber-400">
+                          {stat.notDayRegistered}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mt-4">
+                      <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+                          style={{ width: `${stat.dayRegistrationRate}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Total Registrations (includes duplicates if player in multiple sports) */}
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <div className="flex items-center justify-between text-xs text-white/40">
+                        <span>Total Registrations</span>
+                        <span className="font-mono">{stat.totalRegistrations}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </PrivateRoute>
   );
