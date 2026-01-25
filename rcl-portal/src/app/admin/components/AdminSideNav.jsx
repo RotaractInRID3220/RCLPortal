@@ -26,7 +26,8 @@ import {
   Hash,
   Activity,
   Volleyball,
-  ScanLine
+  ScanLine,
+  CalendarCheck
 } from "lucide-react";
 
 // Navigation items configuration with permission requirements
@@ -45,7 +46,8 @@ const NAV_GROUPS = [
       { label: "Events", path: "/admin/dashboard/events", icon: Calendar, permission: "admin" },
       { label: "Teams", path: "/admin/dashboard/teams", icon: UsersRound, permission: "admin" },
       { label: "Bracket", path: "/admin/dashboard/bracket", icon: GitBranch, permission: "basic" },
-      { label: "Track Events", path: "/admin/dashboard/track-events", icon: Activity, permission: "admin" }
+      { label: "Track Events", path: "/admin/dashboard/track-events", icon: Activity, permission: "admin" },
+      { label: "Day Check-ins", path: "/admin/dashboard/day-registrations", icon: CalendarCheck, permission: "admin" }
     ]
   },
   {
