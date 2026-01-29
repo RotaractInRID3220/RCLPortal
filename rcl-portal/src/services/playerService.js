@@ -42,7 +42,7 @@ export const generatePlayerNumber = (sportDayValue, registrationId) => {
   const paddedId = String(registrationId).padStart(4, '0');
   
   // Combine sport day prefix with padded ID
-  return `${sportDayValue}${paddedId}`;
+  return `${paddedId}`;
 };
 
 /**
