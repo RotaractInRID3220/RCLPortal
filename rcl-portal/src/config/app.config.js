@@ -27,7 +27,7 @@ export const APP_CONFIG = {
   // REGISTRATION_DEADLINE: '2025-11-03T00:30:00', // Date and time after which registration/deletion is disabled (YYYY-MM-DDTHH:mm:ss)
   REPLACEMENT_OPENING: '2025-11-22T00:00:00', // Date and time from which replacements are enabled (YYYY-MM-DDTHH:mm:ss)
   REPLACEMENT_DEADLINE: '2025-11-23T23:59:59', // Date and time after which player replacements are disabled (YYYY-MM-DDTHH:mm:ss)
-  CURRENT_SPORT_DAY: SPORT_DAYS.E_SPORT.value, // Current sport day for on-the-day registrations
+  CURRENT_SPORT_DAY: SPORT_DAYS.DAY_02.value, // Current sport day for on-the-day registrations
   MEMBERSHIP_CUTOFF_DATE: '2026-01-15T00:30:00.000Z', // Set cutoff date as 'YYYY-MM-DDTHH:mm:ss' or leave empty for current date
   REGISTRATION_FEE: 800, // Registration fee per player in Rs.
   PARTICIPATION_POINTS_PER_SPORT: 15, // Points awarded per sport for participation (50%+ attendance)
@@ -37,5 +37,10 @@ export const APP_CONFIG = {
   FIRST_PLACE_POINTS: 100, // Points awarded for 1st place
   SECOND_PLACE_POINTS: 75, // Points awarded for 2nd place
   THIRD_PLACE_POINTS: 50, // Points awarded for 3rd place
+
+  // Track Individual Placement Points (different from regular tournaments)
+  TRACK_INDIVIDUAL_FIRST_PLACE_POINTS: 85, // Points awarded for 1st place in track individual
+  TRACK_INDIVIDUAL_SECOND_PLACE_POINTS: 50, // Points awarded for 2nd place in track individual
+  TRACK_INDIVIDUAL_THIRD_PLACE_POINTS: 30, // Points awarded for 3rd place in track individual
   // ...other config values
 };

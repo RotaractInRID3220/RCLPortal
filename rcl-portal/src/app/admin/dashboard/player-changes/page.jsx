@@ -206,9 +206,11 @@ export default function AdminPlayerChangesPage() {
                         card_name: selectedMember?.card_name || '',
                         name: selectedMember?.card_name || '',
                         email: selectedMember?.email || '',
-                        nic: selectedMember?.nic || '',
+                        nic: selectedMember?.nic_pp || '',
                         gender: selectedMember?.gender || '',
-                        status: selectedMember?.status || ''
+                        status: selectedMember?.status || '',
+                        ri_number: selectedMember?.ri_number || '',
+                        birthdate: selectedMember?.birthdate || ''
                     },
                     reason: replacementReason.trim(),
                     admin_id: userDeets?.membership_id,

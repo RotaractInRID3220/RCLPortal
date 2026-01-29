@@ -57,7 +57,8 @@ export async function POST(request) {
           RMIS_ID,
           events!inner (
             sport_id,
-            sport_day
+            sport_day,
+            sport_type
           )
         `)
         .eq('club_id', club.club_id)
@@ -65,9 +66,15 @@ export async function POST(request) {
 
       if (regError) throw regError;
 
+      // Filter out track events (they have their own point awarding system)
+      const EXCLUDED_SPORT_TYPES = ['trackIndividual', 'trackTeam'];
+      const filteredRegistrations = registrations.filter(
+        reg => !EXCLUDED_SPORT_TYPES.includes(reg.events?.sport_type)
+      );
+
       // Group registrations by sport
       const sportGroups = {};
-      registrations.forEach(reg => {
+      filteredRegistrations.forEach(reg => {
         if (!sportGroups[reg.sport_id]) {
           sportGroups[reg.sport_id] = new Set();
         }

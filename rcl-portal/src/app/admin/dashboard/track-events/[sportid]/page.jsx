@@ -15,6 +15,46 @@ const reorder = (list, fromIndex, toIndex) => {
   return updated
 }
 
+// Parse score/time to a comparable number (handles formats like "10.5", "1:23.45", "01:23:45")
+const parseScore = (score) => {
+  if (!score || String(score).trim() === '') return null
+  const str = String(score).trim()
+  
+  // Check if it's a time format (contains ":")
+  if (str.includes(':')) {
+    const parts = str.split(':').map(Number)
+    if (parts.some(isNaN)) return null
+    // Convert to seconds: supports mm:ss.ms or hh:mm:ss formats
+    if (parts.length === 2) {
+      return parts[0] * 60 + parts[1]
+    } else if (parts.length === 3) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    }
+  }
+  
+  // Try parsing as a number
+  const num = parseFloat(str)
+  return isNaN(num) ? null : num
+}
+
+// Sort entries by score (lower is better for track events)
+const sortByScore = (entries) => {
+  const hasScores = entries.some((e) => parseScore(e.score) !== null)
+  if (!hasScores) return entries
+  
+  return [...entries].sort((a, b) => {
+    const scoreA = parseScore(a.score)
+    const scoreB = parseScore(b.score)
+    
+    // Entries with scores come before those without
+    if (scoreA === null && scoreB === null) return 0
+    if (scoreA === null) return 1
+    if (scoreB === null) return -1
+    
+    return scoreA - scoreB // Lower score/time = better (ascending)
+  })
+}
+
 const TrackEventDetail = () => {
   const params = useParams()
   const router = useRouter()
@@ -35,7 +75,8 @@ const TrackEventDetail = () => {
       setLoading(true)
       const result = await getTrackEntries(sportId)
       setSport(result.sport)
-      setEntries(result.entries || [])
+      // Sort entries by score/time if available
+      setEntries(sortByScore(result.entries || []))
       setReserves(result.reserves || [])
     } catch (error) {
       // toast handled in service
@@ -159,7 +200,7 @@ const TrackEventDetail = () => {
               <Input
                 value={entry.score ?? ''}
                 placeholder="Score / Time"
-                onChange={(e) => setEntries((prev) => prev.map((row) => (row.id === entry.id ? { ...row, score: e.target.value } : row)))}
+                onChange={(e) => setEntries((prev) => prev.map((row) => (row.rmis_id === entry.rmis_id ? { ...row, score: e.target.value } : row)))}
                 className="bg-white/10 border-white/20 text-white"
               />
               <div className="text-sm text-white/70 self-center">Drag to reorder</div>
