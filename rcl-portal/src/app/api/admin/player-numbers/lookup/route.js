@@ -123,7 +123,7 @@ export async function GET(request) {
         throw playerError;
       }
 
-      // Now fetch their registration for this sport day
+      // Now fetch ALL their registrations for this sport day
       // Use !inner join to ensure events filter actually filters registrations
       const { data: registrationRecords, error: regError } = await supabase
         .from('registrations')
@@ -152,8 +152,7 @@ export async function GET(request) {
           )
         `)
         .eq('RMIS_ID', playerRecord.RMIS_ID)
-        .eq('events.sport_day', normalizedSportDay)
-        .limit(1);
+        .eq('events.sport_day', normalizedSportDay);
 
       if (regError) {
         throw regError;
@@ -166,7 +165,7 @@ export async function GET(request) {
         );
       }
 
-      playerData = registrationRecords[0];
+      playerData = registrationRecords;
     } else {
       // Query by RMIS ID (default)
       // Use !inner join to ensure events filter actually filters registrations
@@ -197,8 +196,7 @@ export async function GET(request) {
           )
         `)
         .ilike('RMIS_ID', trimmedQuery)
-        .eq('events.sport_day', normalizedSportDay)
-        .limit(1);
+        .eq('events.sport_day', normalizedSportDay);
 
       if (playerError) {
         throw playerError;
@@ -211,31 +209,22 @@ export async function GET(request) {
         );
       }
 
-      playerData = playerRecords[0];
+      playerData = playerRecords;
     }
 
-    if (!playerData) {
+    if (!playerData || (Array.isArray(playerData) && playerData.length === 0)) {
       return NextResponse.json(
         { success: false, error: 'Player not found' },
         { status: 404 }
       );
     }
 
-    // Extract player info
-    const player = playerData.players;
-    const registration = {
-      id: playerData.id,
-      main_player: playerData.main_player,
-      created_at: playerData.created_at,
-    };
-    const sport = playerData.events;
-
-    if (!sport || !sport.sport_day) {
-      return NextResponse.json(
-        { success: false, error: 'Sport data missing for this registration' },
-        { status: 404 }
-      );
-    }
+    // Normalize to array format for all search types (playerNumber returns single, others return array)
+    const registrations = Array.isArray(playerData) ? playerData : [playerData];
+    
+    // Extract player info from first registration (all should have same player)
+    const firstReg = registrations[0];
+    const player = firstReg.players;
 
     if (!player) {
       return NextResponse.json(
@@ -244,30 +233,52 @@ export async function GET(request) {
       );
     }
 
-    // Generate player number
-    const playerNumber = `${sport.sport_day}${String(playerData.id).padStart(4, '0')}`;
+    // Build sports array with all registrations for this day
+    const sports = registrations
+      .filter(reg => reg.events && reg.events.sport_day)
+      .map(reg => ({
+        id: reg.id,
+        sportId: reg.sport_id,
+        name: reg.events.sport_name,
+        type: reg.events.sport_type,
+        genderType: reg.events.gender_type,
+        category: reg.events.category,
+        sportDay: reg.events.sport_day,
+        isMainPlayer: reg.main_player,
+        registeredAt: reg.created_at,
+        playerNumber: `${reg.events.sport_day}${String(reg.id).padStart(4, '0')}`,
+      }));
+
+    if (sports.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No valid sport registrations found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
       data: {
-        playerNumber,
-        registrationId: playerData.id,
         player: {
           RMIS_ID: player.RMIS_ID,
           name: player.name,
           NIC: player.NIC,
           club: player.clubs,
         },
+        sports,
+        // Keep backwards compatibility with single sport response
+        playerNumber: sports[0].playerNumber,
+        registrationId: sports[0].id,
         sport: {
-          name: sport.sport_name,
-          type: sport.sport_type,
-          genderType: sport.gender_type,
-          category: sport.category,
-          sportDay: sport.sport_day,
+          name: sports[0].name,
+          type: sports[0].type,
+          genderType: sports[0].genderType,
+          category: sports[0].category,
+          sportDay: sports[0].sportDay,
         },
         registration: {
-          isMainPlayer: registration.main_player,
-          registeredAt: registration.created_at,
+          isMainPlayer: sports[0].isMainPlayer,
+          registeredAt: sports[0].registeredAt,
         },
       },
       message: 'Player data retrieved successfully',

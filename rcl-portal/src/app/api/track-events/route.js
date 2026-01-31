@@ -96,14 +96,14 @@ export async function GET(request) {
 
       const playerMap = new Map((playersRes.data || []).map((p) => [p.RMIS_ID, p]))
       const clubMap = new Map((clubsRes.data || []).map((c) => [c.club_id, c.club_name]))
-      const trackMap = new Map((trackRes.data || []).map((t) => [t.rmis_id, t]))
+      const trackMap = new Map((trackRes.data || []).map((t) => [t.RMIS_ID, t]))
 
       const entries = mainRegs.map((reg) => {
         const player = playerMap.get(reg.RMIS_ID)
         const track = trackMap.get(reg.RMIS_ID)
         return {
           id: track?.id,
-          rmis_id: reg.RMIS_ID,
+          RMIS_ID: reg.RMIS_ID,
           name: player?.name || '-',
           club_id: player?.club_id || reg.club_id,
           club_name: clubMap.get(player?.club_id || reg.club_id) || '-',
@@ -116,7 +116,7 @@ export async function GET(request) {
       const reserves = reserveRegs.map((reg) => {
         const player = playerMap.get(reg.RMIS_ID)
         return {
-          rmis_id: reg.RMIS_ID,
+          RMIS_ID: reg.RMIS_ID,
           name: player?.name || '-',
           club_id: player?.club_id || reg.club_id,
           club_name: clubMap.get(player?.club_id || reg.club_id) || '-',
@@ -186,7 +186,7 @@ export async function GET(request) {
       if (!clubPlayers.has(reg.club_id)) clubPlayers.set(reg.club_id, [])
       const player = playersMap.get(reg.RMIS_ID)
       clubPlayers.get(reg.club_id).push({
-        rmis_id: reg.RMIS_ID,
+        RMIS_ID: reg.RMIS_ID,
         name: player?.name || '-',
         club_id: player?.club_id || reg.club_id,
       })
@@ -265,12 +265,12 @@ export async function POST(request) {
         const mainIds = mainRegs.map((r) => r.RMIS_ID).filter(Boolean)
 
         // Preserve scores/places where possible
-        const preservedMap = new Map((existingRows || []).map((row) => [row.rmis_id, row]))
+        const preservedMap = new Map((existingRows || []).map((row) => [row.RMIS_ID, row]))
         const desiredRows = mainIds.map((id) => {
           const existing = preservedMap.get(id)
           return {
             sport_id: sport.sport_id,
-            rmis_id: id,
+            RMIS_ID: id,
             team_id: null,
             score: existing?.score || null,
             place: existing?.place || null,
@@ -310,7 +310,7 @@ export async function POST(request) {
         return {
           sport_id: sport.sport_id,
           team_id: team.team_id,
-          rmis_id: null,
+          RMIS_ID: null,
           score: existing?.score || null,
           place: existing?.place || null,
         }

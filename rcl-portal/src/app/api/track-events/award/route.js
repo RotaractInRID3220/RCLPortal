@@ -68,7 +68,7 @@ export async function POST(request) {
   try {
     const { data: rows, error: rowsError } = await supabase
       .from('track_events')
-      .select('id, rmis_id, team_id, score')
+      .select('id, RMIS_ID, team_id, score')
       .eq('sport_id', sportId)
 
     if (rowsError) throw rowsError
@@ -80,7 +80,7 @@ export async function POST(request) {
     const clubPointsMap = new Map()
 
     if (isIndividual) {
-      const rmisIds = Array.from(new Set((rows || []).map((r) => r.rmis_id))).filter(Boolean)
+      const rmisIds = Array.from(new Set((rows || []).map((r) => r.RMIS_ID))).filter(Boolean)
       if (!rmisIds.length) {
         return NextResponse.json({ success: true, updated: 0, sport })
       }
@@ -96,8 +96,8 @@ export async function POST(request) {
 
       // Filter entries with scores and sort by score (lower is better)
       const entriesWithScores = (rows || [])
-        .filter(r => parseScore(r.score) !== null && playerMap.has(r.rmis_id))
-        .map(r => ({ ...r, parsedScore: parseScore(r.score), clubId: playerMap.get(r.rmis_id) }))
+        .filter(r => parseScore(r.score) !== null && playerMap.has(r.RMIS_ID))
+        .map(r => ({ ...r, parsedScore: parseScore(r.score), clubId: playerMap.get(r.RMIS_ID) }))
         .sort((a, b) => a.parsedScore - b.parsedScore)
 
       // Assign places based on sorted order (1st = lowest score)

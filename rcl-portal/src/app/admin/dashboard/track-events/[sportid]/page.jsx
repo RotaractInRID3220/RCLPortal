@@ -183,7 +183,7 @@ const TrackEventDetail = () => {
     <div className="space-y-3">
       {entries.map((entry, index) => (
         <div
-          key={entry.id || entry.rmis_id}
+          key={entry.id || entry.RMIS_ID}
           className="bg-white/5 border border-white/10 rounded-lg p-4"
           draggable
           onDragStart={onDragStart(index)}
@@ -193,14 +193,14 @@ const TrackEventDetail = () => {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="space-y-1">
               <p className="font-semibold text-white">#{index + 1} • {entry.name}</p>
-              <p className="text-sm text-white/70">{entry.rmis_id}</p>
+              <p className="text-sm text-white/70">{entry.RMIS_ID}</p>
               <p className="text-sm text-white/60">{entry.club_name}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
               <Input
                 value={entry.score ?? ''}
                 placeholder="Score / Time"
-                onChange={(e) => setEntries((prev) => prev.map((row) => (row.rmis_id === entry.rmis_id ? { ...row, score: e.target.value } : row)))}
+                onChange={(e) => setEntries((prev) => prev.map((row) => (row.RMIS_ID === entry.RMIS_ID ? { ...row, score: e.target.value } : row)))}
                 className="bg-white/10 border-white/20 text-white"
               />
               <div className="text-sm text-white/70 self-center">Drag to reorder</div>
@@ -253,9 +253,9 @@ const TrackEventDetail = () => {
             {isExpanded && entry.players?.length ? (
               <div className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
                 {entry.players.map((player) => (
-                  <div key={player.rmis_id} className="flex items-center justify-between text-sm text-white/80">
+                  <div key={player.RMIS_ID} className="flex items-center justify-between text-sm text-white/80">
                     <span>{player.name}</span>
-                    <span className="text-white/60">{player.rmis_id}</span>
+                    <span className="text-white/60">{player.RMIS_ID}</span>
                   </div>
                 ))}
               </div>
@@ -319,7 +319,7 @@ const TrackEventDetail = () => {
               <h4 className="text-sm uppercase text-white/60 mb-2">Reserves</h4>
               <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-2">
                 {reserves.map((res) => (
-                  <div key={res.rmis_id} className="flex justify-between text-sm text-white/80">
+                  <div key={res.RMIS_ID} className="flex justify-between text-sm text-white/80">
                     <span>{res.name}</span>
                     <span className="text-white/60">{res.club_name}</span>
                   </div>
