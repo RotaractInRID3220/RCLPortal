@@ -203,24 +203,19 @@ export default function PlayerNumberMobileLookupage() {
         {/* Player Data Card */}
         {playerData && (
           <Card className="bg-white/5 border border-cranberry/30 overflow-hidden backdrop-blur-lg animate-in fade-in">
-            {/* Player Number Header */}
+            {/* Player Info Header */}
             <div className="bg-gradient-to-r from-cranberry/30 to-cranberry/10 border-b border-cranberry/30 p-4">
-              <p className="text-gray-400 text-xs mb-1">Player Number</p>
-              <p className="text-white text-2xl font-mono font-bold tracking-wider">
-                {playerData.playerNumber}
-              </p>
-            </div>
-
-            {/* Player Info */}
-            <div className="p-4 space-y-4">
-              {/* Player Name */}
-              <div className="bg-cranberry/10 border border-cranberry/30 rounded-lg p-3 text-center">
-                <p className="text-gray-400 text-xs mb-2">Player Name</p>
+              {/* Player Name - Featured */}
+              <div className="text-center mb-3">
+                <p className="text-gray-400 text-xs mb-1">Player Name</p>
                 <h3 className="text-white text-xl font-bold">
                   {playerData.player.name || '-'}
                 </h3>
               </div>
+            </div>
 
+            {/* Player Info */}
+            <div className="p-4 space-y-4">
               {/* Details Grid */}
               <div className="space-y-3">
                 {/* RMIS ID */}
@@ -270,40 +265,65 @@ export default function PlayerNumberMobileLookupage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </Card>
+        )}
 
-              {/* Sport Info */}
-              <div className="bg-gradient-to-r from-cranberry/10 to-transparent border border-cranberry/20 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <Trophy className="h-4 w-4 text-cranberry" />
-                  <p className="text-gray-400 text-xs font-semibold">Sport</p>
-                </div>
-                <p className="text-white text-sm font-semibold mb-2">
-                  {playerData.sport.name || 'Unknown'}
-                </p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {playerData.sport.type && (
-                    <Badge
-                      variant="outline"
-                      className="border-gray-500/40 text-gray-400 bg-gray-500/10 text-xs"
-                    >
-                      {playerData.sport.type}
-                    </Badge>
-                  )}
-                  {playerData.sport.genderType && (
-                    <Badge
-                      variant="outline"
-                      className="border-gray-500/40 text-gray-400 bg-gray-500/10 text-xs"
-                    >
-                      {playerData.sport.genderType}
-                    </Badge>
-                  )}
-                  {playerData.registration.isMainPlayer && (
-                    <Badge className="bg-cranberry/20 border-cranberry/40 text-cranberry text-xs">
-                      Main Player
-                    </Badge>
-                  )}
+        {/* Registered Sports for the Day */}
+        {playerData && playerData.sports && playerData.sports.length > 0 && (
+          <Card className="bg-white/5 border border-cranberry/30 backdrop-blur-lg overflow-hidden animate-in fade-in">
+            <div className="bg-gradient-to-r from-cranberry/20 to-cranberry/5 border-b border-cranberry/30 p-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-cranberry" />
+                <div>
+                  <h3 className="text-lg font-bold text-white">Registered Sports</h3>
+                  <p className="text-gray-400 text-xs">For {APP_CONFIG.CURRENT_SPORT_DAY}</p>
                 </div>
               </div>
+            </div>
+            
+            <div className="p-4 space-y-3">
+              {playerData.sports.map((sport, index) => (
+                <div 
+                  key={index}
+                  className="bg-white/5 border border-white/10 rounded-lg p-3 hover:bg-white/10 transition-all"
+                >
+                  {/* Player Number Header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-white font-mono font-bold tracking-wider text-lg">
+                      {sport.playerNumber}
+                    </p>
+                    {sport.isMainPlayer ? (
+                      <Badge className="bg-cranberry/20 border-cranberry/40 text-cranberry text-xs">
+                        Main Player
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="border-yellow-500/40 text-yellow-400 bg-yellow-500/10 text-xs">
+                        Reserve
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  {/* Sport Name */}
+                  <h4 className="text-white font-semibold mb-2">
+                    {sport.name || 'Unknown Sport'}
+                  </h4>
+                  
+                  {/* Sport Badges */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {sport.type && (
+                      <Badge variant="outline" className="border-gray-500/40 text-gray-400 bg-gray-500/10 text-xs">
+                        {sport.type}
+                      </Badge>
+                    )}
+                    {sport.genderType && (
+                      <Badge variant="outline" className="border-gray-500/40 text-gray-400 bg-gray-500/10 text-xs">
+                        {sport.genderType}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
         )}
