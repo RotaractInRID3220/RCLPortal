@@ -80,7 +80,7 @@ export default function Footer() {
             © {new Date().getFullYear()} Rotaract in RID 3220. All rights reserved.
           </p>
           <p className="text-xs md:text-sm text-white/40">
-            Designed & Developed by <span className='animate-gradient font-bold bg-gradient-to-r bg-clip-text text-transparent from-[#22D1AE] via-[#EAEAEA] to-[#22D1AE]'><a href="https://www.instagram.com/code.techghost_/">Code.Techghost</a></span>
+            Designed & Developed by <span className='animate-gradient font-bold bg-gradient-to-r bg-clip-text text-transparent from-[#22D1AE] via-[#EAEAEA] to-[#22D1AE]'><a href="https://sandinupinnawala.com/">Code.Techghost</a></span>
           </p>
         </div>
       </div>
