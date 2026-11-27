@@ -52,6 +52,19 @@ export function checkRegistrationLimits({ existing, candidate, rules, ignoreSpor
   const rule = rules[group]
   if (!rule) return { ok: false, code: 'unknown_limit_group', message: `Unknown limit group "${group}".` }
 
+  // Athletics (track) and swimming take a player's whole day: on a day where they have one of them they
+  // cannot enter a normal sport, and the other way round. Different days are independent, and the road
+  // race sits on its own day, so it never clashes.
+  const takesWholeDay = group !== 'standard'
+  if (current.some((r) => r.sport_day === candidate.sport_day && (r.limit_group !== 'standard') !== takesWholeDay)) {
+    return {
+      ok: false,
+      code: 'day_conflict',
+      message: 'Athletics and swimming players cannot enter any other sport on the same day.',
+      group, day: candidate.sport_day,
+    }
+  }
+
   const counted = current.filter(
     (r) => r.limit_group === group && (rule.per === 'total' || r.sport_day === candidate.sport_day)
   )

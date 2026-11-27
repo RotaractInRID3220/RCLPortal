@@ -34,9 +34,18 @@ test('swimming is a separate 3, independent of track and standard', () => {
   assert.equal(r.group, 'swimming')
 })
 
-test('a full track allowance does not block a standard event the same day', () => {
-  const three = [ev(10, 'D-03', 'track'), ev(11, 'D-03', 'track'), ev(12, 'D-03', 'track')]
-  assert.equal(check(three, ev(1, 'D-03', 'standard')).ok, true)
+test('athletics/swimming and normal sports cannot share a day, in either order', () => {
+  const a = check([ev(10, 'D-01', 'track')], ev(1, 'D-01', 'standard'))
+  assert.deepEqual([a.ok, a.code], [false, 'day_conflict'])
+  const b = check([ev(1, 'D-01', 'standard')], ev(10, 'D-01', 'track'))
+  assert.deepEqual([b.ok, b.code], [false, 'day_conflict'])
+  assert.equal(check([ev(20, 'D-03', 'swimming')], ev(2, 'D-03', 'standard')).code, 'day_conflict')
+  assert.equal(check([ev(2, 'D-03', 'standard')], ev(20, 'D-03', 'swimming')).code, 'day_conflict')
+  // another day is fine, and several track events together are still fine
+  assert.equal(check([ev(10, 'D-01', 'track')], ev(1, 'D-02', 'standard')).ok, true)
+  assert.equal(check([ev(10, 'D-01', 'track')], ev(11, 'D-01', 'track')).ok, true)
+  // the road race (own day) never clashes with a track day
+  assert.equal(check([ev(10, 'D-01', 'track')], ev(50, 'D-05', 'standard')).ok, true)
 })
 
 test('road race on its own day (D-05) never conflicts with the other days', () => {
