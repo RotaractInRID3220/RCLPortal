@@ -1,3 +1,4 @@
+import ThemeScope from '@/components/ThemeScope'
 import NavBar from './e-arena/components/NavBar'
 import Footer from './e-arena/components/Footer'
 import HeroSection from '@/components/landing/HeroSection'
@@ -19,6 +20,7 @@ export const metadata = {
 
 export default function Home() {
   return (
+    <ThemeScope>
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-black">
       <NavBar />
       <main className="flex-1">
@@ -27,5 +29,6 @@ export default function Home() {
       </main>
       <Footer />
     </div>
+    </ThemeScope>
   )
 }

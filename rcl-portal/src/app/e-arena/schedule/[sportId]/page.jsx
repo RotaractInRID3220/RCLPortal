@@ -1,4 +1,5 @@
 'use client'
+import PageBackground from '@/components/landing/PageBackground'
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import BracketService from '@/services/bracketServices'
@@ -80,9 +81,7 @@ export default function SportSchedulePage() {
       {/* Google Fonts */}
       <link href="https://fonts.googleapis.com/css2?family=Belanosima:wght@400;600;700&display=swap" rel="stylesheet" />
       
-      {/* Pink Glow Effect */}
-      <div className="fixed top-[-900px] left-0 right-0 mx-auto w-[1490px] h-[864px] bg-cranberry/60 rounded-full z-0"
-           style={{ filter: 'blur(1000px)' }}></div>
+      <PageBackground />
 
       {/* Content Container */}
       <div className="relative z-10 max-w-[1920px] mx-auto px-4 md:px-8 lg:px-16 pt-24 pb-20">
@@ -102,11 +101,7 @@ export default function SportSchedulePage() {
           {!loading && sportInfo ? (
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <h1 className="font-belanosima text-5xl md:text-6xl lg:text-7xl font-normal bg-gradient-to-b from-cranberry to-cranberry/20 bg-clip-text text-transparent mb-2 select-none uppercase"
-                    style={{ 
-                      fontFamily: 'Belanosima, system-ui, sans-serif',
-                      WebkitTextStroke: '2px rgba(216, 27, 93, 0.3)',
-                    }}>
+                <h1 className="font-sakana text-[clamp(2rem,7vw,6rem)] leading-tight font-normal text-white mb-2 select-none drop-shadow-[0_0_28px_rgba(0,217,255,0.35)] uppercase">
                   {sportInfo.sport_name}
                 </h1>
                 <div className="flex gap-2 flex-wrap">
@@ -153,7 +148,7 @@ export default function SportSchedulePage() {
         {loading ? (
           <div className="flex justify-center items-center py-40">
             <div className="flex flex-col items-center gap-4">
-              <img src="/load.svg" alt="Loading" className="w-20 animate-spin" />
+              <img src="/load-blue.svg" alt="Loading" className="w-20 animate-spin" />
               <p className="font-poppins text-white/60 text-lg">Loading schedule...</p>
             </div>
           </div>
@@ -177,7 +172,7 @@ export default function SportSchedulePage() {
                 {rounds.map((round, roundIndex) => (
                   <div key={roundIndex}>
                     <div className="flex items-center gap-4 mb-6">
-                      <h2 className="font-bebas text-white text-2xl md:text-3xl tracking-wider">
+                      <h2 className="font-sakana text-white text-xl md:text-2xl tracking-wide">
                         {round.title}
                       </h2>
                       <div className="flex-1 h-px bg-gradient-to-r from-cranberry/50 to-transparent"></div>

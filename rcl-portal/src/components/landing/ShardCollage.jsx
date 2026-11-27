@@ -12,12 +12,12 @@ const y = (v) => +(v * 1.04).toFixed(2) // authored on a 100x125 grid
 const HOLE = [[30, y(45)], [52, y(36)], [72, y(42)], [76, y(60)], [62, y(76)], [40, y(72)], [26, y(62)]]
 
 const SHARDS = [
-  { id: 'rugby', src: '/landing/glimpse-13.webp', alt: 'Tag rugby at RCL', focus: [45, 45], poly: [[0, 0], [45, 0], [52, y(36)], [30, y(45)], [0, y(38)]] },
+  { id: 'rugby', src: '/landing/glimpse-13.webp', alt: 'Tag rugby at RCL', focus: [45, 40], poly: [[0, 0], [45, 0], [52, y(36)], [30, y(45)], [0, y(38)]] },
   { id: 'indoor', src: '/landing/glimpse-14.webp', alt: 'Indoor cricket at RCL', focus: [58, 38], poly: [[45, 0], [100, 0], [100, y(40)], [72, y(42)], [52, y(36)]] },
-  { id: 'cricket', src: '/landing/glimpse-15.webp', alt: 'Batter playing a shot', focus: [50, 60], poly: [[100, y(40)], [100, y(85)], [62, y(76)], [76, y(60)], [72, y(42)]] },
+  { id: 'cricket', src: '/landing/glimpse-15.webp', alt: 'Batter playing a shot', focus: [50, 55], shift: [16, 0], scale: 1.3, poly: [[100, y(40)], [100, y(85)], [62, y(76)], [76, y(60)], [72, y(42)]] },
   { id: 'basketball', src: '/landing/glimpse-16.webp', alt: 'Basketball at RCL', focus: [50, 32], poly: [[100, y(85)], [100, H], [55, H], [40, y(72)], [62, y(76)]] },
-  { id: 'tabletennis', src: '/landing/glimpse-17.webp', alt: 'Table tennis at RCL', focus: [50, 34], poly: [[55, H], [0, H], [0, y(88)], [26, y(62)], [40, y(72)]] },
-  { id: 'netball', src: '/landing/glimpse-18.webp', alt: 'Netball at RCL', focus: [52, 34], poly: [[0, y(88)], [0, y(38)], [30, y(45)], [26, y(62)]] },
+  { id: 'netball', src: '/landing/glimpse-18.webp', alt: 'Netball at RCL', focus: [54, 30], scale: 1.5, poly: [[55, H], [0, H], [0, y(88)], [26, y(62)], [40, y(72)]] },
+  { id: 'tabletennis', src: '/landing/glimpse-17.webp', alt: 'Table tennis at RCL', focus: [47, 36], scale: 1.2, poly: [[0, y(88)], [0, y(38)], [30, y(45)], [26, y(62)]] },
 ]
 
 const bbox = (poly) => {
@@ -33,7 +33,8 @@ const points = (poly) => poly.map((p) => p.join(',')).join(' ')
 const holeBox = bbox(HOLE)
 
 // width of each title line = --w, so the four lines are justified (font-size = width / em-width)
-const LINES = [['ROTARACT', 5.4], ['CHAMPIONS', 6.487], ['LEAGUE', 4.047], ['2026-27', 4.285]]
+// [word, width in em, relative width] — the year is set a touch smaller so it sits comfortably in the frame
+const LINES = [['ROTARACT', 5.4, 1], ['CHAMPIONS', 6.487, 1], ['LEAGUE', 4.047, 1], ['2026-27', 4.285, 0.74]]
 
 export default function ShardCollage() {
   return (
@@ -41,7 +42,7 @@ export default function ShardCollage() {
       <div aria-hidden className="absolute -inset-3 rounded-[2rem] bg-[#00d9ff]/15 blur-2xl" />
 
       {/* photo shards */}
-      {SHARDS.map(({ id, src, alt, focus: [fx, fy], poly }) => {
+      {SHARDS.map(({ id, src, alt, focus: [fx, fy], scale = 1.3, shift: [sx, sy] = [0, 0], poly }) => {
         const b = bbox(poly)
         return (
           <div
@@ -62,7 +63,7 @@ export default function ShardCollage() {
               fill
               sizes="(max-width: 768px) 70vw, 400px"
               className="object-cover"
-              style={{ objectPosition: `${fx}% ${fy}%`, transform: 'scale(1.3)', transformOrigin: `${fx}% ${fy}%` }}
+              style={{ objectPosition: `${fx}% ${fy}%`, transform: `translate(${sx}%, ${sy}%) scale(${scale})`, transformOrigin: `${fx}% ${fy}%` }}
             />
             {/* cool blue grade so every shard sits in the RCL palette */}
             <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-[#0a4dd8]/30 via-transparent to-[#001a4d]/60" />
@@ -102,10 +103,10 @@ export default function ShardCollage() {
       {/* title inside the medallion */}
       <div
         className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center text-center font-sakana leading-[0.8] text-white"
-        style={{ left: '51%', top: `${((y(57)) / H) * 100}%`, '--w': '33cqw' }}
+        style={{ left: '51%', top: `${((y(57)) / H) * 100}%`, '--w': '26cqw' }}
       >
-        {LINES.map(([word, em], i) => (
-          <span key={word} className={`block whitespace-nowrap ${i ? 'mt-[1cqw]' : ''} ${i > 1 ? 'text-[#00d9ff]' : ''}`} style={{ fontSize: `calc(var(--w) / ${em})` }}>
+        {LINES.map(([word, em, rel], i) => (
+          <span key={word} className={`block whitespace-nowrap ${i ? 'mt-[1cqw]' : ''} ${i > 1 ? 'text-[#00d9ff]' : ''}`} style={{ fontSize: `calc(var(--w) * ${rel} / ${em})` }}>
             {word}
           </span>
         ))}

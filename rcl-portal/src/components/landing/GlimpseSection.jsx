@@ -2,7 +2,7 @@ import Image from 'next/image'
 import LandingBackground from './LandingBackground'
 import ShardCollage from './ShardCollage'
 import StandingsTicker from './StandingsTicker'
-import { EdgeRails, RailSparkles, SmallStar } from './Decor'
+import { SmallStar, StageSparkle } from './Decor'
 import { box, px } from './stage'
 
 // Photo tiles of the "A GLIMPSE" collage (Group 3 in Figma).
@@ -56,14 +56,15 @@ export default function GlimpseSection() {
     <section
       id="glimpse"
       aria-labelledby="glimpse-title"
-      className="@container relative flex min-h-svh w-full items-center overflow-hidden bg-[#0a1d2e] lg:min-h-0"
+      className="@container relative flex w-full items-center overflow-hidden bg-[#0a1d2e]"
     >
       <LandingBackground watermarkClassName="text-white/50 opacity-35" mirror bottomFade seamTop />
 
       {/* ---------- Desktop: 1:1 Figma stage ---------- */}
       <div className="relative hidden aspect-[1920/1080] w-full lg:block">
-        <EdgeRails />
-        <RailSparkles />
+        {/* no side rails here: they live on the hero only */}
+        <StageSparkle cx={64.1} cy={1029} />
+        <StageSparkle cx={1877.1} cy={1029} />
 
         {TILES.map(({ id, ...t }) => (
           <StageTile key={id} {...t} />
@@ -118,15 +119,15 @@ export default function GlimpseSection() {
         <SmallStar className="absolute" style={{ ...box(1559.75 + 1.234, 371 + 7.543, 17.474, 24.803) }} />
 
         {/* Standings crawl (replaces the "mokak hri methana danawad?" pill) */}
-        <div className="absolute" style={box(532, 871, 903, 136)}>
-          <StandingsTicker unit="calc(100cqw / 1500)" radius={px(47.5)} className="h-full" />
+        <div className="absolute" style={box(340, 878, 1240, 136)}>
+          <StandingsTicker unit="calc(100cqw / 1500)" className="h-full" />
         </div>
-        <span aria-hidden className="absolute h-px bg-white" style={box(436, 1007, 75)} />
-        <span aria-hidden className="absolute h-px bg-white" style={box(1456, 1007, 75)} />
+        <span aria-hidden className="absolute h-px bg-white" style={box(250, 1007, 75)} />
+        <span aria-hidden className="absolute h-px bg-white" style={box(1595, 1007, 75)} />
       </div>
 
       {/* ---------- Mobile / tablet: same merged collage, re-stacked ---------- */}
-      <div className="relative w-full px-4 pt-16 pb-16 sm:px-10 sm:pt-20 lg:hidden">
+      <div className="relative w-full px-4 pt-4 pb-12 sm:px-10 sm:pt-8 lg:hidden">
         <div className="mx-auto max-w-2xl">
           <div className="text-center">
             <h2 className="font-sakana font-normal leading-[1.1] text-white text-[min(14vw,6.5rem)]">A GLIMpSE</h2>
@@ -138,8 +139,8 @@ export default function GlimpseSection() {
             <ShardCollage />
           </div>
 
-          <div className="mt-10">
-            <StandingsTicker unit="min(calc(100cqw / 520), 1.1px)" radius="1.75rem" layout="col" />
+          <div className="@container mt-14">
+            <StandingsTicker unit="calc(100cqw / 700)" className="h-[calc(var(--u)*140)]" />
           </div>
         </div>
       </div>

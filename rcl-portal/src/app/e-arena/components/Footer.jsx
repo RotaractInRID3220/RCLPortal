@@ -27,12 +27,14 @@ export default function Footer() {
               <Image
                 src="/LogoWhite.png"
                 alt="Rotaract 3220"
-                width={179}
-                height={45}
+                width={372}
+                height={86}
+                sizes="260px"
+                quality={90}
                 className="h-14 w-auto object-contain hover:scale-105 transition-transform duration-300"
               />
             </Link>
-            <Link href="/e-arena">
+            <Link href="/">
               <Image
                 src="/rcl-white.png"
                 alt="RCL"

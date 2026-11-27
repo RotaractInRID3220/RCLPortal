@@ -44,7 +44,7 @@ export default function SportSelector({ sport }) {
     <Link href={`/e-arena/schedule/${sport.sport_id}`}>
       <div className="group relative overflow-hidden rounded-xl h-full cursor-pointer transition-all duration-300 hover:scale-[1.02]">
         {/* Animated border effect */}
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-cranberry via-pink-500 to-cranberry bg-[length:200%_100%] animate-shimmer opacity-0 group-hover:opacity-100 transition-opacity duration-500" 
+        <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-cranberry via-brand-glow to-cranberry bg-[length:200%_100%] animate-shimmer opacity-0 group-hover:opacity-100 transition-opacity duration-500" 
              style={{ padding: '2px' }}>
           <div className="absolute inset-[2px] bg-black rounded-xl"></div>
         </div>

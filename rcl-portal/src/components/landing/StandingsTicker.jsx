@@ -1,20 +1,20 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Trophy } from 'lucide-react'
 import { LAST_SEASON } from '@/data/lastSeasonStandings'
+import { chamfer, chamferInset } from './chamfer'
 
 /**
- * Broadcast "lower third": a solid cyan tag with a diagonal cut, then a crawl of the top 5 clubs
- * per category with medal badges.
+ * Standings crawl in the same angular broadcast style as the hero status: a chamfered panel with a
+ * hairline outline, a label tab centred on its top edge, a corner bracket and a hatch block, with a
+ * scrolling top-5 per club category inside. No curves.
  *
  * - Until the new season goes live it shows last season's final standings.
  * - Set NEXT_PUBLIC_RCL_LIVE_FROM (ISO date, e.g. 2026-12-05T07:00:00+05:30) and from then on it
  *   fetches the live leaderboard (never cached, refreshed every minute). If the fetch fails or
  *   nobody has points yet, it quietly keeps showing last season.
  *
- * Sizing: everything is a multiple of `--u`, set from the `unit` prop (a CSS length), so the same
- * component scales on the desktop stage and on phones. `radius` is the pill's corner radius.
+ * Sizing: everything is a multiple of `--u` (the `unit` prop, a CSS length).
  */
 const LIVE_FROM = process.env.NEXT_PUBLIC_RCL_LIVE_FROM
 const CATEGORIES = [
@@ -24,9 +24,9 @@ const CATEGORIES = [
 const REFRESH_MS = 60_000
 
 const MEDAL = {
-  1: { bg: 'linear-gradient(145deg,#fff1a8,#f5b82e 55%,#b7791f)', glow: 'rgba(255,200,60,0.65)' },
-  2: { bg: 'linear-gradient(145deg,#ffffff,#c9d3e0 55%,#8794a8)', glow: 'rgba(200,215,235,0.45)' },
-  3: { bg: 'linear-gradient(145deg,#ffd2b0,#e0905a 55%,#9a5424)', glow: 'rgba(224,144,90,0.5)' },
+  1: 'linear-gradient(145deg,#fff1a8,#f5b82e 55%,#b7791f)',
+  2: 'linear-gradient(145deg,#ffffff,#c9d3e0 55%,#8794a8)',
+  3: 'linear-gradient(145deg,#ffd2b0,#e0905a 55%,#9a5424)',
 }
 
 const u = (n) => `calc(var(--u) * ${n})`
@@ -46,33 +46,31 @@ async function fetchLive() {
 
 function RankBadge({ rank }) {
   const medal = MEDAL[rank]
+  const size = u(44)
   return (
     <span
-      className="grid flex-none place-items-center rounded-full font-sakana leading-none"
-      style={{
-        width: u(48),
-        height: u(48),
-        fontSize: u(28),
-        background: medal ? medal.bg : 'rgba(0,217,255,0.12)',
-        color: medal ? '#0b1a2e' : '#00d9ff',
-        boxShadow: medal ? `0 0 ${u(16)} ${medal.glow}, inset 0 ${u(2)} ${u(2)} rgba(255,255,255,0.6)` : `inset 0 0 0 ${u(2)} rgba(0,217,255,0.55)`,
-      }}
+      className="relative grid flex-none place-items-center font-sakana leading-none"
+      style={{ width: size, height: size, fontSize: u(26), background: medal || '#00d9ff', color: '#06152a', clipPath: chamfer(u(10)) }}
     >
-      {rank}
+      {!medal && (
+        // 4th / 5th: outlined, not filled
+        <span aria-hidden className="absolute inset-0 bg-[#0a2547]" style={{ clipPath: chamferInset(u(10), u(2)) }} />
+      )}
+      <span className="relative" style={{ color: medal ? '#06152a' : '#00d9ff' }}>{rank}</span>
     </span>
   )
 }
 
 function Entry({ rank, name, points }) {
   return (
-    <span className="inline-flex items-center" style={{ gap: u(14), marginRight: u(30) }}>
+    <span className="inline-flex items-center" style={{ gap: u(14), marginRight: u(28) }}>
       <RankBadge rank={rank} />
-      <span className="font-sakana leading-none text-white" style={{ fontSize: u(36) }}>{name}</span>
+      <span className="font-sakana leading-none text-white" style={{ fontSize: u(34) }}>{name}</span>
       <span className="inline-flex items-baseline" style={{ gap: u(6) }}>
-        <span className="font-sakana leading-none text-[#00d9ff]" style={{ fontSize: u(32) }}>{points.toLocaleString('en-US')}</span>
-        <span className="font-sakana leading-none text-white/45" style={{ fontSize: u(17) }}>PTS</span>
+        <span className="font-sakana leading-none text-[#00d9ff]" style={{ fontSize: u(30) }}>{points.toLocaleString('en-US')}</span>
+        <span className="font-poppins font-semibold leading-none tracking-[0.18em] text-white/45" style={{ fontSize: u(12) }}>PTS</span>
       </span>
-      <i aria-hidden className="bg-white/25" style={{ width: u(2), height: u(40), marginLeft: u(16), transform: 'skewX(-18deg)' }} />
+      <i aria-hidden className="bg-white/25" style={{ width: u(2), height: u(38), marginLeft: u(14), transform: 'skewX(-16deg)' }} />
     </span>
   )
 }
@@ -80,15 +78,15 @@ function Entry({ rank, name, points }) {
 function Divider({ label }) {
   return (
     <span
-      className="inline-block bg-white font-sakana leading-none text-[#06152a]"
-      style={{ fontSize: u(22), padding: `${u(9)} ${u(22)}`, marginRight: u(34), transform: 'skewX(-14deg)', borderRadius: u(4) }}
+      className="inline-block font-sakana leading-none tracking-[0.08em] text-[#04101e]"
+      style={{ fontSize: u(20), padding: `${u(10)} ${u(22)}`, marginRight: u(30), background: 'linear-gradient(100deg,#00e5ff,#1e8cff)', clipPath: chamfer(u(9)) }}
     >
-      <span className="inline-block" style={{ transform: 'skewX(14deg)', letterSpacing: '0.04em' }}>TOP 5 · {label}</span>
+      TOP 5 · {label}
     </span>
   )
 }
 
-export default function StandingsTicker({ unit, radius, className = '', layout = 'row' }) {
+export default function StandingsTicker({ unit, className = '' }) {
   const [live, setLive] = useState(null)
 
   useEffect(() => {
@@ -121,56 +119,61 @@ export default function StandingsTicker({ unit, radius, className = '', layout =
     ...data[key].map((r) => <Entry key={`${key}-${r.rank}-${r.club}`} rank={r.rank} name={r.club} points={r.points} />),
   ])
 
-  const edge = 'linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent)'
+  const cut = u(26)
+  const edge = 'linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)'
 
   return (
     <div
       role="marquee"
       aria-label={isLive ? 'Live top 5 clubs per category' : `Final standings ${LAST_SEASON.label}, top 5 clubs per category`}
       className={`relative ${className}`}
-      style={{ '--u': unit, borderRadius: radius, padding: u(3), background: 'linear-gradient(100deg,#00d9ff,rgba(255,255,255,0.55) 35%,#1e7bff 70%,#00d9ff)', boxShadow: `0 ${u(8)} ${u(40)} rgba(0,0,0,0.55), 0 0 ${u(34)} rgba(0,217,255,0.35)` }}
+      style={{ '--u': unit, filter: `drop-shadow(0 ${u(6)} ${u(18)} rgba(0,0,0,0.55)) drop-shadow(0 0 ${u(16)} rgba(0,217,255,0.28))` }}
     >
-      <div
-        className={`relative flex h-full overflow-hidden ${layout === 'row' ? 'items-stretch' : 'flex-col'}`}
-        style={{ borderRadius: `calc(${radius} - ${u(3)})`, background: 'linear-gradient(180deg,#0a2547 0%,#050f20 100%)' }}
-      >
-        {/* tag */}
-        <div
-          className="relative z-10 flex flex-none items-center text-[#04101e]"
-          style={{
-            gap: u(16),
-            padding: `${u(16)} ${u(52)} ${u(16)} ${u(30)}`,
-            background: 'linear-gradient(100deg,#00e5ff,#1e8cff)',
-            clipPath: layout === 'row' ? `polygon(0 0, 100% 0, calc(100% - ${u(32)}) 100%, 0 100%)` : `polygon(0 0, 100% 0, calc(100% - ${u(32)}) 100%, 0 100%)`,
-          }}
-        >
-          {isLive ? (
-            <span className="relative flex" style={{ width: u(40), height: u(40) }}>
-              <span className="absolute inset-0 animate-ping rounded-full bg-red-600/70" />
-              <span className="relative m-auto rounded-full bg-red-600" style={{ width: u(24), height: u(24) }} />
-            </span>
-          ) : (
-            <Trophy style={{ width: u(44), height: u(44) }} strokeWidth={2.2} />
-          )}
-          <span className="font-sakana leading-[1.1]" style={{ fontSize: u(30) }}>
-            {isLive ? 'LIVE' : 'FINAL'} STANDINGS
-            <span className="block opacity-70" style={{ fontSize: u(20) }}>{isLive ? 'TOP 5 PER CATEGORY' : `RCL ${LAST_SEASON.label}`}</span>
-          </span>
-        </div>
+      {/* hairline outline */}
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(100deg,#00d9ff,rgba(255,255,255,0.6) 40%,#1e7bff 75%,#00d9ff)', clipPath: chamfer(cut) }} />
 
+      {/* panel */}
+      <div
+        className="absolute inset-0 overflow-hidden"
+        style={{
+          clipPath: chamferInset(cut, u(2)),
+          background:
+            'linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px) 0 0 / 100% calc(var(--u) * 26), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px) 0 0 / calc(var(--u) * 26) 100%, linear-gradient(180deg,#0b2a52 0%,#050f20 100%)',
+        }}
+      >
         {/* crawl */}
-        <div className="relative min-w-0 flex-1 overflow-hidden" style={{ maskImage: edge, WebkitMaskImage: edge }}>
-          <div
-            className="flex h-full w-max items-center whitespace-nowrap motion-reduce:!animate-none"
-            style={{ animation: 'ticker 60s linear infinite', padding: `${u(16)} 0` }}
-          >
+        <div className="absolute inset-0 flex items-center overflow-hidden" style={{ paddingTop: u(14), paddingBottom: u(12), maskImage: edge, WebkitMaskImage: edge }}>
+          <div className="flex w-max items-center whitespace-nowrap motion-reduce:!animate-none" style={{ animation: 'ticker 60s linear infinite' }}>
             <div className="flex flex-none items-center" style={{ paddingLeft: u(34) }}>{track}</div>
             <div aria-hidden className="flex flex-none items-center" style={{ paddingLeft: u(34) }}>{track}</div>
           </div>
         </div>
 
-        {/* soft top sheen */}
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 bg-gradient-to-b from-white/10 to-transparent" style={{ height: '42%' }} />
+        {/* hatch block, bottom-left */}
+        <span aria-hidden className="absolute" style={{ left: u(26), bottom: u(10), width: u(58), height: u(12), background: 'repeating-linear-gradient(115deg, rgba(0,217,255,0.75) 0 2px, transparent 2px 7px)' }} />
+        {/* corner bracket, top-right */}
+        <span aria-hidden className="absolute border-white/70" style={{ top: u(12), right: u(16), width: u(20), height: u(20), borderTopWidth: u(2), borderRightWidth: u(2) }} />
+      </div>
+
+      {/* label tab centred on the top edge */}
+      <div
+        className="absolute z-10 flex items-center text-[#04101e]"
+        style={{
+          left: '50%',
+          transform: 'translateX(-50%)',
+          top: u(-19),
+          height: u(38),
+          padding: `0 ${u(30)}`,
+          gap: u(10),
+          whiteSpace: 'nowrap',
+          background: isLive ? 'linear-gradient(100deg,#ff5d6c,#ff2f4a)' : 'linear-gradient(100deg,#00e5ff,#1e8cff)',
+          clipPath: chamfer(u(11)),
+        }}
+      >
+        {isLive && <span className="animate-pulse bg-white" style={{ width: u(10), height: u(10) }} />}
+        <span className="font-sakana leading-none tracking-[0.1em]" style={{ fontSize: u(22) }}>
+          {isLive ? 'LIVE STANDINGS' : `FINAL STANDINGS · ${LAST_SEASON.label}`}
+        </span>
       </div>
     </div>
   )

@@ -171,7 +171,7 @@ const EArenaPortalLeaderboard = React.memo(({ category }) => {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-20">
-        <img src="/load.svg" alt="" className="w-20" />
+        <img src="/load-blue.svg" alt="" className="w-20" />
       </div>
     )
   }
@@ -191,7 +191,7 @@ const EArenaPortalLeaderboard = React.memo(({ category }) => {
     <div className="space-y-6">
       {/* Leaderboard Header */}
       <div className="text-center">
-        <h2 className="text-3xl font-semibold mb-2 capitalize font-bebas text-cranberry">{category} Leaderboard</h2>
+        <h2 className="text-3xl font-semibold mb-2 capitalize font-sakana font-normal text-brand-glow">{category} Leaderboard</h2>
         <p className="text-gray-400">
           Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, categoryData.length)} of {categoryData.length} clubs
         </p>

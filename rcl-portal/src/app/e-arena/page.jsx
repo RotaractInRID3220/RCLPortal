@@ -115,7 +115,7 @@ export default function EArenaPage() {
               <h2 className="bg-gradient-to-b from-cranberry to-cranberry/20 bg-clip-text text-transparent font-belanosima text-7xl md:text-9xl lg:text-[200px] xl:text-[280px] font-normal leading-[0.9] tracking-tight mb-10 select-none"
                   style={{ 
                     fontFamily: 'Belanosima, system-ui, sans-serif',
-                    WebkitTextStroke: '2px rgba(216, 27, 93, 0.3)',
+                    WebkitTextStroke: '2px color-mix(in srgb, var(--brand) 30%, transparent)',
                   }}>
                 E-ARENA
               </h2>
@@ -159,7 +159,7 @@ export default function EArenaPage() {
                       ].map((item, index) => (
                         <div key={item.label} className="flex items-center gap-3 sm:gap-4 md:gap-4">
                           {/* Time Unit Box */}
-                          <div className="group relative bg-cranberry/10 border-2 border-cranberry rounded-xl w-[70px] sm:w-[90px] md:w-[100px] py-3 sm:py-4 md:py-3 transition-all duration-300 hover:bg-cranberry/20 hover:border-cranberry hover:shadow-[0_0_20px_rgba(216,27,93,0.4)] hover:scale-105">
+                          <div className="group relative bg-cranberry/10 border-2 border-cranberry rounded-xl w-[70px] sm:w-[90px] md:w-[100px] py-3 sm:py-4 md:py-3 transition-all duration-300 hover:bg-cranberry/20 hover:border-cranberry hover:shadow-[0_0_20px_color-mix(in_srgb,var(--brand)_40%,transparent)] hover:scale-105">
                             <div className="relative z-10 text-center select-none">
                               <div className="font-poppins text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold text-cranberry group-hover:text-white transition-colors duration-300 tabular-nums">
                                 {String(item.value).padStart(2, '0')}
@@ -192,7 +192,7 @@ export default function EArenaPage() {
                       ].map((item, index) => (
                         <div key={item.label} className="flex items-center gap-3 sm:gap-4 md:gap-4">
                           {/* Time Unit Box */}
-                          <div className="group relative bg-cranberry/10 border-2 border-cranberry rounded-xl w-[70px] sm:w-[90px] md:w-[100px] py-3 sm:py-4 md:py-3 transition-all duration-300 hover:bg-cranberry/20 hover:border-cranberry hover:shadow-[0_0_20px_rgba(216,27,93,0.4)] hover:scale-105">
+                          <div className="group relative bg-cranberry/10 border-2 border-cranberry rounded-xl w-[70px] sm:w-[90px] md:w-[100px] py-3 sm:py-4 md:py-3 transition-all duration-300 hover:bg-cranberry/20 hover:border-cranberry hover:shadow-[0_0_20px_color-mix(in_srgb,var(--brand)_40%,transparent)] hover:scale-105">
                             <div className="relative z-10 text-center select-none">
                               <div className="font-poppins text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold text-cranberry group-hover:text-white transition-colors duration-300 tabular-nums">
                                 {String(item.value).padStart(2, '0')}
@@ -214,10 +214,10 @@ export default function EArenaPage() {
                 ) : (
                   <div className="group relative">
                     {/* Animated glowing border effect */}
-                    <div className="absolute -inset-1 bg-gradient-to-r from-cranberry via-pink-500 to-cranberry rounded-xl blur opacity-5 group-hover:opacity-10 animate-pulse "></div>
+                    <div className="absolute -inset-1 bg-gradient-to-r from-cranberry via-brand-glow to-cranberry rounded-xl blur opacity-5 group-hover:opacity-10 animate-pulse "></div>
                     
                     {/* Main box */}
-                    <div className="relative bg-black/70 border-2 border-cranberry rounded-xl px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-4 transition-all duration-300 hover:border-pink-500 hover:shadow-[0_0_30px_rgba(216,27,93,0.2)] ">
+                    <div className="relative bg-black/70 border-2 border-cranberry rounded-xl px-6 sm:px-8 md:px-10 py-3 sm:py-4 md:py-4 transition-all duration-300 hover:border-brand-glow hover:shadow-[0_0_30px_color-mix(in_srgb,var(--brand)_20%,transparent)] ">
                       <div className="flex items-center justify-center gap-3 select-none">
                         <FaBolt className="text-cranberry text-xl sm:text-2xl md:text-3xl animate-pulse" />
                         <p className="font-bebas text-cranberry text-xl sm:text-2xl md:text-3xl tracking-wider group-hover:text-white transition-colors duration-300 whitespace-nowrap">
@@ -259,7 +259,7 @@ export default function EArenaPage() {
             <div className="max-w-6xl mx-auto">
               <div className="relative group">
                 {/* Animated border */}
-                <div className="absolute inset-0 bg-gradient-to-r from-cranberry via-pink-500 to-cranberry bg-[length:200%_100%] animate-shimmer opacity-50 rounded-lg"
+                <div className="absolute inset-0 bg-gradient-to-r from-cranberry via-brand-glow to-cranberry bg-[length:200%_100%] animate-shimmer opacity-50 rounded-lg"
                      style={{ padding: '1px' }}>
                   <div className="absolute inset-[1px] bg-black/80 backdrop-blur-sm rounded-lg"></div>
                 </div>

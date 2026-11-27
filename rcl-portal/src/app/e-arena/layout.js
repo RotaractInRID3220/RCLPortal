@@ -1,4 +1,5 @@
 import NavBar from './components/NavBar'
+import ThemeScope from '@/components/ThemeScope'
 import Script from 'next/script'
 
 export const metadata = {
@@ -159,8 +160,10 @@ export default function EArenaLayout({ children }) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <NavBar />
-      {children}
+      <ThemeScope>
+        <NavBar />
+        {children}
+      </ThemeScope>
     </>
   )
 }
