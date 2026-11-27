@@ -5,7 +5,7 @@ export default function GameCard({ title, image, className = '' }) {
   return (
     <div className={`group relative overflow-hidden cursor-crosshair rounded-lg ${className}`}>
       {/* Animated border effect */}
-      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-cranberry via-pink-500 to-cranberry bg-[length:200%_100%] animate-shimmer opacity-0 group-hover:opacity-100 transition-opacity duration-500" 
+      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-cranberry via-brand-glow to-cranberry bg-[length:200%_100%] animate-shimmer opacity-0 group-hover:opacity-100 transition-opacity duration-500" 
            style={{ padding: '2px' }}>
         <div className="absolute inset-[2px] bg-black rounded-lg"></div>
       </div>
@@ -17,7 +17,7 @@ export default function GameCard({ title, image, className = '' }) {
           <div className="absolute inset-0 bg-gradient-to-b from-cranberry/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <h3 className="font-bebas text-cranberry text-[100px] leading-[104px] tracking-wider transform -rotate-90 whitespace-nowrap select-none group-hover:text-white transition-colors duration-500 relative z-10" 
               style={{ 
-                textShadow: '0 0 20px rgba(216, 27, 93, 0.5)',
+                textShadow: '0 0 20px color-mix(in srgb, var(--brand) 50%, transparent)',
                 letterSpacing: title === 'fifa' ? '0.11em' : 'normal'
               }}>
             {title}

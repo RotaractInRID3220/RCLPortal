@@ -2,6 +2,10 @@
 const nextConfig = {
   output: 'standalone',            // small production image (Dockerfile copies .next/standalone)
   poweredByHeader: false,
+  // The e-arena landing page is hidden for the 2026-27 season; its sub-pages (schedule, leaderboard) stay live.
+  async redirects() {
+    return [{ source: '/e-arena', destination: '/', permanent: false }]
+  },
   async headers() {
     return [
       { source: '/:path*', headers: [

@@ -1,4 +1,5 @@
 'use client'
+import PageBackground from '@/components/landing/PageBackground'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { FaBolt, FaTrophy, FaClock } from 'react-icons/fa'
@@ -63,23 +64,17 @@ export default function SchedulePage() {
       {/* Google Fonts */}
       <link href="https://fonts.googleapis.com/css2?family=Belanosima:wght@400;600;700&display=swap" rel="stylesheet" />
       
-      {/* Pink Glow Effect */}
-      <div className="fixed top-[-900px] left-0 right-0 mx-auto w-[1490px] h-[864px] bg-cranberry/60 rounded-full z-0"
-           style={{ filter: 'blur(1000px)' }}></div>
+      <PageBackground />
 
       {/* Content Container */}
       <div className="relative z-10 max-w-[1920px] mx-auto px-6 md:px-12 lg:px-24 pt-24 pb-20">
         
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="font-belanosima text-5xl md:text-7xl lg:text-8xl font-normal bg-gradient-to-b from-cranberry to-cranberry/20 bg-clip-text text-transparent mb-2 select-none"
-              style={{ 
-                fontFamily: 'Belanosima, system-ui, sans-serif',
-                WebkitTextStroke: '2px rgba(216, 27, 93, 0.3)',
-              }}>
+          <h1 className="font-sakana text-[clamp(2rem,8.5vw,6rem)] leading-tight font-normal text-white mb-2 select-none drop-shadow-[0_0_28px_rgba(0,217,255,0.35)]">
             LIVE SCHEDULE
           </h1>
-          <p className="font-bebas text-white/70 text-xl md:text-2xl tracking-wider">
+          <p className="font-sakana text-brand-glow text-sm md:text-xl tracking-wide">
             TRACK EVERY MATCH IN REAL-TIME
           </p>
         </div>
@@ -89,7 +84,7 @@ export default function SchedulePage() {
           <div className="flex items-center gap-4 mb-8">
             <div className="flex items-center gap-3">
               <FaTrophy className="text-cranberry text-2xl" />
-              <h2 className="font-bebas text-white text-3xl md:text-4xl tracking-wider">
+              <h2 className="font-sakana text-white text-xl md:text-3xl tracking-wide">
                 SELECT SPORT
               </h2>
             </div>
@@ -98,7 +93,7 @@ export default function SchedulePage() {
 
           {loading ? (
             <div className="flex justify-center items-center py-20">
-              <img src="/load.svg" alt="Loading" className="w-20" />
+              <img src="/load-blue.svg" alt="Loading" className="w-20" />
             </div>
           ) : sports.length === 0 ? (
             <div className="text-center py-12 bg-white/5 rounded-xl border border-white/10">

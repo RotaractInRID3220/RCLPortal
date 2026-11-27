@@ -1,4 +1,5 @@
 import Script from "next/script";
+import ThemeScope from "@/components/ThemeScope";
 
 export const metadata = {
   title: "Player Search - RCL Portal",
@@ -16,7 +17,7 @@ export default function PlayerLayout({ children }) {
         gtag('js', new Date());
         gtag('config', 'G-9BRFC5JVKB');`}
       </Script>
-      {children}
+      <ThemeScope>{children}</ThemeScope>
     </>
   );
 }

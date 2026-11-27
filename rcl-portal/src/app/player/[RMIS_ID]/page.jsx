@@ -69,9 +69,9 @@ export default function PlayerLanyardPage({ params }) {
       canvas.width = width;
       canvas.height = height;
 
-      // Background gradient (cranberry to black)
+      // Background gradient (RCL blue to black)
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, '#9B1B3A'); // Cranberry
+      gradient.addColorStop(0, '#0B3F9E'); // RCL blue
       gradient.addColorStop(1, '#121212'); // Black
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
@@ -127,7 +127,7 @@ export default function PlayerLanyardPage({ params }) {
       const qrY = cardY + 60;
       
       // QR code border
-      ctx.fillStyle = '#9B1B3A';
+      ctx.fillStyle = '#0B3F9E';
       ctx.fillRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
       
       ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize);
@@ -165,7 +165,7 @@ export default function PlayerLanyardPage({ params }) {
 
       // RMIS ID at bottom
       ctx.font = 'bold 32px Poppins, sans-serif';
-      ctx.fillStyle = '#9B1B3A';
+      ctx.fillStyle = '#0B3F9E';
       ctx.fillText(`ID: ${player.membership_id || player.member_id}`, width / 2, cardY + cardHeight - 40);
 
       // Footer text

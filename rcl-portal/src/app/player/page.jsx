@@ -1,5 +1,6 @@
 'use client';
 
+import PageBackground from '@/components/landing/PageBackground';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { searchPlayers } from '@/services/playerService';
@@ -93,16 +94,16 @@ export default function PlayerSearchPage() {
 
   return (
     <div className="min-h-screen bg-black p-4 md:p-8">
-      <div className='w-[800px] h-[600px] fixed -top-80 left-0 right-0 mx-auto bg-cranberry/75 z-0 rounded-full blur-[18rem] opacity-60 '></div>
+      <PageBackground />
 
-      <div className="max-w-2xl mx-auto">
+      <div className="relative z-10 max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center flex flex-col lg:flex-row lg:space-x-5 items-center justify-center mb-8 my-10">
           <img src="/rcl-white.png" alt="" className='w-2/5 lg:w-1/5 mb-10 z-10'/>
           <div className=' lg:items-start flex flex-col z-10'>
             <div className="flex items-center justify-center gap-3 mb-2">
               <QrCode className="w-8 h-8 text-cranberry" />
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground">
+              <h1 className="font-sakana font-normal text-[clamp(1.6rem,7vw,3rem)] leading-tight text-white">
                 Player Search
               </h1>
             </div>
@@ -114,7 +115,7 @@ export default function PlayerSearchPage() {
 
         {/* Search Form */}
         {isSearchExpanded && (
-          <Card className="p-6 mb-6 bg-card border-border z-10">
+          <Card className="p-6 mb-6 bg-white/[0.07] backdrop-blur-xl border-white/20 shadow-[0_8px_40px_rgba(0,0,0,0.35)]">
             <div className="space-y-4 z-10">
               {/* Name Input */}
               <div>
@@ -128,7 +129,7 @@ export default function PlayerSearchPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="h-11 bg-background border-border focus:border-cranberry focus:ring-cranberry z-10"
+                  className="h-11 bg-white/5 border-white/15 backdrop-blur-sm placeholder:text-white/40 focus:border-cranberry focus:ring-cranberry z-10"
                 />
               </div>
 
@@ -144,7 +145,7 @@ export default function PlayerSearchPage() {
                   value={rmisId}
                   onChange={(e) => setRmisId(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="h-11 bg-background border-border focus:border-cranberry focus:ring-cranberry"
+                  className="h-11 bg-white/5 border-white/15 backdrop-blur-sm placeholder:text-white/40 focus:border-cranberry focus:ring-cranberry"
                 />
               </div>
 
@@ -160,7 +161,7 @@ export default function PlayerSearchPage() {
                   value={nic}
                   onChange={(e) => setNic(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="h-11 bg-background border-border focus:border-cranberry focus:ring-cranberry"
+                  className="h-11 bg-white/5 border-white/15 backdrop-blur-sm placeholder:text-white/40 focus:border-cranberry focus:ring-cranberry"
                 />
               </div>
 
@@ -274,7 +275,7 @@ export default function PlayerSearchPage() {
               <Card
                 key={player.member_id}
                 onClick={() => handlePlayerClick(player.member_id)}
-                className="p-4 cursor-pointer hover:border-cranberry transition-all duration-200 hover:shadow-lg hover:shadow-cranberry/20 active:scale-[0.98] bg-card border-border"
+                className="p-4 cursor-pointer hover:border-cranberry transition-all duration-200 hover:shadow-lg hover:shadow-cranberry/20 active:scale-[0.98] bg-white/[0.07] backdrop-blur-xl border-white/20"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">

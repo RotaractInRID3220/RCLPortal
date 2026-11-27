@@ -3,12 +3,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* RCL 2026-27 display face (landing page). Sakana by Drizy Studio (1001Fonts FFP licence: personal / non-profit use only) */
+@font-face {
+  font-family: 'Sakana';
+  src: url('/fonts/Sakana.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-bebas: var(--font-bebas);
   --font-poppins: var(--font-poppins);
-  --color-cranberry: oklch(0.57 0.2173 8.97);
+  --font-sakana: 'Sakana', var(--font-bebas), sans-serif;
+  --color-cranberry: var(--brand);
+  --color-brand-glow: var(--brand-glow);
   --color-blackD: #121212;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -50,6 +61,9 @@ body {
 }
 
 :root {
+  /* Brand accent. Portals (admin / council) stay cranberry; public pages opt into .theme-blue below. */
+  --brand: oklch(0.57 0.2173 8.97);
+  --brand-glow: oklch(0.656 0.241 354); /* hover / shimmer partner colour */
   --radius: 0.625rem;
   --background: oklch(0% 0 0);
   --foreground: oklch(0.985 0 0);
@@ -82,6 +96,12 @@ body {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* RCL 2026-27 blue — applied to the public website (landing, e-arena, player) only */
+.theme-blue {
+  --brand: oklch(0.62 0.205 256);
+  --brand-glow: oklch(0.82 0.15 205); /* cyan */
 }
 
 /* Light theme (optional override) */
@@ -131,11 +151,11 @@ body {
     background: #000000; /* Bar background */
   }
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.57 0.2173 8.97); /* Cranberry */
+    background: var(--brand); /* Cranberry in portals, blue on the public site */
     border-radius: 8px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.57 0.2173 8.97 / 0.8);
+    background: color-mix(in srgb, var(--brand) 80%, transparent);
   }
 }
 
@@ -229,13 +249,13 @@ body {
 }
 
 .scrollbar-thumb-cranberry\/50::-webkit-scrollbar-thumb {
-  background: rgba(216, 27, 93, 0.5);
+  background: color-mix(in srgb, var(--brand) 50%, transparent);
   border-radius: 4px;
 }
 
 .scrollbar-thumb-cranberry\/50:hover::-webkit-scrollbar-thumb,
 .hover\:scrollbar-thumb-cranberry:hover::-webkit-scrollbar-thumb {
-  background: rgba(216, 27, 93, 0.8);
+  background: color-mix(in srgb, var(--brand) 80%, transparent);
 }
 
 .custom-bracket .bracket-round {
@@ -276,4 +296,9 @@ body {
 .animate-gradient {
   background-size: 200% 100%; /* Keep the size fixed */
   animation: gradient 10s linear infinite; /* Smooth movement */
+}
+/* Landing-page standings marquee: track holds two copies, so -50% loops seamlessly */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
