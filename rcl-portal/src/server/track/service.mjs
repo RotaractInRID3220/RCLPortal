@@ -180,7 +180,10 @@ export async function award({ actor, sportId }) {
     if (!hasPermission(actor.permission_level, needed)) return fail(403, 'forbidden', existing > 0 ? 'Re-awarding an event needs the administrator level.' : 'Awarding needs the super admin level.')
     const pts = await loadPoints(c)
     if (!pts) return fail(503, 'track_points_not_configured', 'The track point settings are missing or invalid.')
-    const podium = sport.sport_type === 'trackIndividual' ? pts.individual : pts.team
+    // The event's own scale (events.points) wins; events without one use the global track settings.
+    const own = sport.points
+    const podium = own ? own.podium : sport.sport_type === 'trackIndividual' ? pts.individual : pts.team
+    const participation = own ? own.participation : pts.participation
     const { rows: ranked } = await c.query(
       `SELECT t.place, COALESCE(p.club_id, m.club_id) AS club_id
        FROM track_events t LEFT JOIN players p ON p.member_id = t.member_id LEFT JOIN teams m ON m.team_id = t.team_id
@@ -188,7 +191,7 @@ export async function award({ actor, sportId }) {
     const byClub = new Map()
     for (const r of ranked) {
       const cur = byClub.get(r.club_id) ?? { points: 0, place: r.place }
-      cur.points += pointsForPlace(r.place, podium, pts.participation)
+      cur.points += pointsForPlace(r.place, podium, participation)
       cur.place = Math.min(cur.place, r.place)
       byClub.set(r.club_id, cur)
     }

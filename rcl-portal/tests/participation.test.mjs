@@ -86,6 +86,15 @@ test('award: one participation row per eligible sport with the configured points
   assert.equal(r.summary.totalPointsAwarded >= 30, true)
 })
 
+test('an event with its own participation points overrides the global setting; others use it', async () => {
+  await query('UPDATE events SET points = $2 WHERE sport_id = $1', [ev.s1, JSON.stringify({ podium: [30, 20, 15], participation: 10 })])
+  try {
+    await squad(A, ev.s1, 4, 3, 'D-02'); await squad(A, ev.s2, 2, 2, 'D-02')
+    assert.equal((await svc.award({ actor, day: 'D-02' })).ok, true)
+    assert.deepEqual(await points(), [{ club_id: A, sport_id: ev.s1, points: 10 }, { club_id: A, sport_id: ev.s2, points: 15 }])
+  } finally { await query('UPDATE events SET points = NULL WHERE sport_id = $1', [ev.s1]) }
+})
+
 test('REGRESSION: awarding again (and again) never duplicates points', async () => {
   await squad(A, ev.s1, 4, 3, 'D-02')
   for (let i = 0; i < 5; i++) await svc.award({ actor, day: 'D-02' })

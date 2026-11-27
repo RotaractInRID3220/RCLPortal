@@ -109,7 +109,7 @@ export async function award({ actor, day }) {
     await c.query('SELECT pg_advisory_xact_lock($1)', [LOCK_BASE + d.sort_order])
     const { rows: made } = await c.query(
       `INSERT INTO club_points (club_id, sport_id, kind, points, note, created_by)
-       SELECT s.club_id, s.sport_id, 'participation', $3, $4, $5 FROM (${PER_SPORT_SQL}) s WHERE s.eligible AND NOT s.awarded
+       SELECT s.club_id, s.sport_id, 'participation', COALESCE((SELECT (e.points ->> 'participation')::int FROM events e WHERE e.sport_id = s.sport_id), $3), $4, $5 FROM (${PER_SPORT_SQL}) s WHERE s.eligible AND NOT s.awarded
        ON CONFLICT DO NOTHING RETURNING club_id, sport_id, points`, [d.day_code, config.ratio, config.pointsPerSport, `Participation ${d.day_code}`, actor.member_id])
     const { rows: eligibleClubs } = await c.query(`SELECT DISTINCT club_id FROM (${PER_SPORT_SQL}) s WHERE s.eligible`, [d.day_code, config.ratio])
     const awardedClubs = new Set(made.map((m) => m.club_id))

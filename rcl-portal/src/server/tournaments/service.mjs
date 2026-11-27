@@ -326,7 +326,10 @@ export async function deleteMatch({ actor, matchId }) {
 }
 
 // ---------------------------------------------------------------------------------------------- standings + placement points
-async function loadPlacementPoints(db) {
+// The event's own scale (events.points.podium) wins; events without one use the global points.placement.
+async function loadPlacementPoints(db, sportId) {
+  const { rows: [ev] } = await db.query('SELECT points FROM events WHERE sport_id = $1', [sportId])
+  if (ev?.points) { const own = validateSetting('points.placement', ev.points.podium); return own.ok ? own.value : null }
   const { rows } = await db.query("SELECT value FROM settings WHERE key = 'points.placement'")
   const v = validateSetting('points.placement', rows[0]?.value)
   return v.ok ? v.value : null
@@ -340,7 +343,7 @@ async function loadPlacementPoints(db) {
  */
 export async function computeStandings(sportId, db = { query }) {
   const { rows } = await db.query(`${MATCH_SELECT} WHERE m.sport_id = $1`, [sportId])
-  const podium = await loadPlacementPoints(db)
+  const podium = await loadPlacementPoints(db, sportId)
   const clubs = new Map()
   const club = (id, name) => { if (id && !clubs.has(id)) clubs.set(id, { club_id: id, club_name: name, total: 0 }); return clubs.get(id) }
   const decide = (m) => {

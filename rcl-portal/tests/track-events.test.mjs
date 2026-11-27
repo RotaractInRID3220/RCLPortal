@@ -107,6 +107,16 @@ test('award individual: 1/2/3 from settings, others participation, club with 2 e
     { club_id: A, points: 85 + 15, place: 1 }, { club_id: B, points: 50, place: 2 }, { club_id: C, points: 30, place: 3 }, { club_id: D, points: 15, place: 5 }])
 })
 
+test('an event with its own points (events.points) overrides the global track settings, others keep using the settings', async () => {
+  await query("UPDATE events SET points = $2 WHERE sport_id = $1", [ev.ind, JSON.stringify({ podium: [50, 30, 20], participation: 10 })])
+  try {
+    await svc.saveResults({ actor: sa, sportId: ev.ind, results: [m('a1', '10', 1), m('b1', '11', 2), m('c1', '12', 3), m('a2', '13', 4), m('d1', '14', 5)] })
+    assert.equal((await svc.award({ actor: sa, sportId: ev.ind })).ok, true)
+    assert.deepEqual(await pts(ev.ind), [
+      { club_id: A, points: 50 + 10, place: 1 }, { club_id: B, points: 30, place: 2 }, { club_id: C, points: 20, place: 3 }, { club_id: D, points: 10, place: 5 }])
+  } finally { await query('UPDATE events SET points = NULL WHERE sport_id = $1', [ev.ind]) }
+})
+
 test('award team uses points.track_team; points follow settings changes', async () => {
   await setSetting('points.track_team', [10, 7, 5]); await setSetting('points.track_participation', 2)
   const t = (await query('SELECT team_id, club_id FROM teams WHERE sport_id = $1', [ev.team])).rows

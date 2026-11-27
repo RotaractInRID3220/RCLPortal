@@ -1,3 +1,4 @@
+-- Applied by hand (psql) to production: it is NOT in db/seed so `npm run db:seed` never adds it to a dev or test database.
 -- RCL 2026-27 events and event-day dates, taken from the "RCL 2026-27 Handbook" (Rules and Regulations).
 -- Idempotent: events are matched on (name, gender, category), so re-running never duplicates and never
 -- overwrites an event an admin has since edited. Every sport exists twice: community and institute.
@@ -5,7 +6,8 @@
 -- Day 05 is a technical day for the Road Race only. The Road Race is played on 9 Jan together with Day 01;
 -- it has its own day code so its entrants are not limited by "one sport per day".
 -- Counts: min/max = players on the field, reserve = standby / substitutes (squad = max + reserve).
--- Points are NOT here: the system still uses one global points setting (see docs notes in the hand-off).
+-- Points follow the handbook's "Full list of events and points breakdown" and are stored per event (events.points,
+-- migration 0014); they are only filled in where an event has none yet, so admin edits are kept.
 
 BEGIN;
 
@@ -78,5 +80,20 @@ CROSS JOIN (VALUES ('community'), ('institute')) AS c(category)
 WHERE NOT EXISTS (
   SELECT 1 FROM events e WHERE e.sport_name = s.name AND e.gender_type = s.gender AND e.category = c.category
 );
+
+-- Points per event: podium (1st, 2nd, 3rd) and participation, from the handbook tables.
+UPDATE events e SET points = jsonb_build_object('podium', to_jsonb(p.podium), 'participation', p.part)
+FROM (
+  SELECT unnest(ARRAY['Road Race', 'Cricket', 'Basketball', 'Beach Tag Rugby', 'Netball', 'Tug of War', 'Futsal',
+                      'Pickleball Mixed Doubles', 'Beach Handball']) AS name, ARRAY[100, 75, 50] AS podium, 15 AS part          -- team sports
+  UNION ALL SELECT unnest(ARRAY['Badminton Singles', 'Table Tennis Singles']), ARRAY[30, 20, 15], 10                               -- racquet singles
+  UNION ALL SELECT unnest(ARRAY['Badminton Mixed Doubles', 'Table Tennis Mixed Doubles', 'Beach Volleyball Mixed Doubles']), ARRAY[40, 20, 15], 10
+  UNION ALL SELECT unnest(ARRAY['Carrom Singles', 'Chess']), ARRAY[50, 30, 20], 10
+  UNION ALL SELECT unnest(ARRAY['100m', '200m', '400m', '800m', 'Shot Put', '4×100m Relay', '4×400m Relay', 'Medley Relay',   -- athletics
+                                '50m Freestyle', '50m Backstroke', '50m Breaststroke', '50m Dolphin',                       -- swimming
+                                '100m Freestyle', '100m Backstroke', '100m Breaststroke', '100m Dolphin']), ARRAY[50, 30, 20], 10
+  UNION ALL SELECT '4×50m Relay', ARRAY[75, 50, 25], 15
+) p
+WHERE e.sport_name = p.name AND e.points IS NULL;
 
 COMMIT;

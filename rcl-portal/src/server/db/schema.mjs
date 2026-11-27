@@ -26,6 +26,7 @@ export const events = pgTable("events", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	limitGroup: text("limit_group").default('standard').notNull(),
 	bibRequired: boolean("bib_required").default(false).notNull(),
+	points: jsonb(),
 }, (table) => [
 	index("idx_events_cat_type").using("btree", table.category.asc().nullsLast().op("text_ops"), table.sportType.asc().nullsLast().op("text_ops")),
 	index("idx_events_day").using("btree", table.sportDay.asc().nullsLast().op("text_ops")),

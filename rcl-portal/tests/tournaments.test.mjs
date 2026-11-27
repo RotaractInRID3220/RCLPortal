@@ -260,6 +260,17 @@ test('standings + award: 1st/2nd from the final, 3rd/4th from the consolation; p
   assert.equal(t.length, 4)
 })
 
+test('an event with its own podium points overrides points.placement', async () => {
+  await playFull(4)
+  await query('UPDATE events SET points = $2 WHERE sport_id = $1', [sport, JSON.stringify({ podium: [40, 20, 15], participation: 10 })])
+  try {
+    const ms = await matches(); const [s1, s2] = byRound(ms, 3), [final] = byRound(ms, 5), [cons] = byRound(ms, 4)
+    await score(s1, 3, 1); await score(s2, 0, 2); await score(final, 1, 4); await score(cons, 0, 1)
+    const st = await svc.standings({ sportId: sport })
+    assert.deepEqual(st.standings.filter((x) => x.place <= 3).map((x) => x.points), [40, 20, 15])
+  } finally { await query('UPDATE events SET points = NULL WHERE sport_id = $1', [sport]) }
+})
+
 test('re-award replaces (never duplicates), follows corrected results and needs the administrator level', async () => {
   await playFull(4)
   const ms = await matches(); const [s1, s2] = byRound(ms, 3), [final] = byRound(ms, 5), [cons] = byRound(ms, 4)
