@@ -23,6 +23,8 @@ export default function PermissionsPage() {
   const [permissions, setPermissions] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchLoading, setSearchLoading] = useState(false)
+  const [selfId, setSelfId] = useState(null)
+  const [levels, setLevels] = useState({}) // member_id -> chosen level in the search results
 
   useEffect(() => {
     if (status === 'loading') return
@@ -30,8 +32,8 @@ export default function PermissionsPage() {
       router.push('/admin/login')
       return
     }
-    // Allow access for role_id=1 (super admin role) or if user has super_admin permission
-    const hasAccess = session.user.role_id === 1 || session.user.permission_level === 'administrator'
+    // Only an administrator may manage permissions (the API enforces it again)
+    const hasAccess = session.user.permission_level === 'administrator'
     if (!hasAccess) {
       router.push('/unauthorized')
       return
@@ -39,13 +41,14 @@ export default function PermissionsPage() {
     fetchPermissions()
   }, [session, status, router])
 
-  const fetchPermissions = async () => {
+  const fetchPermissions = async (silent = false) => {
     try {
-      setLoading(true)
-      const res = await fetch('/api/admin/permissions')
+      if (!silent) setLoading(true)
+      const res = await fetch('/api/admin/permissions', { cache: 'no-store' })
       const data = await res.json()
       if (res.ok) {
         setPermissions(data.permissions)
+        setSelfId(data.self)
       } else {
         toast.error("Failed to fetch permissions")
       }
@@ -87,14 +90,15 @@ export default function PermissionsPage() {
       const res = await fetch('/api/admin/permissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ RMIS_ID: user.RMIS_ID, permission_level: permissionLevel, card_name: user.card_name })
+        body: JSON.stringify({ member_id: user.member_id, permission_level: permissionLevel })
       })
       const data = await res.json()
       if (res.ok) {
-        toast.success(`Permission "${permissionLevel}" added to ${user.card_name}`)
-        fetchPermissions()
+        toast.success(`Permission "${permissionLevel}" saved for ${user.card_name}`)
+        fetchPermissions(true)
         setSearchResults([])
         setSearchName('')
+        setLevels({})
       } else {
         toast.error(data.error || "Failed to add permission")
       }
@@ -104,7 +108,7 @@ export default function PermissionsPage() {
     }
   }
 
-  const handleRemovePermission = async (rmisId, userName) => {
+  const handleRemovePermission = async (memberId, userName) => {
     if (!confirm(`Are you sure you want to remove permissions from ${userName}?`)) {
       return
     }
@@ -112,13 +116,14 @@ export default function PermissionsPage() {
       const res = await fetch('/api/admin/permissions', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ RMIS_ID: rmisId })
+        body: JSON.stringify({ member_id: memberId })
       })
       if (res.ok) {
         toast.success("Permission removed successfully")
-        fetchPermissions()
+        fetchPermissions(true)
       } else {
-        toast.error("Failed to remove permission")
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.error || "Failed to remove permission")
       }
     } catch (error) {
       console.error('Error removing permission:', error)
@@ -169,14 +174,14 @@ export default function PermissionsPage() {
             <h3 className="text-lg font-semibold mb-4 text-white">Search Results</h3>
             <div className="space-y-3">
               {searchResults.map((user) => (
-                <div key={user.RMIS_ID} className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div key={user.member_id} className="bg-white/5 rounded-lg p-4 border border-white/10">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <h4 className="font-medium text-white">{user.card_name}</h4>
-                      <p className="text-sm text-white/60">RMIS ID: {user.RMIS_ID} | Role: {user.role_id}</p>
+                      <p className="text-sm text-white/60">Member ID: {user.member_id} | Role: {user.role_id}{user.permission_level ? ` | Current: ${user.permission_level}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Select defaultValue="admin">
+                      <Select value={levels[user.member_id] ?? 'admin'} onValueChange={(v) => setLevels((l) => ({ ...l, [user.member_id]: v }))}>
                         <SelectTrigger className="w-40 bg-white/10 border-white/20 text-white">
                           <SelectValue />
                         </SelectTrigger>
@@ -187,11 +192,7 @@ export default function PermissionsPage() {
                         </SelectContent>
                       </Select>
                       <Button
-                        onClick={() => {
-                          const selectElement = document.querySelector(`[data-radix-select-value]`)
-                          const level = selectElement?.textContent?.toLowerCase().replace(' ', '_') || 'admin'
-                          handleAddPermission(user, level)
-                        }}
+                        onClick={() => handleAddPermission(user, levels[user.member_id] ?? 'admin')}
                         className="bg-green-500/80 hover:bg-green-500 border border-green-500 hover:shadow hover:shadow-green-500 text-white px-4 cursor-pointer"
                       >
                         Add Permission
@@ -221,12 +222,12 @@ export default function PermissionsPage() {
         ) : (
           <div className="space-y-3">
             {permissions.map((perm) => (
-              <div key={perm.RMIS_ID} className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div key={perm.member_id} className="bg-white/5 rounded-lg p-4 border border-white/10">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h4 className="font-medium text-white">{perm.card_name || 'Unknown User'}</h4>
                     <p className="text-sm text-white/60">
-                      RMIS ID: {perm.RMIS_ID} |
+                      Member ID: {perm.member_id} |
                       <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
                         perm.permission_level === 'administrator'
                           ? 'bg-amber-500/20 text-amber-200 border border-amber-500/30'
@@ -243,7 +244,9 @@ export default function PermissionsPage() {
                     </p>
                   </div>
                   <Button
-                    onClick={() => handleRemovePermission(perm.RMIS_ID, perm.card_name || 'Unknown User')}
+                    onClick={() => handleRemovePermission(perm.member_id, perm.card_name || 'Unknown User')}
+                    disabled={perm.member_id === selfId}
+                    title={perm.member_id === selfId ? 'You cannot remove your own permission' : undefined}
                     variant="destructive"
                     className="bg-red-500/80 hover:bg-red-500 border border-red-500 hover:shadow hover:shadow-red-500 text-white px-4 cursor-pointer"
                   >

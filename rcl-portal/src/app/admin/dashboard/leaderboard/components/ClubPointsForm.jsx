@@ -69,21 +69,21 @@ const ClubPointsForm = React.memo(({ sport, onPointAdded }) => {
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault()
     
-    if (!selectedClub || !place || !points) {
-      toast.error('Please fill in all fields')
+    if (!selectedClub || !points) {
+      toast.error('Please select a club and enter the points')
       return
     }
 
-    // Validate points must be double digits
-    const placeNum = parseInt(place)
+    // Manual entry: any non-zero whole number (negative = deduction)
+    const placeNum = place ? parseInt(place) : null
     const pointsNum = parseInt(points)
-    
-    if (pointsNum < 10 || pointsNum > 99) {
-      toast.error('Points must be between 10-99')
+
+    if (!Number.isInteger(pointsNum) || pointsNum === 0 || Math.abs(pointsNum) > 1000) {
+      toast.error('Points must be a non-zero whole number (max 1000, negative to deduct)')
       return
     }
-    
-    if (placeNum < 1) {
+
+    if (placeNum !== null && placeNum < 1) {
       toast.error('Place must be a positive number')
       return
     }
@@ -98,7 +98,9 @@ const ClubPointsForm = React.memo(({ sport, onPointAdded }) => {
         points: pointsNum
       })
       
-      if (result.success) {
+      if (!result.success) {
+        toast.error(result.error || 'Failed to add points')
+      } else {
         toast.success('Points added successfully!')
         
         // Reset form
@@ -131,7 +133,7 @@ const ClubPointsForm = React.memo(({ sport, onPointAdded }) => {
     return club ? club.club_name : 'Select club...'
   }, [filteredClubs, value])
 
-  if (clubsLoading) {
+  if (clubsLoading && clubsData.length === 0) {
     return (
       <div className="bg-white/5 rounded-lg p-6">
         <h3 className="text-xl font-medium mb-4">Add Club Points</h3>
@@ -144,7 +146,7 @@ const ClubPointsForm = React.memo(({ sport, onPointAdded }) => {
 
   return (
     <div className="bg-white/5 rounded-lg p-6">
-      <h3 className="text-xl font-medium mb-4">Add Club Points</h3>
+      <h3 className="text-xl font-medium mb-4">Add Manual Club Points</h3>
       
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -191,7 +193,7 @@ const ClubPointsForm = React.memo(({ sport, onPointAdded }) => {
 
           {/* Place Input */}
           <div className="space-y-2">
-            <Label htmlFor="place">Place</Label>
+            <Label htmlFor="place">Place (optional)</Label>
             <Input
               id="place"
               type="number"
@@ -205,12 +207,12 @@ const ClubPointsForm = React.memo(({ sport, onPointAdded }) => {
 
           {/* Points Input */}
           <div className="space-y-2">
-            <Label htmlFor="points">Points (10-99)</Label>
+            <Label htmlFor="points">Points (negative to deduct)</Label>
             <Input
               id="points"
               type="number"
-              min="10"
-              max="99"
+              min="-1000"
+              max="1000"
               value={points}
               onChange={(e) => setPoints(e.target.value)}
               placeholder="Enter points"
@@ -223,7 +225,7 @@ const ClubPointsForm = React.memo(({ sport, onPointAdded }) => {
         <div className="flex justify-end">
           <Button 
             type="submit" 
-            disabled={loading || !selectedClub || !place || !points}
+            disabled={loading || !selectedClub || !points}
             className="min-w-32"
           >
             {loading ? (

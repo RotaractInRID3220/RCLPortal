@@ -47,9 +47,9 @@ export default function AdminSwapsPage() {
     requestId: null,
   });
 
-  const fetchRequests = useCallback(async () => {
+  const fetchRequests = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await fetch(`/api/admin/swaps?tab=${activeTab}&limit=50`);
       const result = await response.json();
 
@@ -78,8 +78,8 @@ export default function AdminSwapsPage() {
       setProcessingId(requestId);
       const endpoint = type === 'approve' ? '/api/admin/swaps/approve' : '/api/admin/swaps/reject';
       const body = type === 'approve' 
-        ? { request_id: requestId, approved_by: userDeets?.membership_id || 'Admin' }
-        : { request_id: requestId, rejected_by: userDeets?.membership_id || 'Admin' };
+        ? { request_id: requestId }
+        : { request_id: requestId };
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -91,7 +91,7 @@ export default function AdminSwapsPage() {
 
       if (result.success) {
         toast.success(`Request ${type}d successfully`);
-        fetchRequests();
+        fetchRequests(true);
       } else {
         toast.error(result.error || `Failed to ${type} request`);
       }
@@ -105,8 +105,8 @@ export default function AdminSwapsPage() {
   };
 
   const getStatusBadge = (status) => {
-    if (status === true) return <Badge className="bg-green-500">Approved</Badge>;
-    if (status === false) return <Badge variant="destructive">Rejected</Badge>;
+    if (status === 1) return <Badge className="bg-green-500">Approved</Badge>;
+    if (status === 2) return <Badge variant="destructive">Rejected</Badge>;
     return <Badge variant="secondary" className="bg-amber-500/15 text-amber-600 border-amber-500/40">Pending</Badge>;
   };
 

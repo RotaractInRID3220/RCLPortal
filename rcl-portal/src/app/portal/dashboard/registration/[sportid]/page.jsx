@@ -37,12 +37,16 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getAllEvents } from '@/services/sportServices';
-import { APP_CONFIG } from '@/config/app.config';
 
 // Memoized PlayerRow component moved outside to avoid conditional hook usage
+// Name shown for a member: the RMIS card name, or the full name when the card name is empty.
+const memberName = (m) => (m?.card_name && m.card_name.trim()) || (m?.full_name && m.full_name.trim()) || 'Unnamed member';
+// Active and transferred members are "General" (status 1 here); prospective members stay "Prospective".
+const statusLabel = (status) => (status === 1 ? 'General' : 'Prospective');
+
 const PlayerRow = React.memo(({ player, isMain, clubMembers, onDeletePlayer, isRegistrationAllowed }) => {
     const memberInfo = Array.isArray(clubMembers) ? 
-        clubMembers.find(member => member.membership_id === player.RMIS_ID) : null;
+        clubMembers.find(member => member.member_id === player.member_id) : null;
     
     return (
         <div 
@@ -50,13 +54,13 @@ const PlayerRow = React.memo(({ player, isMain, clubMembers, onDeletePlayer, isR
         >
             <div className="flex space-x-4 items-center">
                 <div className='flex space-x-4 items-center'>
-                    <p className="font-bold">{memberInfo?.card_name || 'Unknown'}</p>
-                    <p className="text-xs text-white/50">{player.RMIS_ID}</p>
+                    <p className="font-bold">{player.player_name || (memberInfo ? memberName(memberInfo) : 'Unknown')}</p>
+                    <p className="text-xs text-white/50">{player.membership_id || player.member_id}</p>
                 </div>
             </div>
             <div className="flex space-x-4 items-center">
                 <p className="text-xs px-2 py-1 bg-white/10 rounded-full">
-                    {memberInfo?.status === 1 ? 'General' : memberInfo?.status === 5 ? 'Prospective' : 'Unknown'}
+                    {(player.player_status ?? memberInfo?.status) === 1 ? 'General' : (player.player_status ?? memberInfo?.status) === 5 ? 'Prospective' : 'Unknown'}
                 </p>
                 <p className={`text-xs font-semibold px-2 py-1 rounded-full ${isMain ? 'bg-cranberry/40' : 'bg-white/20'}`}>
                     {isMain ? 'Main' : 'Reserve'}
@@ -86,14 +90,28 @@ const SportRegistrationPage = React.memo(() => {
     const [lastFetchTimestamp, setLastFetchTimestamp] = useAtom(lastFetchTimestampAtom);
     const [selectedSportData, setSelectedSportData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [clubMembers, setClubMembers] = useAtom(clubMembersAtom);
-    
+    // Why the member list is empty: the membership cutoff is not set yet (nobody can be registered until it is)
+    const [cutoffSet, setCutoffSet] = useState(true);
+    useEffect(() => {
+        if (Array.isArray(clubMembers) && clubMembers.length > 0) return;
+        let cancelled = false;
+        fetch('/api/portal/members', { cache: 'no-store' })
+            .then((r) => r.json())
+            .then((b) => { if (!cancelled && b?.success) setCutoffSet(b.cutoffSet !== false); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [clubMembers]);
+
     // ComboBox states
     const [open, setOpen] = useState(false);
     const [selectedValue, setSelectedValue] = useState("");
     const [selectedMember, setSelectedMember] = useState(null);
     const [registeredPlayers, setRegisteredPlayers] = useState([]);
     const [isMainPlayer, setIsMainPlayer] = useState(true);
+    const [riNumber, setRiNumber] = useState('');
+    const [registrationOpenAt, setRegistrationOpenAt] = useState(null);
     
     // Alert Dialog states
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -109,7 +127,7 @@ const SportRegistrationPage = React.memo(() => {
         return clubMembers.filter(member => {
             // Check if member is already registered
             if (Array.isArray(registeredPlayers) && 
-                registeredPlayers.some(player => player.RMIS_ID === member.membership_id)) {
+                registeredPlayers.some(player => player.member_id === member.member_id)) {
                 return false;
             }
             
@@ -137,7 +155,8 @@ const SportRegistrationPage = React.memo(() => {
     // Check if registration/deletion is allowed based on opening date (from config) and closing date (from sport data)
     const isRegistrationAllowed = useMemo(() => {
         const currentDate = new Date();
-        const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
+        const openingDate = registrationOpenAt ? new Date(registrationOpenAt) : null;
+        if (!openingDate) return false; // not scheduled yet = closed
         
         // Use individual sport's registration_close from database
         if (!selectedSportData?.registration_close) {
@@ -147,14 +166,14 @@ const SportRegistrationPage = React.memo(() => {
         
         const deadlineDate = new Date(selectedSportData.registration_close);
         return currentDate >= openingDate && currentDate <= deadlineDate;
-    }, [selectedSportData?.registration_close]);
+    }, [selectedSportData?.registration_close, registrationOpenAt]);
 
     // Determine registration status for UI display
     const registrationStatus = useMemo(() => {
         const currentDate = new Date();
-        const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
+        const openingDate = registrationOpenAt ? new Date(registrationOpenAt) : null;
         
-        if (currentDate < openingDate) return 'not-open';
+        if (!openingDate || currentDate < openingDate) return 'not-open';
         
         // Use individual sport's registration_close from database
         if (!selectedSportData?.registration_close) {
@@ -165,13 +184,14 @@ const SportRegistrationPage = React.memo(() => {
         const deadlineDate = new Date(selectedSportData.registration_close);
         if (currentDate > deadlineDate) return 'closed';
         return 'open';
-    }, [selectedSportData?.registration_close]);
+    }, [selectedSportData?.registration_close, registrationOpenAt]);
 
     // Calculate days until opening/closing for better UX
     const daysInfo = useMemo(() => {
         const currentDate = new Date();
-        const openingDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
+        const openingDate = registrationOpenAt ? new Date(registrationOpenAt) : null;
         
+        if (!openingDate) return { days: 0, type: 'not-scheduled' };
         if (currentDate < openingDate) {
             const diffTime = openingDate - currentDate;
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -190,7 +210,7 @@ const SportRegistrationPage = React.memo(() => {
             return { days: diffDays, type: 'until-close', closeDate: deadlineDate };
         }
         return { days: 0, type: 'closed', closeDate: deadlineDate };
-    }, [selectedSportData?.registration_close]);
+    }, [selectedSportData?.registration_close, registrationOpenAt]);
 
     // Optimized fetch functions with caching
     const fetchAllSports = useCallback(async () => {
@@ -214,13 +234,20 @@ const SportRegistrationPage = React.memo(() => {
         }
     }, [sportsData.length, lastFetchTimestamp.sports, setSportsData, setLastFetchTimestamp]);
 
+    // Opening time is a server-side setting (unset = registration not scheduled yet).
+    useEffect(() => {
+        let cancelled = false;
+        fetch('/api/portal/registration-status')
+            .then((r) => r.json())
+            .then((body) => { if (!cancelled && body?.success) setRegistrationOpenAt(body.data.registrationOpenAt); })
+            .catch((e) => console.error('Could not load registration status:', e));
+        return () => { cancelled = true; };
+    }, []);
+
     const fetchRegisteredPlayers = useCallback(async () => {
         if (!userDeets || !userDeets.club_id) return;
         try {
-            const response = await getRegistrations({ 
-                sport_id: params.sportid, 
-                club_id: userDeets.club_id 
-            });
+            const response = await getRegistrations({ sport_id: params.sportid });
             if (response.success) {
                 setRegisteredPlayers(response.data);
             } else {
@@ -288,27 +315,15 @@ const SportRegistrationPage = React.memo(() => {
     }, [clubMembers, setClubMembers, selectedSportData]);
 
     // Optimized member selection handler
-    const handleSelectMember = useCallback((currentValue) => {
-        if (!Array.isArray(availableClubMembers)) {
-            console.error('availableClubMembers is not available');
-            setSelectedValue("");
-            setOpen(false);
-            return;
-        }
-        
-        // Find member from available members (already filtered)
-        const member = availableClubMembers.find(member => 
-            member && member.card_name && 
-            member.card_name.trim().toLowerCase() === currentValue.trim().toLowerCase()
-        );
-        
+    const handleSelectMember = useCallback((member) => {
+        // Selected by member (not by name): two members can share a name, and a name can be empty.
         if (member) {
             setSelectedMember(member);
-            setSelectedValue(member.card_name);
+            setSelectedValue(memberName(member));
+            setRiNumber('');
         }
-        
         setOpen(false);
-    }, [availableClubMembers]);
+    }, []);
 
 
     
@@ -316,15 +331,16 @@ const SportRegistrationPage = React.memo(() => {
     const handleRegisterPlayer = useCallback(async () => {
         if (!selectedMember) return;
         
-        setLoading(true);
+        setSubmitting(true);
         try {
-            const response = await registerPlayer(selectedMember, selectedSport, isMainPlayer, selectedSportData);
+            const response = await registerPlayer(selectedMember, selectedSport, isMainPlayer, riNumber.trim());
             
             if (response.success) {
                 toast.success('Player registered successfully');
                 await fetchRegisteredPlayers();
                 setSelectedMember(null);
                 setSelectedValue("");
+                setRiNumber('');
             } else {
                 toast.error(response.error || 'Failed to register player');
             }
@@ -332,16 +348,16 @@ const SportRegistrationPage = React.memo(() => {
             toast.error('Error registering player');
             console.error('Registration error:', error);
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
-    }, [selectedMember, selectedSport, isMainPlayer, selectedSportData, fetchRegisteredPlayers]);
+    }, [selectedMember, selectedSport, isMainPlayer, riNumber, fetchRegisteredPlayers]);
 
     // Memoized registration validation
     const canRegisterPlayer = useMemo(() => {
         if (!selectedMember) return false;
 
         // For general members (status 1), RI number is required
-        if (selectedMember.status === 1 && (!selectedMember.ri_number || selectedMember.ri_number.trim() === '')) {
+        if (selectedMember.status === 1 && riNumber.trim() === '') {
             return false;
         }
 
@@ -350,7 +366,7 @@ const SportRegistrationPage = React.memo(() => {
         } else {
             return playerCounts.reservePlayers < playerCounts.maxReserve;
         }
-    }, [selectedMember, isMainPlayer, playerCounts]);
+    }, [selectedMember, isMainPlayer, playerCounts, riNumber]);
     
     // Optimized delete handlers
     const confirmDeletePlayer = useCallback((player) => {
@@ -362,7 +378,7 @@ const SportRegistrationPage = React.memo(() => {
         if (!playerToDelete) return;
         
         try {
-            await deleteRegistration(playerToDelete.RMIS_ID, playerToDelete.sport_id);
+            await deleteRegistration(playerToDelete.member_id, playerToDelete.sport_id);
             toast.success('Player removed successfully');
             await fetchRegisteredPlayers();
             setIsDeleteDialogOpen(false);
@@ -447,25 +463,28 @@ const SportRegistrationPage = React.memo(() => {
                                                     {availableClubMembers.length > 0 ? (
                                                         availableClubMembers.map((member) => (
                                                             <CommandItem
-                                                                key={member.id || member.membership_id}
-                                                                value={member.card_name}
-                                                                onSelect={handleSelectMember}
+                                                                key={member.member_id}
+                                                                value={`${memberName(member)} ${statusLabel(member.status)} ${member.membership_id || ''} ${member.member_id}`}
+                                                                onSelect={() => handleSelectMember(member)}
                                                                 className="hover:bg-white/10 cursor-pointer"
                                                             >
                                                                 <CheckIcon
                                                                     className={cn(
                                                                         "mr-2 h-4 w-4",
-                                                                        selectedValue === member.card_name
+                                                                        selectedMember?.member_id === member.member_id
                                                                             ? "opacity-100"
                                                                             : "opacity-0"
                                                                     )}
                                                                 />
-                                                                {member.card_name}
+                                                                <span className="flex-1 truncate">{memberName(member)}</span>
+                                                                <span className={`ml-3 shrink-0 rounded-full border px-2 py-0.5 text-xs ${member.status === 1 ? 'border-green-500/40 bg-green-500/10 text-green-300' : 'border-blue-500/40 bg-blue-500/10 text-blue-300'}`}>
+                                                                    {statusLabel(member.status)}
+                                                                </span>
                                                             </CommandItem>
                                                         ))
                                                     ) : (
                                                         <CommandItem disabled>
-                                                            {clubMembers.length === 0 ? 'No club members available' : 'All eligible members already registered'}
+                                                            {clubMembers.length === 0 ? (cutoffSet ? 'No eligible club members available' : 'Registration is not open yet: the membership cutoff has not been set by an admin') : 'All eligible members already registered'}
                                                         </CommandItem>
                                                     )}
                                                 </CommandGroup>
@@ -478,8 +497,8 @@ const SportRegistrationPage = React.memo(() => {
                                 <Input
                                     type="text"
                                     placeholder="RI number"
-                                    value={selectedMember?.ri_number || ""}
-                                    onChange={(e) => setSelectedMember({ ...selectedMember, ri_number: e.target.value })}
+                                    value={riNumber}
+                                    onChange={(e) => setRiNumber(e.target.value)}
                                     className="border border-white/20 bg-transparent w-1/4 text-white placeholder:text-white/50"
                                 />
                             )}
@@ -513,22 +532,22 @@ const SportRegistrationPage = React.memo(() => {
                         {/* Player type selection */}
                         {selectedMember && (
                             <div className="mb-6 p-4 border border-white/20 rounded-md bg-black/15 grid grid-cols-2">
-                                <h3 className="text-sm text-white/80 mb-3">Selected Player: <span className="font-semibold">{selectedMember.card_name}</span></h3>
-                                <h3 className="text-sm text-white/80 mb-3">RMIS Id: <span className="font-semibold">{selectedMember.membership_id}</span></h3>
-                                <h3 className="text-sm text-white/80 mb-3">Membership status: <span className="font-semibold">{selectedMember.status == 1 ? 'General Member' : 'Prospective Member'}</span></h3>
+                                <h3 className="text-sm text-white/80 mb-3">Selected Player: <span className="font-semibold">{memberName(selectedMember)}</span></h3>
+                                <h3 className="text-sm text-white/80 mb-3">Member ID: <span className="font-semibold">{selectedMember.membership_id || selectedMember.member_id}</span></h3>
+                                <h3 className="text-sm text-white/80 mb-3">Membership status: <span className="font-semibold">{statusLabel(selectedMember.status)} Member</span></h3>
                                 {selectedMember.status === 1 && (
-                                    <h3 className="text-sm text-white/80 mb-3">RI Number: <span className="font-semibold">{selectedMember.ri_number || 'Not provided'}</span></h3>
+                                    <h3 className="text-sm text-white/80 mb-3">RI Number: <span className="font-semibold">{riNumber.trim() || 'Not provided'}</span></h3>
                                 )}
-                                <h3 className="text-sm text-white/80 mb-3">NIC: <span className="font-semibold">{selectedMember.nic_pp}</span></h3>
+                                <h3 className="text-sm text-white/80 mb-3">NIC: <span className="font-semibold">{selectedMember.nic}</span></h3>
                             </div>
                         )}
                         
                         <Button 
                             className="bg-cranberry/10 border border-cranberry hover:bg-cranberry cursor-pointer text-white w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={!canRegisterPlayer || loading}
+                            disabled={!canRegisterPlayer || submitting}
                             onClick={handleRegisterPlayer}
                         >
-                            {loading ? 'Registering...' : 'Register Player'}
+                            {submitting ? 'Registering...' : 'Register Player'}
                         </Button>
                     </div>
                 </div>
@@ -546,12 +565,12 @@ const SportRegistrationPage = React.memo(() => {
                         </div>
                         <p className="text-white/70 mb-4">
                             Player registrations will open on <span className="font-semibold text-blue-300">
-                                {new Date(APP_CONFIG.REGISTRATION_OPENING_DATE).toLocaleDateString('en-US', { 
+                                {registrationOpenAt ? new Date(registrationOpenAt).toLocaleDateString('en-US', { 
                                     weekday: 'long', 
                                     year: 'numeric', 
                                     month: 'long', 
                                     day: 'numeric' 
-                                })}
+                                }) : 'a date that has not been announced yet'}
                             </span>
                         </p>
                         <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
@@ -608,7 +627,7 @@ const SportRegistrationPage = React.memo(() => {
                     {/* Main Players */}
                     {mainPlayers.map(player => (
                         <PlayerRow 
-                            key={`main-${player.RMIS_ID}`} 
+                            key={`main-${player.member_id}`} 
                             player={player} 
                             isMain={true}
                             clubMembers={clubMembers}
@@ -620,7 +639,7 @@ const SportRegistrationPage = React.memo(() => {
                     {/* Reserve Players */}
                     {reservePlayers.map(player => (
                         <PlayerRow 
-                            key={`reserve-${player.RMIS_ID}`} 
+                            key={`reserve-${player.member_id}`} 
                             player={player} 
                             isMain={false}
                             clubMembers={clubMembers}
@@ -642,8 +661,8 @@ const SportRegistrationPage = React.memo(() => {
                             </AlertDialogDescription>
                             {playerToDelete && 
                                 <div className="mt-2 p-2 bg-white/10 rounded-md">
-                                    <div className="font-medium">{clubMembers?.find(m => m.membership_id === playerToDelete.RMIS_ID)?.card_name || 'Unknown player'}</div>
-                                    <div className="text-sm text-white/50">{playerToDelete.RMIS_ID}</div>
+                                    <div className="font-medium">{playerToDelete.player_name || memberName(clubMembers?.find(m => m.member_id === playerToDelete.member_id)) || 'Unknown player'}</div>
+                                    <div className="text-sm text-white/50">{playerToDelete.membership_id || playerToDelete.member_id}</div>
                                 </div>
                             }
                         </AlertDialogHeader>

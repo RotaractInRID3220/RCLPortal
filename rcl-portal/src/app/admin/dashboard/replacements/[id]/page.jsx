@@ -76,7 +76,6 @@ const ReplacementRequestDetailPage = () => {
         },
         body: JSON.stringify({
           request_id: request.id,
-          approved_by: userDetails.membership_id,
         }),
       })
 
@@ -108,7 +107,6 @@ const ReplacementRequestDetailPage = () => {
         },
         body: JSON.stringify({
           request_id: request.id,
-          rejected_by: userDetails.membership_id,
         }),
       })
 
@@ -130,7 +128,7 @@ const ReplacementRequestDetailPage = () => {
   }
 
   const getStatusBadge = (status, approvedBy = null) => {
-    if (status === true) {
+    if (status === 1) {
       return (
         <div className="flex items-center gap-3">
           <Badge className="bg-green-500/10 text-green-500 border-green-500 px-3 py-1">
@@ -140,7 +138,7 @@ const ReplacementRequestDetailPage = () => {
           {approvedBy && <span className="text-sm text-white/60">by: {approvedBy}</span>}
         </div>
       )
-    } else if (status === false) {
+    } else if (status === 2) {
       return (
         <div className="flex items-center gap-3">
           <Badge className="bg-red-500/10 text-red-500 border-red-500 px-3 py-1">
@@ -215,7 +213,7 @@ const ReplacementRequestDetailPage = () => {
           </div>
           <div className="flex items-center gap-3">
             {getStatusBadge(request.status, request.approved_by)}
-            {request.status === null && (
+            {request.status === 0 && (
               <>
                 <Button
                   onClick={handleApproveRequest}
@@ -257,7 +255,7 @@ const ReplacementRequestDetailPage = () => {
         </div>
 
         {/* Status Timeline Card */}
-        {(request.status !== null || request.approved_at) && (
+        {(request.status !== 0 || request.approved_at) && (
           <Card className="bg-gradient-to-r from-cranberry/10 via-white/5 to-white/5 border-white/15">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -277,17 +275,17 @@ const ReplacementRequestDetailPage = () => {
                       <div className="flex items-center gap-3">
                         <div
                           className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                            request.status === true ? 'bg-green-500/20' : 'bg-red-500/20'
+                            request.status === 1 ? 'bg-green-500/20' : 'bg-red-500/20'
                           }`}
                         >
-                          {request.status === true ? (
+                          {request.status === 1 ? (
                             <CheckCircle className="w-5 h-5 text-green-400" />
                           ) : (
                             <XCircle className="w-5 h-5 text-red-400" />
                           )}
                         </div>
                         <div>
-                          <p className="text-xs text-white/50">{request.status === true ? 'Approved' : 'Rejected'}</p>
+                          <p className="text-xs text-white/50">{request.status === 1 ? 'Approved' : 'Rejected'}</p>
                           <p className="text-sm font-medium">{formatDateTime(request.approved_at)}</p>
                         </div>
                       </div>
@@ -395,7 +393,7 @@ const ReplacementRequestDetailPage = () => {
                     </div>
                     <div className="flex-1">
                       <p className="text-xl font-bold">{request.original_player?.name || 'Unknown'}</p>
-                      <p className="text-sm text-white/50 font-mono">{request.original_player?.RMIS_ID}</p>
+                      <p className="text-sm text-white/50 font-mono">{(request.original_player?.membership_id || request.original_player?.member_id)}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/10">
@@ -410,10 +408,10 @@ const ReplacementRequestDetailPage = () => {
                       <Badge className="bg-white/10 border-white/20 text-white">{request.original_player?.gender || '-'}</Badge>
                     </div>
                   </div>
-                  {request.original_player?.RI_ID && (
+                  {request.original_player?.ri_id && (
                     <div className="pt-3 border-t border-white/10">
                       <p className="text-xs text-white/50 mb-1">RI Number</p>
-                      <p className="text-sm font-mono text-white/70">{request.original_player.RI_ID}</p>
+                      <p className="text-sm font-mono text-white/70">{request.original_player.ri_id}</p>
                     </div>
                   )}
                 </CardContent>
@@ -435,7 +433,7 @@ const ReplacementRequestDetailPage = () => {
                     </div>
                     <div className="flex-1">
                       <p className="text-xl font-bold">{request.replacement_player?.name || 'Unknown'}</p>
-                      <p className="text-sm text-white/50 font-mono">{request.replacement_player?.RMIS_ID}</p>
+                      <p className="text-sm text-white/50 font-mono">{(request.replacement_player?.membership_id || request.replacement_player?.member_id)}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 pt-4 border-t border-white/10">
@@ -443,12 +441,12 @@ const ReplacementRequestDetailPage = () => {
                       <p className="text-xs text-white/50 mb-1">Status</p>
                       <Badge
                         className={
-                          request.replacement_player?.status === 1 || request.replacement_player?.status === 3
+                          request.replacement_player?.status === 1
                             ? 'bg-amber-500/20 text-amber-200 border-amber-500/40'
                             : 'bg-blue-500/20 text-blue-200 border-blue-500/40'
                         }
                       >
-                        {request.replacement_player?.status === 1 || request.replacement_player?.status === 3
+                        {request.replacement_player?.status === 1
                           ? 'General'
                           : 'Prospective'}
                       </Badge>
@@ -458,10 +456,10 @@ const ReplacementRequestDetailPage = () => {
                       <Badge className="bg-white/10 border-white/20 text-white">{request.replacement_player?.gender || '-'}</Badge>
                     </div>
                   </div>
-                  {request.replacement_player?.ri_number && (
+                  {request.replacement_player?.ri_id && (
                     <div className="pt-3 border-t border-white/10">
                       <p className="text-xs text-white/50 mb-1">RI Number</p>
-                      <p className="text-sm font-mono text-white/70">{request.replacement_player.ri_number}</p>
+                      <p className="text-sm font-mono text-white/70">{request.replacement_player.ri_id}</p>
                     </div>
                   )}
                   {request.replacement_player?.nic && (

@@ -15,7 +15,7 @@ import {
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog'
 import { ArrowLeft, Download, Search, RefreshCw, Filter } from 'lucide-react'
-import { getRegistrationsWithPlayerData, convertPlayer } from '@/services/registrationService'
+import { getAllRegistrationsWithPlayerData, convertPlayer } from '@/services/registrationService'
 import RegistrationStats from './RegistrationStats'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
@@ -46,7 +46,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
     const searchLower = searchTerm.toLowerCase().trim()
     return registrations.filter(registration => {
       const playerName = registration.players?.name?.toLowerCase() || ''
-      const rmisId = registration.players?.RMIS_ID?.toLowerCase() || ''
+      const rmisId = String(registration.players?.membership_id ?? registration.players?.member_id ?? '').toLowerCase()
       const clubName = registration.clubs?.club_name?.toLowerCase() || ''
       
       return playerName.includes(searchLower) || 
@@ -61,7 +61,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
     
     const seenRMIS = new Set()
     return filteredRegistrations.filter(registration => {
-      const rmisId = registration.players?.RMIS_ID
+      const rmisId = registration.member_id
       if (!rmisId || seenRMIS.has(rmisId)) return false
       seenRMIS.add(rmisId)
       return true
@@ -74,7 +74,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
     
     const seenRMIS = new Set()
     return allRegistrations.filter(registration => {
-      const rmisId = registration.players?.RMIS_ID
+      const rmisId = registration.member_id
       if (!rmisId || seenRMIS.has(rmisId)) return false
       seenRMIS.add(rmisId)
       return true
@@ -101,11 +101,8 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
         if (sportId) filters.sport_id = parseInt(sportId)
       }
 
-      // Fetch all data at once (reasonable limit to prevent memory issues)
-      const result = await getRegistrationsWithPlayerData(filters, {
-        page: 1,
-        limit: 5000 // Fetch up to 5000 records for client-side pagination and filtering
-      })
+      // Fetch everything in pages of 200 (the server never returns more per call)
+      const result = await getAllRegistrationsWithPlayerData(filters)
       
       if (result.success) {
         const allData = result.data || []
@@ -160,17 +157,17 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
 
       // Prepare Excel data
       const excelData = dataToExport.map(registration => ({
-        'RMIS ID': registration.players?.RMIS_ID || '',
+        'Member ID': registration.players?.membership_id || registration.players?.member_id || '',
         'Player Name': registration.players?.name || '',
         'Club Name': registration.clubs?.club_name || '',
         'Sport': registration.sports?.sport_name || '',
         'Gender Type': registration.sports?.gender_type || '',
         'Player Type': registration.main_player ? 'Main Player' : 'Reserve Player',
-        'NIC': registration.players?.NIC || '',
+        'NIC': registration.players?.nic || '',
         'Birthdate': registration.players?.birthdate || '',
         'Gender': registration.players?.gender || '',
         'Status': registration.players?.status || '',
-        'RI ID': registration.players?.RI_ID || '',
+        'RI ID': registration.players?.ri_id || '',
         'Registration Date': new Date(registration.created_at).toLocaleDateString(),
       }))
 
@@ -204,18 +201,14 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
   }, [])
 
   const handleConvertConfirm = useCallback(async () => {
-    const membershipId = session?.user?.membership_id || userDeets?.membership_id
-    if (!registrationToConvert || !membershipId) {
-      console.log('Missing data:', { registrationToConvert, membershipId, session: session?.user, userDeets })
+    const actorId = session?.user?.member_id
+    if (!registrationToConvert || !actorId) {
       toast.error('Missing registration data or user session')
       return
     }
 
     try {
-      const result = await convertPlayer(
-        registrationToConvert.players.RMIS_ID,
-        membershipId
-      )
+      const result = await convertPlayer(registrationToConvert.member_id)
 
       if (result.success) {
                 toast.success('Player converted successfully')
@@ -223,14 +216,14 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
         // Update the local data
         setAllRegistrations(prev => 
           prev.map(reg => 
-            reg.RMIS_ID === registrationToConvert.players.RMIS_ID && reg.sport_id === registrationToConvert.sport_id
+            reg.member_id === registrationToConvert.member_id
               ? { 
                   ...reg, 
                   players: {
                     ...reg.players,
                     status: 5, 
                     converted: true, 
-                    converted_by: membershipId 
+                    converted_by: actorId 
                   }
                 }
               : reg
@@ -240,14 +233,14 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
         // Update current page data as well
         setRegistrations(prev => 
           prev.map(reg => 
-            reg.RMIS_ID === registrationToConvert.players.RMIS_ID && reg.sport_id === registrationToConvert.sport_id
+            reg.member_id === registrationToConvert.member_id
               ? { 
                   ...reg, 
                   players: {
                     ...reg.players,
                     status: 5, 
                     converted: true, 
-                    converted_by: membershipId 
+                    converted_by: actorId 
                   }
                 }
               : reg
@@ -442,17 +435,17 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
                     <tbody className="divide-y divide-white/10">
                       {filteredUniqueRegistrations.map((registration, index) => (
                         <tr 
-                          key={`${registration.RMIS_ID}-${registration.sport_id}-${index}`} 
+                          key={`${registration.member_id}-${registration.sport_id}-${index}`} 
                           className={`hover:bg-white/5 ${registration.players?.converted ? 'bg-red-500/10 ' : ''}`}
                         >
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                             {registration.players?.name || 'N/A'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-white/70">
-                            {registration.players?.RMIS_ID || 'N/A'}
+                            {registration.players?.membership_id || registration.players?.member_id || 'N/A'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-white/70">
-                            {registration.players?.RI_ID || '-'}
+                            {registration.players?.ri_id || '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-white/70">
                             {registration.clubs?.club_name || 'N/A'}
@@ -530,7 +523,7 @@ const RegistrationsList = React.memo(({ event, clubId, sportId, onBack, filterTy
               <div className="mt-4 p-3 bg-white/5 rounded-lg">
                 <div className="text-sm text-white/70">
                   <strong>Player:</strong> {registrationToConvert.players?.name}<br />
-                  <strong>RMIS ID:</strong> {registrationToConvert.players?.RMIS_ID}<br />
+                  <strong>Member ID:</strong> {registrationToConvert.players?.membership_id || registrationToConvert.players?.member_id}<br />
                   <strong>Sport:</strong> {registrationToConvert.sports?.sport_name}
                 </div>
               </div>

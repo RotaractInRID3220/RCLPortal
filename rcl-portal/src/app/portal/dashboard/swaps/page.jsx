@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAtom } from "jotai";
 import { toast } from "sonner";
 import { userDeetsAtom, clubMembersAtom } from "@/app/state/store";
 import PrivateRoute from "@/lib/PrivateRoute";
 import { getSwapContext, submitSwapRequest } from "@/services/swapService";
-import { APP_CONFIG } from "@/config/app.config";
+import { useEventInfo } from "@/hooks/useEventInfo";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -71,14 +71,14 @@ const formatDateTime = (value) => {
 };
 
 const getStatusMeta = (status) => {
-  if (status === true) {
+  if (status === 1) {
     return {
       label: "Approved",
       className:
         "border-green-500/40 bg-green-500/15 text-green-200 dark:text-green-100",
     };
   }
-  if (status === false) {
+  if (status === 2) {
     return {
       label: "Rejected",
       className:
@@ -110,27 +110,32 @@ const SwapsPage = () => {
   // supportingLink intentionally removed
   const [submitting, setSubmitting] = useState(false);
 
+  // Window dates are set by a super admin (settings). Not scheduled = not open.
+  const eventInfo = useEventInfo();
   const now = new Date();
-  const replacementOpening = new Date(APP_CONFIG.REPLACEMENT_OPENING);
-  const replacementDeadline = new Date(APP_CONFIG.REPLACEMENT_DEADLINE);
-  const isBeforeReplacementOpen = now < replacementOpening;
-  const isAfterReplacementDeadline = now > replacementDeadline;
-  const isWithinReplacementWindow = !isBeforeReplacementOpen && !isAfterReplacementDeadline;
+  const replacementOpening = eventInfo?.replacementOpenAt ? new Date(eventInfo.replacementOpenAt) : null;
+  const replacementDeadline = eventInfo?.replacementCloseAt ? new Date(eventInfo.replacementCloseAt) : null;
+  const isBeforeReplacementOpen = !replacementOpening || now < replacementOpening;
+  const isAfterReplacementDeadline = replacementDeadline ? now > replacementDeadline : false;
+  const isWithinReplacementWindow = Boolean(replacementOpening) && !isBeforeReplacementOpen && !isAfterReplacementDeadline;
 
+  // Fetch once per club. (An empty list is a valid answer, e.g. before the cutoff is set, so "empty" must not trigger a re-fetch.)
+  const membersFetchedFor = useRef(null);
   const ensureClubMembers = useCallback(async () => {
     if (!userDeets?.club_id) return;
-    if (Array.isArray(clubMembers) && clubMembers.length > 0) return;
+    if (membersFetchedFor.current === userDeets.club_id) return;
+    membersFetchedFor.current = userDeets.club_id;
 
     try {
-      const response = await fetch(`/api/council?clubID=${userDeets.club_id}`);
+      const response = await fetch('/api/portal/members');
       const data = await response.json();
-      if (data.success && Array.isArray(data.members)) {
-        setClubMembers(data.members);
+      if (data.success && Array.isArray(data.data)) {
+        setClubMembers(data.data);
       }
     } catch (error) {
       console.error("Failed to fetch club members for swaps:", error);
     }
-  }, [clubMembers, setClubMembers, userDeets?.club_id]);
+  }, [setClubMembers, userDeets?.club_id]);
 
   const loadContext = useCallback(
     async (force = false) => {
@@ -287,7 +292,7 @@ const SwapsPage = () => {
     const sportId = Number(selectedSecondPlayerSportId);
     const registrations = context.sportRegistrations?.[String(sportId)] || [];
     const primaryPlayer = registeredPlayers.find((reg) => String(reg.id) === String(selectedRegistrationId));
-    const primaryPlayerRMIS = primaryPlayer?.RMIS_ID;
+    const primaryPlayerRMIS = primaryPlayer ? String(primaryPlayer.member_id) : null;
     const primaryPlayerGender = primaryPlayer?.player?.gender?.toLowerCase();
     const primarySportGender = selectedSport?.gender_type?.toLowerCase();
     
@@ -326,7 +331,7 @@ const SwapsPage = () => {
     return registrations
       .filter((reg) => {
         // Exclude primary player
-        if (reg.RMIS_ID === primaryPlayerRMIS) return false;
+        if (String(reg.member_id) === primaryPlayerRMIS) return false;
         
         const secondPlayerGender = reg.player?.gender?.toLowerCase();
         
@@ -343,8 +348,8 @@ const SwapsPage = () => {
         return true;
       })
       .map((reg) => ({
-        rmis: reg.RMIS_ID,
-        name: reg.player?.name || reg.RMIS_ID,
+        rmis: String(reg.member_id),
+        name: reg.player?.name || String(reg.member_id),
         registration_id: reg.id,
         main_player: reg.main_player,
         sport_day: reg.sport_day,
@@ -357,11 +362,11 @@ const SwapsPage = () => {
     const keys = Object.keys(context.playerRegistrationMap || {});
     const flattened = Object.values(context.sportRegistrations).flat();
     const primary = (context.sportRegistrations?.[String(selectedSport?.sport_id)] || []).find((r) => String(r.id) === String(selectedRegistrationId));
-    const primaryRMIS = primary?.RMIS_ID || null;
+    const primaryRMIS = primary ? String(primary.member_id) : null;
     return keys
       .filter((rmis) => rmis !== primaryRMIS)
       .map((rmis) => {
-      const joined = flattened.find((r) => r.RMIS_ID === rmis);
+      const joined = flattened.find((r) => String(r.member_id) === rmis);
       const name = joined?.player?.name || rmis;
       const regs = context.playerRegistrationMap[rmis] || [];
       return { rmis, name, regs };
@@ -389,10 +394,8 @@ const SwapsPage = () => {
     // supporting link disabled in portal flow
 
     const payload = {
-      club_id: userDeets.club_id,
-      player1_registrations_id: Number(selectedRegistrationId),
-      reason: reason.trim(),
-      requested_by: userDeets?.membership_id || null,
+      reg1_id: Number(selectedRegistrationId),
+      description: reason.trim(),
     };
 
     // linking is removed from swap flow
@@ -401,13 +404,13 @@ const SwapsPage = () => {
         toast.error("Select the second player for the swap");
         return;
       }
-      payload.player2_registrations_id = Number(selectedSecondRegistrationId);
+      payload.reg2_id = Number(selectedSecondRegistrationId);
     } else {
       if (!selectedDestinationSportId) {
         toast.error("Choose a destination sport");
         return;
       }
-      payload.sport2_id = Number(selectedDestinationSportId);
+      payload.target_sport_id = Number(selectedDestinationSportId);
     }
 
     try {
@@ -433,7 +436,6 @@ const SwapsPage = () => {
     swapType,
     selectedSecondRegistrationId,
     selectedDestinationSportId,
-    userDeets?.membership_id,
     loadContext,
   ]);
 
@@ -499,7 +501,7 @@ const SwapsPage = () => {
                   <Calendar className="w-4 h-4 text-amber-200 flex-shrink-0" />
                   <div className="text-left">
                     <p className="text-xs text-amber-200/70 uppercase tracking-wide leading-tight">Swaps open after</p>
-                    <p className="text-xs font-semibold text-amber-100">{formatDateLabel(APP_CONFIG.REPLACEMENT_OPENING)}</p>
+                    <p className="text-xs font-semibold text-amber-100">{formatDateLabel(eventInfo?.replacementOpenAt)}</p>
                   </div>
                 </div>
               </div>
@@ -522,7 +524,7 @@ const SwapsPage = () => {
                   <Calendar className="w-4 h-4 text-red-200 flex-shrink-0" />
                   <div className="text-left">
                     <p className="text-xs text-red-200/70 uppercase tracking-wide leading-tight">Window closed on</p>
-                    <p className="text-xs font-semibold text-red-100">{formatDateLabel(APP_CONFIG.REPLACEMENT_DEADLINE)}</p>
+                    <p className="text-xs font-semibold text-red-100">{formatDateLabel(eventInfo?.replacementCloseAt)}</p>
                   </div>
                 </div>
               </div>
@@ -644,7 +646,7 @@ const SwapsPage = () => {
                           <SelectItem key={player.id} value={String(player.id)}>
                             <div className="flex items-center gap-2">
                               <span className="font-medium">
-                                {player.player?.name || player.RMIS_ID}
+                                {player.player?.name || player.member_id}
                               </span>
                               {player.main_player && (
                                 <Badge variant="outline" className="text-xs">
@@ -864,9 +866,9 @@ const SwapsPage = () => {
                     Swap window
                   </p>
                   <p className="text-sm font-semibold text-amber-100">
-                    {formatDateLabel(APP_CONFIG.REPLACEMENT_OPENING)} —
+                    {formatDateLabel(eventInfo?.replacementOpenAt)} —
                     {" "}
-                    {formatDateLabel(APP_CONFIG.REPLACEMENT_DEADLINE)}
+                    {formatDateLabel(eventInfo?.replacementCloseAt)}
                   </p>
                 </div>
               </div>
@@ -906,11 +908,11 @@ const SwapsPage = () => {
                             <Users className="h-4 w-4 text-white/60" aria-hidden="true" />
                             <div className="flex flex-1 items-center gap-2">
                               <span className="font-medium">
-                                {request.player_one?.name || request.player_one?.RMIS_ID || "-"}
+                                {request.player_one?.name || "-"}
                               </span>
                               <ArrowRight className="h-4 w-4 text-white/50" aria-hidden="true" />
                               <span className="font-medium">
-                                {request.player_two?.name || request.player_two?.RMIS_ID || request.sport_two?.sport_name || "-"}
+                                {request.player_two?.name || request.sport_two?.sport_name || "-"}
                               </span>
                             </div>
                           </div>

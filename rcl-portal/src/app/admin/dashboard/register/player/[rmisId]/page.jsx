@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { getPlayerVerificationData, generatePlayerNumber } from '@/services/playerService';
 import { registerPlayerForDay } from '@/services/dayRegistrationService';
 import { getPortalStatus, subscribeToPortalStatus } from '@/services/configService';
-import { APP_CONFIG, SPORT_DAYS } from '@/config/app.config';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -22,9 +21,11 @@ export default function PlayerVerificationPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
+  const [bibNumber, setBibNumber] = useState(null);
   
   // Portal status state
-  const [portalStatus, setPortalStatus] = useState({ isOpen: true, updatedBy: null, updatedAt: null });
+  const [portalStatus, setPortalStatus] = useState({ isOpen: true, currentDay: null, updatedBy: null, updatedAt: null });
+  const currentDay = portalStatus.currentDay;
   const [portalLoading, setPortalLoading] = useState(true);
 
   // Fetch portal status
@@ -34,6 +35,11 @@ export default function PlayerVerificationPage({ params }) {
       const status = await getPortalStatus();
       setPortalStatus(status);
       
+      if (status.isOpen && !status.currentDay) {
+        toast.error('No check-in day is selected', { description: 'Ask a super admin to set the current day.', duration: 4000 });
+        setTimeout(() => router.push('/admin/dashboard/register'), 2000);
+        return;
+      }
       // If portal is closed, redirect back with message
       if (!status.isOpen) {
         toast.error('Registration portal is closed', {
@@ -44,7 +50,7 @@ export default function PlayerVerificationPage({ params }) {
       }
     } catch (error) {
       console.error('Error fetching portal status:', error);
-      setPortalStatus({ isOpen: false, updatedBy: null, updatedAt: null });
+      setPortalStatus({ isOpen: false, currentDay: null, updatedBy: null, updatedAt: null });
     } finally {
       setPortalLoading(false);
     }
@@ -71,10 +77,10 @@ export default function PlayerVerificationPage({ params }) {
   }, []);
 
   useEffect(() => {
-    if (rmisId && !portalLoading && portalStatus.isOpen) {
+    if (rmisId && !portalLoading && portalStatus.isOpen && currentDay) {
       loadPlayerData();
     }
-  }, [rmisId, portalLoading, portalStatus.isOpen]);
+  }, [rmisId, portalLoading, portalStatus.isOpen, currentDay]);
 
   // Fetches player data, sports, and registration status - OPTIMIZED (1 API call instead of 3)
   const loadPlayerData = async () => {
@@ -82,11 +88,12 @@ export default function PlayerVerificationPage({ params }) {
       setLoading(true);
       
       // Single optimized API call that fetches all data at once
-      const verificationData = await getPlayerVerificationData(rmisId, APP_CONFIG.CURRENT_SPORT_DAY);
+      const verificationData = await getPlayerVerificationData(rmisId, currentDay);
 
       setPlayer(verificationData.player);
       setSports(verificationData.sports);
       setIsAlreadyRegistered(verificationData.registration.isRegistered);
+      setBibNumber(verificationData.bib_number ?? null);
 
     } catch (error) {
       console.error('Error loading player:', error);
@@ -110,10 +117,10 @@ export default function PlayerVerificationPage({ params }) {
     try {
       setRegistering(true);
 
-      await registerPlayerForDay(rmisId, APP_CONFIG.CURRENT_SPORT_DAY);
+      await registerPlayerForDay(player.member_id ?? rmisId, currentDay);
       
       toast.success(`${player.name} registered successfully!`, {
-        description: `Registered for ${APP_CONFIG.CURRENT_SPORT_DAY}`
+        description: `Registered for ${currentDay}`
       });
       
       router.push('/admin/dashboard/register');
@@ -121,11 +128,11 @@ export default function PlayerVerificationPage({ params }) {
     } catch (error) {
       console.error('Error registering player:', error);
       
-      if (error.message.includes('already registered')) {
-        toast.error('Player is already registered for this day');
+      if (/already (registered|checked in)/i.test(error.message)) {
+        toast.error('Player is already checked in for this day');
         setIsAlreadyRegistered(true);
       } else {
-        toast.error('Failed to register player');
+        toast.error(error.message || 'Failed to check the player in');
       }
     } finally {
       setRegistering(false);
@@ -217,7 +224,7 @@ export default function PlayerVerificationPage({ params }) {
                   <h2 className="text-3xl font-bold text-white mb-1">Player Verification</h2>
                   <div className="flex items-center gap-2 text-gray-400">
                     <Calendar className="h-4 w-4" />
-                    <span className="text-sm">Sport Day: {APP_CONFIG.CURRENT_SPORT_DAY}</span>
+                    <span className="text-sm">Sport Day: {currentDay}</span>
                   </div>
                 </div>
                 
@@ -284,6 +291,16 @@ export default function PlayerVerificationPage({ params }) {
                     </p>
                   </div>
                 )}
+                {/* Bib number (track events, swimming, road race): fixed once assigned */}
+                {bibNumber && (
+                  <div className="bg-cranberry/10 border border-cranberry/40 rounded-lg p-4">
+                    <div className="flex items-center text-gray-300 text-sm mb-2">
+                      <Trophy className="h-4 w-4 mr-2" />
+                      <span>Bib Number</span>
+                    </div>
+                    <p className="text-white text-3xl font-mono font-bold tracking-widest">{bibNumber}</p>
+                  </div>
+                )}
                 {/* Club Name */}
                 <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                   <div className="flex items-center text-gray-400 text-sm mb-2">
@@ -324,7 +341,7 @@ export default function PlayerVerificationPage({ params }) {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white">Registered Sports</h3>
-                    <p className="text-gray-400 text-sm">For {APP_CONFIG.CURRENT_SPORT_DAY}</p>
+                    <p className="text-gray-400 text-sm">For {currentDay}</p>
                   </div>
                 </div>
               </div>
@@ -376,7 +393,7 @@ export default function PlayerVerificationPage({ params }) {
               <div className="flex items-center gap-3 text-yellow-400">
                 <AlertCircle className="h-5 w-5" />
                 <p className="text-sm">
-                  No sports registered for {APP_CONFIG.CURRENT_SPORT_DAY}
+                  No sports registered for {currentDay}
                 </p>
               </div>
             </Card>
@@ -431,7 +448,7 @@ export default function PlayerVerificationPage({ params }) {
           {/* Info Text */}
           {!isAlreadyRegistered && (
             <p className="text-center text-gray-500 text-sm">
-              This will register <span className="text-white font-semibold">{player.name}</span> for <span className="text-cranberry font-semibold">{APP_CONFIG.CURRENT_SPORT_DAY}</span>
+              This will register <span className="text-white font-semibold">{player.name}</span> for <span className="text-cranberry font-semibold">{currentDay}</span>
             </p>
           )}
         </div>

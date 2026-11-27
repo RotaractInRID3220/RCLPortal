@@ -1,39 +1,15 @@
-import { NextResponse } from "next/server";
+import { z } from 'zod'
+import { requireUser } from '@/server/auth/guards'
+import { ok, parseQuery } from '@/server/http.mjs'
+import { searchAdminMembers } from '@/server/auth/permissions-admin.mjs'
 
+// Find RMIS members with an admin access role (for the permissions screen). Reads the local
+// rmis_members mirror, not the old external SQL endpoint.
 export async function GET(request) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const name = searchParams.get("name");
-
-        if (!name || name.length < 3) {
-            return NextResponse.json({ error: "Name must be at least 3 characters" }, { status: 400 });
-        }
-
-        const sql = 'SELECT membership_id as RMIS_ID, card_name, role_id FROM club_membership_data WHERE role_id IN (1,2,3,4) AND card_name LIKE ?';
-
-        const res = await fetch('https://info.rotaract3220.org/api/query', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': process.env.NEXT_PUBLIC_DBMID_API_KEY,
-            },
-            body: JSON.stringify({
-                sql,
-                params: [`%${name}%`],
-            }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-            throw new Error(data.error || 'API Error');
-        }
-
-        const users = data.results || [];
-
-        return NextResponse.json({ users }, { status: 200 });
-
-    } catch (error) {
-        console.error('Error searching users:', error);
-        return NextResponse.json({ error: 'Failed to search users' }, { status: 500 });
-    }
+  const auth = await requireUser({ admin: true, permission: 'administrator' })
+  if (!auth.ok) return auth.response
+  const q = parseQuery(request, { name: z.string().trim().min(3).max(80) })
+  if (!q.ok) return q.response
+  const users = await searchAdminMembers(q.data.name)
+  return ok(users, { users })
 }

@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from 'sonner'
 import { UserMinus, Users, AlertTriangle, Search, RefreshCw } from 'lucide-react'
 import { getPlayersByClub } from '@/services/playerService'
-import { APP_CONFIG } from '@/config/app.config'
+import { useEventInfo } from '@/hooks/useEventInfo'
 import { useDebounce } from '@/hooks/useDebounce'
 
 const PlayersPage = () => {
@@ -32,11 +32,18 @@ const PlayersPage = () => {
   const hasConvertedPlayers = allPlayers.some(player => player.converted)
 
   // Check if registration deadline has passed
-  const isAfterDeadline = useMemo(() => {
-    const currentDate = new Date();
-    const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
-    return currentDate > deadlineDate;
+  const eventInfo = useEventInfo();
+  // The share clubs should reach comes from the penalty tiers (a super-admin setting), not a constant
+  const [penaltyTarget, setPenaltyTarget] = useState(null);
+  useEffect(() => {
+    fetch('/api/portal/registration-status').then((r) => r.json())
+      .then((b) => { if (b?.success) setPenaltyTarget(b.data.penaltyTarget) })
+      .catch((e) => console.error('Could not load the membership target:', e));
   }, []);
+  const isAfterDeadline = useMemo(() => {
+    // no generic deadline set = no deadline
+    return eventInfo?.registrationCloseAt ? new Date() > new Date(eventInfo.registrationCloseAt) : false;
+  }, [eventInfo]);
 
   useEffect(() => {
     if (userDetails?.club_id && !hasLoadedData && !dataLoading) {
@@ -78,10 +85,10 @@ const PlayersPage = () => {
 
       if (response.ok) {
         const result = await response.json()
-        toast.success(`Successfully removed ${result.deletedCount} players without registrations`)
+        toast.success(`Successfully removed ${result.data?.removed ?? result.deletedCount ?? 0} players without registrations`)
 
         // Refresh players data
-        setHasLoadedData(false)
+        fetchPlayers()
         setCurrentPage(1)
       } else {
         const error = await response.json()
@@ -114,17 +121,21 @@ const PlayersPage = () => {
       if (response.ok) {
         const result = await response.json()
         
-        if (result.updatedCount > 0) {
-          toast.success(result.message, {
-            description: result.updates.map(u => 
-              `${u.RMIS_ID}: ${u.oldStatus} → ${u.newStatus}`
+        const changes = result.data?.changes ?? []
+        const label = (s) => (s === 1 ? 'General' : s === 5 ? 'Prospective' : 'Unknown')
+        if (changes.length > 0) {
+          toast.success(`${changes.length} player(s) updated from RMIS`, {
+            description: changes.map(u =>
+              u.new_status !== u.old_status
+                ? `${u.name}: ${label(u.old_status)} → ${label(u.new_status)}`
+                : `${u.name}: details updated`
             ).join('\n')
           })
           
           // Refresh players data
-          setHasLoadedData(false)
+          fetchPlayers()
         } else {
-          toast.info(result.message)
+          toast.info('Everyone is already up to date with RMIS')
         }
       } else {
         const error = await response.json()
@@ -144,7 +155,7 @@ const PlayersPage = () => {
 
     return allPlayers.filter(player =>
       player.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-      player.RMIS_ID?.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+      String(player.membership_id ?? player.member_id ?? '').toLowerCase().includes(debouncedSearchTerm.toLowerCase())
     )
   }, [allPlayers, debouncedSearchTerm])
 
@@ -161,7 +172,7 @@ const PlayersPage = () => {
   const generalMembers = allPlayers.filter(player => player.status === 1).length
   const totalMembers = allPlayers.length
   const generalPercentage = totalMembers > 0 ? (generalMembers / totalMembers) * 100 : 0
-  const showWarning = generalPercentage < APP_CONFIG.GENERAL_MEMBER_WARNING_THRESHOLD && totalMembers > 0
+  const showWarning = penaltyTarget != null && generalPercentage < penaltyTarget && totalMembers > 0
 
   // Reset to first page when search changes
   useEffect(() => {
@@ -225,7 +236,7 @@ const PlayersPage = () => {
     )
   }, [totalPages, currentPage])
 
-  if (dataLoading || loading) {
+  if ((dataLoading && !hasLoadedData) || loading) {
     return (
       <div className="flex justify-center items-center mt-40">
         <img src="/load.svg" alt="" className="w-20" />
@@ -314,7 +325,7 @@ const PlayersPage = () => {
             <div className="font-medium">Low general membership ratio</div>
             <div className="text-sm text-yellow-200/80">
               Only {generalPercentage.toFixed(1)}% of your players are general members ({generalMembers}/{totalMembers}).
-              Consider registering more general members to meet the {APP_CONFIG.GENERAL_MEMBER_WARNING_THRESHOLD}% threshold.
+              Consider registering more general members to meet the {penaltyTarget}% threshold.
             </div>
           </div>
         </div>
@@ -404,12 +415,12 @@ const PlayersPage = () => {
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {paginatedPlayers.map((player) => (
-                    <tr key={player.RMIS_ID} className={`hover:bg-white/5 ${player.converted ? 'bg-red-500/20 border-l-2 border-red-500' : ''}`}>
+                    <tr key={player.member_id} className={`hover:bg-white/5 ${player.converted ? 'bg-red-500/20 border-l-2 border-red-500' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                         {player.name || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white/70">
-                        {player.RMIS_ID || 'N/A'}
+                        {player.membership_id || player.member_id || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge className={`border ${
@@ -421,6 +432,15 @@ const PlayersPage = () => {
                         }`}>
                           {player.status === 1 ? 'General' : player.status === 5 ? 'Prospective' : 'Unknown'}
                         </Badge>
+                        {player.flag === 'not_active_in_rmis' && (
+                          <Badge className="ml-2 border bg-red-500/20 text-red-200 border-red-400">Not active in RMIS</Badge>
+                        )}
+                        {player.flag === 'transferred_after_cutoff' && (
+                          <Badge className="ml-2 border bg-red-500/20 text-red-200 border-red-400">Transfer after cutoff</Badge>
+                        )}
+                        {player.flag === 'club_changed_in_rmis' && (
+                          <Badge className="ml-2 border bg-yellow-500/20 text-yellow-200 border-yellow-400">Club changed in RMIS</Badge>
+                        )}
                       </td>
                     </tr>
                   ))}

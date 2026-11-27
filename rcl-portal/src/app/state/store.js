@@ -64,9 +64,7 @@ export const bracketErrorAtom = atom(null);
 export const selectedSportAtom = atom(4); // Default sport ID
 
 // Clubs atoms (keeping for backward compatibility)
-export const clubsAtom = atom([]);
 export const clubMembersAtom = atom([]);
-export const clubsLoadingAtom = atom(false);
 
 // Admin Dashboard atoms with enhanced caching
 export const adminDashboardDataAtom = atomWithStorage('adminDashboardData', {
@@ -108,19 +106,8 @@ export const pendingRequestsAtom = atom(
 export const adminStatsLoadingAtom = atom(false);
 export const adminStatsErrorAtom = atom(null);
 export const adminLeaderboardLoadingAtom = atom(false);
-export const clubsErrorAtom = atom(null);
 
-// Leaderboard data atoms with caching
-export const leaderboardDataAtom = atomWithStorage('leaderboardData', {
-  community: [],
-  institute: []
-});
-export const leaderboardLoadingAtom = atom(false);
-export const leaderboardErrorAtom = atom(null);
-
-// Club points cache atoms
-export const clubPointsDataAtom = atomWithStorage('clubPointsData', {});
-export const clubPointsLoadingAtom = atom(false);
+// (Leaderboard data is live: fetched with ETag revalidation by useLivePoll, never cached in the browser.)
 
 // Portal Dashboard atoms with enhanced caching
 export const portalDashboardDataAtom = atomWithStorage('portalDashboardData', {
@@ -170,9 +157,6 @@ export function useResetAllAtoms() {
   const setMatches = useSetAtom(matchesAtom);
   const setMatchesLoading = useSetAtom(matchesLoadingAtom);
   const setMatchesError = useSetAtom(matchesErrorAtom);
-  const setClubs = useSetAtom(clubsAtom);
-  const setClubsLoading = useSetAtom(clubsLoadingAtom);
-  const setClubsError = useSetAtom(clubsErrorAtom);
   const setBracketData = useSetAtom(bracketDataAtom);
   const setBracketLoading = useSetAtom(bracketLoadingAtom);
   const setBracketError = useSetAtom(bracketErrorAtom);
@@ -187,9 +171,6 @@ export function useResetAllAtoms() {
     setMatches([]);
     setMatchesLoading(false);
     setMatchesError(null);
-    setClubs([]);
-    setClubsLoading(false);
-    setClubsError(null);
     setBracketData([]);
     setBracketLoading(false);
     setBracketError(null);

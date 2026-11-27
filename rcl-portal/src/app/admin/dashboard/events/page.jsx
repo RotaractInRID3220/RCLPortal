@@ -22,9 +22,10 @@ import { toast } from 'sonner';
 import { useAtom } from 'jotai';
 import { sportsDataAtom, sportsLoadingAtom } from '@/app/state/store';
 import PrivateRoute from '@/lib/PrivateRoute';
-import { SPORT_DAYS } from '@/config/app.config';
+import { useSportDays } from '@/hooks/useEventInfo';
 
 const page = () => {
+    const { days: eventDays } = useSportDays();
     const[addEvent, setAddEvent] = useState(false);
     const [open, setOpen] = useState(false)
 
@@ -193,7 +194,7 @@ const page = () => {
                                     <SelectValue placeholder="Event Day" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {Object.values(SPORT_DAYS).map((day) => (
+                                    {eventDays.map((day) => (
                                         <SelectItem key={day.value} value={day.value}>
                                             {day.label}
                                         </SelectItem>
@@ -328,7 +329,7 @@ const page = () => {
                                         {sportsData
                                             .filter(event => event.category === 'institute')
                                             .map((event, index) => (
-                                                <div key={event.id || index} className="bg-white/5 rounded-lg py-5 px-5 hover:bg-white/10 cursor-pointer border-l-3 border-blue-500">
+                                                <div key={event.id || index} className="bg-white/5 rounded-lg py-5 px-5 border border-white/10 hover:bg-white/10 hover:border-blue-500/60 cursor-pointer transition-colors">
                                                     <div className='justify-between flex'>
                                                         <h1 className="text-xl">{event.sport_name}</h1>
                                                         <p className="bg-cranberry/10 border border-cranberry px-4 py-1 rounded-full text-sm text-cranberry">{event.sport_day}</p>
@@ -359,7 +360,7 @@ const page = () => {
                                         {sportsData
                                             .filter(event => event.category === 'community')
                                             .map((event, index) => (
-                                                <div key={event.id || index} className="bg-white/5 rounded-lg py-5 px-5 hover:bg-white/10 cursor-pointer border-l-3 border-green-500">
+                                                <div key={event.id || index} className="bg-white/5 rounded-lg py-5 px-5 border border-white/10 hover:bg-white/10 hover:border-green-500/60 cursor-pointer transition-colors">
                                                     <div className='justify-between flex'>
                                                         <h1 className="text-xl">{event.sport_name}</h1>
                                                         <p className="bg-cranberry/10 border border-cranberry px-4 py-1 rounded-full text-sm text-cranberry">{event.sport_day}</p>

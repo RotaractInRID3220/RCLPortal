@@ -7,9 +7,10 @@ import { useAtom, useSetAtom } from 'jotai'
 import { loadingAtom, userDeetsAtom } from '@/app/state/store'
 import { toast } from 'sonner'
 import { signIn, useSession } from 'next-auth/react'
+import { loginErrorMessage } from '@/lib/loginErrors'
 
 const adminLogin = () => {
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -33,7 +34,7 @@ const adminLogin = () => {
 
     const handleLogin = async () => {
       setError(null);
-      if (!email || !password) {
+      if (!username || !password) {
         toast.error('Username and password are required');
         return;
       }
@@ -42,7 +43,7 @@ const adminLogin = () => {
         
         // Use NextAuth signIn directly
         const result = await signIn('admin-credentials', {
-          email,
+          username: username.trim().toLowerCase(),
           password,
           loginType: 'admin',
           redirect: false
@@ -51,11 +52,8 @@ const adminLogin = () => {
         if (result?.ok) {
           toast.success('Login successful');
           router.push('/admin/dashboard');
-        } else if (result?.error === 'CredentialsSignin') {
-          // Generic NextAuth error - provide helpful message
-          toast.error('Invalid credentials or insufficient permissions for admin access');
         } else {
-          toast.error(result?.error || 'Login failed');
+          toast.error(loginErrorMessage(result?.error));
         }
       } catch (e) {
         console.error('Login error:', e);
@@ -72,7 +70,7 @@ const adminLogin = () => {
       <div className='md:w-1/4 w-5/6 h-96 bg-cranberry border border-cranberry fixed top-0 bottom-0 left-0 right-0 m-auto rounded-3xl flex flex-col items-center justify-center py-5'>
           <img src="/LogoWhite.png" alt="" className="w-2/4"/>
           <div className='w-5/6 mt-10'>
-              <Input type='email' placeholder='Username' value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className='w-full h-12'/>
+              <Input type='text' autoComplete='username' autoCapitalize='none' placeholder='RMIS username' value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className='w-full h-12'/>
               <Input type='password' placeholder='Password' value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className='w-full mt-5 h-12'/>
               {error && <p className='text-red-500 text-sm mt-2'>{error}</p>}
           </div>

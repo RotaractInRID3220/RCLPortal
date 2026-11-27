@@ -70,7 +70,7 @@ export default function LeaderboardPreview({ leaderboardData = [], onCategoryCha
           ))
         ) : (
           displayData.slice(0, 5).map((club, index) => {
-            const rank = index + 1;
+            const rank = club.rank ?? index + 1; // ties share a rank (server-computed)
             return (
               <div
                 key={club.club_id || index}

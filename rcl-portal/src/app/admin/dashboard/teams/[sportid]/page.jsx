@@ -106,7 +106,7 @@ const SportTeamsPage = ({ params }) => {
     setShowPlayerDetails(showPlayerDetails === teamId ? null : teamId)
   }
 
-  if (loading) {
+  if (loading && !sportName) {
     return (
       <div className="flex justify-center items-center py-12">
         <img src="/load.svg" alt="Loading" className="w-20" />
@@ -295,7 +295,7 @@ const SportTeamsPage = ({ params }) => {
                             return 0;
                           })
                           .map((reg, index) => (
-                          <div key={reg.RMIS_ID} className="flex items-center justify-between py-2 px-3 bg-white/5 rounded-lg">
+                          <div key={reg.member_id} className="flex items-center justify-between py-2 px-3 bg-white/5 rounded-lg">
                             <div className="flex items-center space-x-3">
                               <span className="text-xs text-white/50 w-6">
                                 {index + 1}.
@@ -315,7 +315,7 @@ const SportTeamsPage = ({ params }) => {
                               </Badge>
                             </div>
                             <span className="text-xs text-white/50">
-                              ID: {reg.RMIS_ID}
+                              ID: {reg.players.membership_id || reg.member_id}
                             </span>
                           </div>
                         ))

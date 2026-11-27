@@ -89,7 +89,7 @@ const AdminReplacementsPage = () => {
   }
 
   const getStatusBadge = (status, approvedBy = null) => {
-    if (status === true) {
+    if (status === 1) {
       return (
         <div className="flex items-center gap-2">
           <Badge className="bg-green-500/10 text-green-500 border-green-500">
@@ -99,7 +99,7 @@ const AdminReplacementsPage = () => {
           {approvedBy && <span className="text-xs text-white/50">by: {approvedBy}</span>}
         </div>
       )
-    } else if (status === false) {
+    } else if (status === 2) {
       return (
         <div className="flex items-center gap-2">
           <Badge className="bg-red-500/10 text-red-500 border-red-500">
@@ -273,9 +273,9 @@ const AdminReplacementsPage = () => {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-white/60">
                           <User className="w-3.5 h-3.5" />
-                          <span className="truncate">{request.original_player?.name || request.original_player?.RMIS_ID}</span>
+                          <span className="truncate">{request.original_player?.name || (request.original_player?.membership_id || request.original_player?.member_id)}</span>
                           <ArrowRight className="w-3.5 h-3.5 text-cranberry" />
-                          <span className="truncate">{request.replacement_player?.name || request.replacement_player?.RMIS_ID}</span>
+                          <span className="truncate">{request.replacement_player?.name || (request.replacement_player?.membership_id || request.replacement_player?.member_id)}</span>
                         </div>
                       </div>
                     </div>

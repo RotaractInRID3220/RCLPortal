@@ -23,17 +23,19 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Search, Download, Hash, Smartphone, CalendarCheck, Users, Check, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import PrivateRoute from '@/lib/PrivateRoute';
-import { SPORT_DAYS } from '@/config/app.config';
+import { useSportDays } from '@/hooks/useEventInfo';
 import useDebounce from '@/hooks/useDebounce';
+import BibNumbersPanel from './BibNumbersPanel';
 import { Badge } from '@/components/ui/badge';
 
-export default function PlayerNumbersPage() {
+function DayNumbers() {
   const router = useRouter();
   const [players, setPlayers] = useState([]);
   const [allPlayers, setAllPlayers] = useState([]); // Store all data for client-side filtering
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [activeDay, setActiveDay] = useState(SPORT_DAYS.E_SPORT.value);
+  const { days: sportDayTabs, currentDay, loading: daysLoading } = useSportDays();
+  const [activeDay, setActiveDay] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
@@ -44,11 +46,11 @@ export default function PlayerNumbersPage() {
   const itemsPerPage = 10;
   const debouncedSearch = useDebounce(searchTerm, 300);
 
-  // Sport day tabs configuration from SPORT_DAYS
-  const sportDayTabs = Object.values(SPORT_DAYS).map(day => ({
-    value: day.value,
-    label: day.label
-  }));
+  // start on the check-in day (or the first day) once the days are known
+  useEffect(() => {
+    if (activeDay || !sportDayTabs.length) return;
+    setActiveDay(currentDay && sportDayTabs.some((d) => d.value === currentDay) ? currentDay : sportDayTabs[0].value);
+  }, [activeDay, sportDayTabs, currentDay]);
 
   // Fetches all player numbers for a sport day (no search/pagination)
   const fetchAllPlayerNumbers = useCallback(async (sportDay) => {
@@ -89,8 +91,9 @@ export default function PlayerNumbersPage() {
       const searchLower = search.trim().toLowerCase();
       filteredData = data.filter(player =>
         player.playerName.toLowerCase().includes(searchLower) ||
-        player.rmisId.toLowerCase().includes(searchLower) ||
+        String(player.rmisId).toLowerCase().includes(searchLower) ||
         player.clubName.toLowerCase().includes(searchLower) ||
+        (player.bib || '').includes(searchLower) ||
         player.playerNumber.toLowerCase().includes(searchLower)
       );
     }
@@ -136,7 +139,7 @@ export default function PlayerNumbersPage() {
   }, []);
 
   useEffect(() => {
-    fetchAllPlayerNumbers(activeDay);
+    if (activeDay) fetchAllPlayerNumbers(activeDay);
     setCurrentPage(1);
     setSearchTerm('');
   }, [activeDay, fetchAllPlayerNumbers]);
@@ -179,9 +182,9 @@ export default function PlayerNumbersPage() {
       }
 
       // Create CSV content from allPlayers (already sorted)
-      const headers = ['Player Number', 'RMIS ID', 'Name', 'Club Name', 'Sport', 'Checked In'];
+      const headers = ['Bib Number', 'RMIS ID', 'Name', 'Club Name', 'Sport', 'Checked In'];
       const rows = allPlayers.map(player => [
-        player.playerNumber,
+        player.bib || '',
         player.rmisId,
         player.playerName,
         player.clubName,
@@ -325,7 +328,7 @@ export default function PlayerNumbersPage() {
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" />
                 <Input
-                  placeholder="Search by player number, name, RMIS ID, or club..."
+                  placeholder="Search by bib number, name, RMIS ID, or club..."
                   value={searchTerm}
                   onChange={handleSearch}
                   className="pl-10 w-64 bg-white/5 border-white/10 text-white placeholder:text-white/40"
@@ -348,7 +351,7 @@ export default function PlayerNumbersPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                          <TableHead className="text-white/60 w-[140px]">Player Number</TableHead>
+                          <TableHead className="text-white/60 w-[140px]">Bib Number</TableHead>
                           <TableHead className="text-white/60">RMIS ID</TableHead>
                           <TableHead className="text-white/60">Name</TableHead>
                           <TableHead className="text-white/60">Club Name</TableHead>
@@ -363,7 +366,7 @@ export default function PlayerNumbersPage() {
                             className="border-white/5 hover:bg-white/5"
                           >
                             <TableCell className="font-mono font-semibold text-cranberry">
-                              {player.playerNumber}
+                              {player.bib || <span className="text-white/30 font-sans font-normal">-</span>}
                             </TableCell>
                             <TableCell className="text-white/80">
                               {player.rmisId}
@@ -493,6 +496,28 @@ export default function PlayerNumbersPage() {
           </CardContent>
         </Card>
       </div>
+    </PrivateRoute>
+  );
+}
+
+
+// Two views: the per-day player numbers (as before) and the bib numbers (track events, swimming, road race).
+export default function PlayerNumbersPage() {
+  const [view, setView] = useState('days');
+  return (
+    <PrivateRoute requiredPermission="admin" accessType="admin">
+      <div className="mb-6 inline-flex rounded-lg border border-white/10 bg-white/5 p-1">
+        {[['days', 'Day numbers'], ['bibs', 'Bib numbers']].map(([v, label]) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`cursor-pointer rounded-md px-4 py-1.5 text-sm transition-colors ${view === v ? 'bg-cranberry text-white' : 'text-white/70 hover:text-white'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {view === 'days' ? <DayNumbers /> : <BibNumbersPanel />}
     </PrivateRoute>
   );
 }

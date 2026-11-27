@@ -10,14 +10,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { toast } from 'sonner';
 import { Search, Award, Trophy, Users, CheckCircle2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import PrivateRoute from '@/lib/PrivateRoute';
-import { APP_CONFIG, SPORT_DAYS } from '@/config/app.config';
 
 const ParticipationPointsPage = () => {
   const [participationData, setParticipationData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [awardingPoints, setAwardingPoints] = useState(false);
-  const [selectedSportDay] = useState(APP_CONFIG.CURRENT_SPORT_DAY);
+  // The day, the points per sport and the attendance ratio come from the server (settings, event days)
+  const [selectedSportDay, setSelectedSportDay] = useState(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('day') || '' : '');
+  const [meta, setMeta] = useState({ days: [], pointsPerSport: 0, minAttendanceRatio: 0.5, dayLabel: '' });
   const [awardSummary, setAwardSummary] = useState(null);
   
   // Pagination state
@@ -25,17 +26,22 @@ const ParticipationPointsPage = () => {
   const itemsPerPage = 10;
 
   // Get sport day label
-  const sportDayLabel = Object.values(SPORT_DAYS).find(day => day.value === selectedSportDay)?.label || selectedSportDay;
+  const sportDayLabel = meta.dayLabel || selectedSportDay;
+  const pointsPerSport = meta.pointsPerSport;
 
   // Fetch participation data
-  const fetchParticipationData = async () => {
+  const fetchParticipationData = async (silent = false) => {
     try {
-      setLoading(true);
-      const response = await fetch(`/api/admin/participation-points?sportDay=${selectedSportDay}`);
+      if (!silent) setLoading(true);
+      const response = await fetch(`/api/admin/participation-points${selectedSportDay ? `?sportDay=${encodeURIComponent(selectedSportDay)}` : ''}`);
       const result = await response.json();
 
       if (response.ok) {
         setParticipationData(result.data || []);
+        if (result.meta) {
+          setMeta(result.meta);
+          if (!selectedSportDay) setSelectedSportDay(result.meta.sportDay);
+        }
       } else {
         throw new Error(result.error);
       }
@@ -66,7 +72,7 @@ const ParticipationPointsPage = () => {
         setAwardSummary(result.summary);
         toast.success(result.message);
         // Refresh data after awarding points
-        fetchParticipationData();
+        fetchParticipationData(true);
       } else {
         throw new Error(result.error);
       }
@@ -118,6 +124,9 @@ const ParticipationPointsPage = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-semibold tracking-wide text-white">PARTICIPATION POINTS</h1>
+          <select value={selectedSportDay} onChange={(e) => { setLoading(true); setSelectedSportDay(e.target.value); }} className="mt-3 h-9 rounded-md bg-black/30 border border-white/20 text-white px-3">
+            {meta.days.map((d) => <option key={d.day_code} value={d.day_code}>{d.label} ({d.day_code})</option>)}
+          </select>
           <p className="text-white/70 mt-2">Award points to clubs based on player attendance - {sportDayLabel}</p>
         </div>
 
@@ -146,7 +155,7 @@ const ParticipationPointsPage = () => {
               <CardContent className="p-4">
                 <div className="text-center">
                   <p className="text-white/70 text-sm">Points Per Sport</p>
-                  <p className="text-yellow-500 text-2xl font-bold">{APP_CONFIG.PARTICIPATION_POINTS_PER_SPORT}</p>
+                  <p className="text-yellow-500 text-2xl font-bold">{pointsPerSport}</p>
                 </div>
               </CardContent>
             </Card>
@@ -181,14 +190,14 @@ const ParticipationPointsPage = () => {
               <AlertDialogHeader>
                 <AlertDialogTitle className="text-white">Confirm Award Participation Points</AlertDialogTitle>
                 <AlertDialogDescription className="text-gray-300">
-                  <span>This will award <span className="text-cranberry font-semibold">{APP_CONFIG.PARTICIPATION_POINTS_PER_SPORT} points</span> per eligible sport to clubs for <span className="text-white font-semibold">{sportDayLabel}</span>.</span>
+                  <span>This will award <span className="text-cranberry font-semibold">{pointsPerSport} points</span> per eligible sport to clubs for <span className="text-white font-semibold">{sportDayLabel}</span>.</span>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <div className="px-6 pb-4">
                 <strong className="text-white">Eligibility Criteria:</strong>
                 <ul className="list-disc list-inside text-sm mt-2 space-y-1 text-gray-300">
-                  <li>Club must have ≥50% of registered players attend on the day</li>
-                  <li>Points will NOT be awarded if already awarded for this day</li>
+                  <li>Club must have at least {Math.round(meta.minAttendanceRatio * 100)}% of its registered players (main and reserve) checked in on the day</li>
+                  <li>Safe to repeat: only sports that have no participation points yet are awarded</li>
                   <li>Total eligible clubs: <span className="text-green-400">{eligibleClubs}</span></li>
                   <li>Total eligible sports: <span className="text-blue-400">{totalEligibleSports}</span></li>
                 </ul>
@@ -283,7 +292,7 @@ const ParticipationPointsPage = () => {
                           <td className="p-4 text-white/70">{globalIndex}</td>
                           <td className="p-4 text-white font-medium">
                             <Link
-                              href={`/admin/dashboard/participation-points/${club.club_id}`}
+                              href={`/admin/dashboard/participation-points/${club.club_id}?day=${encodeURIComponent(selectedSportDay)}`}
                               className="hover:text-blue-400 transition-colors underline decoration-transparent hover:decoration-current"
                             >
                               {club.club_name}
@@ -299,7 +308,7 @@ const ParticipationPointsPage = () => {
                           </td>
                           <td className="p-4 text-center">
                             <span className={`font-semibold ${club.eligible_sports_count > 0 ? 'text-yellow-400' : 'text-white/50'}`}>
-                              {club.eligible_sports_count * APP_CONFIG.PARTICIPATION_POINTS_PER_SPORT}
+                              {club.pending_sports_count * pointsPerSport}
                             </span>
                           </td>
                           <td className="p-4 text-center">

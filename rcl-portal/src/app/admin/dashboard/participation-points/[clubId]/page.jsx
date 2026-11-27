@@ -7,23 +7,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Users, Trophy, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import PrivateRoute from '@/lib/PrivateRoute';
-import { APP_CONFIG, SPORT_DAYS } from '@/config/app.config';
 
 const ClubParticipationDetailsPage = () => {
   const params = useParams();
   const router = useRouter();
   const [clubData, setClubData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSportDay] = useState(APP_CONFIG.CURRENT_SPORT_DAY);
+  const [selectedSportDay] = useState(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('day') || '' : '');
 
   // Get sport day label
-  const sportDayLabel = Object.values(SPORT_DAYS).find(day => day.value === selectedSportDay)?.label || selectedSportDay;
+  const sportDayLabel = clubData?.summary?.sport_day || selectedSportDay;
 
   // Fetch club participation details
   const fetchClubDetails = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/admin/participation-points/${params.clubId}?sportDay=${selectedSportDay}`);
+      const response = await fetch(`/api/admin/participation-points/${params.clubId}${selectedSportDay ? `?sportDay=${encodeURIComponent(selectedSportDay)}` : ''}`);
       const result = await response.json();
 
       if (response.ok) {
@@ -185,7 +184,7 @@ const ClubParticipationDetailsPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {sport.players.map((player) => (
                       <div
-                        key={player.RMIS_ID}
+                        key={player.member_id}
                         className={`p-3 rounded border transition-colors ${
                           player.day_registered
                             ? 'border-green-400 bg-green-400/5'
@@ -202,7 +201,7 @@ const ClubParticipationDetailsPage = () => {
                             <XCircle className="w-4 h-4 text-gray-400" />
                           )}
                         </div>
-                        <p className="text-white/60 text-xs mt-1">{player.RMIS_ID}</p>
+                        <p className="text-white/60 text-xs mt-1">{player.membership_id || player.member_id}</p>
                       </div>
                     ))}
                   </div>

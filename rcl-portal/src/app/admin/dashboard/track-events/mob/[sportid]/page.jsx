@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
-import { awardTrackPoints, getTrackEntries, syncTrackEvents, updateTrackEntry } from '@/services/trackEventsService'
+import { awardTrackPoints, getTrackEntries, syncTrackEvents, saveTrackResults } from '@/services/trackEventsService'
 import { ArrowLeft } from 'lucide-react'
 
 const reorder = (list, fromIndex, toIndex) => {
@@ -28,9 +28,9 @@ const TrackEventMobileDetail = () => {
   const [awarding, setAwarding] = useState(false)
   const [savingAll, setSavingAll] = useState(false)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       const result = await getTrackEntries(sportId)
       setSport(result.sport)
       setEntries(result.entries || [])
@@ -51,7 +51,7 @@ const TrackEventMobileDetail = () => {
       setSyncing(true)
       const result = await syncTrackEvents(Number(sportId))
       toast.success(`Synced ${result.inserted || 0} entries`)
-      await fetchData()
+      await fetchData(true)
     } catch (error) {
       // toast handled in service
     } finally {
@@ -60,20 +60,27 @@ const TrackEventMobileDetail = () => {
   }
 
   const handleSaveAll = async () => {
-    const payload = entries
-      .filter((entry) => entry.id)
-      .map((entry, idx) => ({ id: entry.id, score: entry.score ?? '', place: idx + 1 }))
+    // positions follow the on-screen order, but only entries that have a time get one
+    let rank = 0
+    const payload = entries.map((entry) => {
+      const scored = String(entry.score ?? '').trim() !== ''
+      return {
+        ...(entry.team_id ? { team_id: entry.team_id } : { member_id: entry.member_id }),
+        score: scored ? String(entry.score).trim() : null,
+        place: scored ? ++rank : null,
+      }
+    })
 
     if (!payload.length) {
-      toast.error('Nothing to save. Sync first?')
+      toast.error('Nothing to save.')
       return
     }
 
     try {
       setSavingAll(true)
-      await Promise.all(payload.map((row) => updateTrackEntry(row)))
-      setEntries((prev) => prev.map((entry, idx) => ({ ...entry, place: idx + 1 })))
-      toast.success('Rankings saved')
+      await saveTrackResults(sportId, payload)
+      toast.success('Rankings saved. Use Award Points to update the club points.')
+      await fetchData(true)
     } catch (error) {
       // toast handled in service
     } finally {
@@ -85,7 +92,7 @@ const TrackEventMobileDetail = () => {
     try {
       setAwarding(true)
       const result = await awardTrackPoints(Number(sportId))
-      toast.success(`Awarded points to ${result.updated || 0} club(s)`) 
+      toast.success(`Awarded points to ${result.updated || 0} club(s)`)
     } catch (error) {
       // toast handled in service
     } finally {
@@ -112,7 +119,7 @@ const TrackEventMobileDetail = () => {
     <div className="space-y-3">
       {entries.map((entry, index) => (
         <div
-          key={entry.id || entry.rmis_id}
+          key={entry.member_id}
           className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3"
           draggable
           onDragStart={onDragStart(index)}
@@ -122,13 +129,13 @@ const TrackEventMobileDetail = () => {
           <div>
             <p className="font-semibold text-white">#{index + 1} • {entry.name}</p>
             <p className="text-sm text-white/70">{entry.club_name}</p>
-            <p className="text-xs text-white/60">{entry.rmis_id}</p>
+            <p className="text-xs text-white/60">{entry.member_id}</p>
           </div>
           <div className="space-y-2">
             <Input
               value={entry.score ?? ''}
               placeholder="Score / Time"
-              onChange={(e) => setEntries((prev) => prev.map((row) => (row.id === entry.id ? { ...row, score: e.target.value } : row)))}
+              onChange={(e) => setEntries((prev) => prev.map((row) => (row.member_id === entry.member_id ? { ...row, score: e.target.value } : row)))}
               className="bg-white/10 border-white/20 text-white"
             />
             <p className="text-xs text-white/60 text-right">Drag to reorder</p>
@@ -167,9 +174,9 @@ const TrackEventMobileDetail = () => {
           {entry.players?.length ? (
             <div className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
               {entry.players.map((player) => (
-                <div key={player.rmis_id} className="flex justify-between text-sm text-white/80">
+                <div key={player.member_id} className="flex justify-between text-sm text-white/80">
                   <span>{player.name}</span>
-                  <span className="text-white/60">{player.rmis_id}</span>
+                  <span className="text-white/60">{player.member_id}</span>
                 </div>
               ))}
             </div>
@@ -248,7 +255,7 @@ const TrackEventMobileDetail = () => {
               <h4 className="text-sm text-white/70">Reserves</h4>
               <div className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-2">
                 {reserves.map((res) => (
-                  <div key={res.rmis_id} className="flex justify-between text-sm text-white/80">
+                  <div key={res.member_id} className="flex justify-between text-sm text-white/80">
                     <span>{res.name}</span>
                     <span className="text-white/60">{res.club_name}</span>
                   </div>

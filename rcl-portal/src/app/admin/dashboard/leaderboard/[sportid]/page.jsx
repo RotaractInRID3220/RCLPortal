@@ -17,6 +17,7 @@ const TournamentLeaderboardPage = () => {
   const [sportsData, setSportsData] = useAtom(sportsDataAtom)
   const [selectedSport, setSelectedSport] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [standingsLoaded, setStandingsLoaded] = useState(false)
   const [standings, setStandings] = useState([])
   const [isAwardDialogOpen, setIsAwardDialogOpen] = useState(false)
   const [isAwarding, setIsAwarding] = useState(false)
@@ -70,7 +71,7 @@ const TournamentLeaderboardPage = () => {
       if (response.ok) {
         setStandings(result.standings || [])
       } else {
-        toast.error(result.error || 'Failed to fetch tournament standings')
+        toast.error(result.error?.message || result.error || 'Failed to fetch tournament standings')
         setStandings([])
       }
     } catch (error) {
@@ -79,6 +80,7 @@ const TournamentLeaderboardPage = () => {
       setStandings([])
     } finally {
       setLoading(false)
+      setStandingsLoaded(true)
     }
   }
 
@@ -102,19 +104,19 @@ const TournamentLeaderboardPage = () => {
       const result = await awardTournamentPoints(sportId, standings)
       
       if (result.success) {
-        toast.success(`Successfully awarded points to ${result.updated} team(s)`)
+        toast.success(result.message || `Successfully awarded points to ${result.updated} team(s)`)
         setIsAwardDialogOpen(false)
       } else {
         toast.error(result.error || 'Failed to award points')
       }
     } catch (error) {
-      toast.error('Failed to award tournament points')
+      toast.error(error?.message || 'Failed to award tournament points')
     } finally {
       setIsAwarding(false)
     }
   }
 
-  if (loading) {
+  if (loading && !standingsLoaded) {
     return (
       <div className="flex justify-center items-center mt-40">
         <img src="/load.svg" alt="Loading" className="w-20" />

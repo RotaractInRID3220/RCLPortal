@@ -82,15 +82,13 @@ const PortalSideNav = () => {
     }
     
     try {
-      const response = await fetch(`/api/council?clubID=${userDetails.club_id}`);
+      // The club's registrable members come from the local RMIS mirror (club taken from the session).
+      const response = await fetch('/api/portal/members');
       const data = await response.json();
-      console.log('Club members API response:', data);
-      
-      // Set the members array from the response
-      if (data.success && Array.isArray(data.members)) {
-        setClubMembers(data.members);
+      if (data.success && Array.isArray(data.data)) {
+        setClubMembers(data.data);
       } else {
-        console.error('Invalid club members data format:', data);
+        console.error('Could not load club members:', data?.error);
         setClubMembers([]);
       }
     } catch (error) {
@@ -119,7 +117,7 @@ const PortalSideNav = () => {
           {/* Navigation Links */}
           <nav className="w-full flex flex-col space-y-2" aria-label="Portal navigation">
             {NAV_ITEMS.map((item) => {
-              const isActive = pathname?.startsWith(item.path);
+              const isActive = item.path === "/portal/dashboard" ? pathname === item.path : pathname?.startsWith(item.path);
               return (
                 <NavLink
                   key={item.path}

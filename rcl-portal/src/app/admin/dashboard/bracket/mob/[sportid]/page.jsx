@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from 'next/navigation';
 import { useAtom } from 'jotai';
-import { createClient } from '@supabase/supabase-js';
 import BracketService from '@/services/bracketServices';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,9 +36,17 @@ import {
 import { toast } from 'sonner';
 import { ArrowLeft, RefreshCw, Edit, Trash2, Check, ChevronsUpDown } from 'lucide-react';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Live data is never cached in the browser: re-read from the server every few seconds (paused while hidden).
+const POLL_MS = 10000;
+const toLocalInput = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+const toIso = (local) => (local ? new Date(local).toISOString() : null);
+const errorMessage = async (response, fallback) => {
+  try { const body = await response.json(); return body?.error?.message || body?.error || fallback; } catch { return fallback; }
+};
 
 const MobileMatchesPage = () => {
   const params = useParams();
@@ -70,64 +77,29 @@ const MobileMatchesPage = () => {
 
   // Set selectedSport from URL params when component mounts
   useEffect(() => {
-    if (params.sportid) {
-      fetchMatches();
-    }
+    if (!params.sportid) return;
+    fetchMatches();
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchMatches({ quiet: true });
+    }, POLL_MS);
+    return () => clearInterval(timer);
   }, [params.sportid]);
 
-  // Fetch matches for the sport
-  const fetchMatches = async () => {
+  // Fetch matches for the sport (quiet = background refresh: no spinner)
+  const fetchMatches = async ({ quiet = false } = {}) => {
     if (!params.sportid) return;
 
     const currentSportId = parseInt(params.sportid);
-    setLoading(true);
-    setError(null);
+    if (!quiet) { setLoading(true); setError(null); }
 
     try {
-      // Fetch matches data
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select(`
-          match_id,
-          team1_id,
-          team2_id,
-          team1_score,
-          team2_score,
-          round_id,
-          match_order,
-          parent_match1_id,
-          parent_match2_id,
-          sport_id,
-          start_time,
-          team1:teams!matches_team1_id_fkey (
-            team_id,
-            club:clubs (
-              club_id,
-              club_name
-            )
-          ),
-          team2:teams!matches_team2_id_fkey (
-            team_id,
-            club:clubs (
-              club_id,
-              club_name
-            )
-          )
-        `)
-        .eq('sport_id', currentSportId)
-        .order('round_id', { ascending: true })
-        .order('match_order', { ascending: true });
-
-      if (matchesError) {
-        throw new Error(matchesError.message);
-      }
-
-      setMatches(matchesData || []);
+      setMatches(await BracketService.getRawMatches(currentSportId));
+      if (quiet) setError(null);
     } catch (error) {
       console.error('Error fetching matches:', error);
-      setError(error.message);
+      if (!quiet) setError(error.message);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
@@ -168,41 +140,26 @@ const MobileMatchesPage = () => {
     setIsScoreDialogOpen(true);
   };
 
-  // Handle saving scores
+  // Handle saving scores: one server transaction saves the score and advances the winner
   const handleSaveScores = async () => {
     if (!editingMatch || !editingMatch.match_id) return;
+    if (tempScores.team1 === tempScores.team2) {
+      toast.error('A knockout match needs a winner: the scores cannot be equal.');
+      return;
+    }
 
     setIsSaving(true);
     try {
-      // Update scores in database
-      const { error } = await supabase
-        .from('matches')
-        .update({
-          team1_score: tempScores.team1,
-          team2_score: tempScores.team2
-        })
-        .eq('match_id', editingMatch.match_id);
-
-      if (error) {
-        console.error('Error updating scores:', error);
-        toast.error('Failed to update scores. Please try again.');
-        return;
-      }
-
-      // Close dialog and reset state
+      await BracketService.updateMatchResult(editingMatch.match_id, tempScores.team1, tempScores.team2);
       setIsScoreDialogOpen(false);
       setEditingMatch(null);
       setTempScores({ team1: 0, team2: 0 });
-
-      // Refresh matches
-      fetchMatches();
-
       toast.success('Scores updated successfully!');
     } catch (error) {
-      console.error('Error saving scores:', error);
-      toast.error('Failed to update scores. Please try again.');
+      toast.error(error.message || 'Failed to update scores. Please try again.');
     } finally {
       setIsSaving(false);
+      fetchMatches({ quiet: true });
     }
   };
 
@@ -225,7 +182,7 @@ const MobileMatchesPage = () => {
       match_order: match.match_order,
       parent_match1_id: match.parent_match1_id || null,
       parent_match2_id: match.parent_match2_id || null,
-      start_time: match.start_time ? new Date(match.start_time).toISOString().slice(0, 16) : '',
+      start_time: toLocalInput(match.start_time),
       sport_id: parseInt(params.sportid)
     });
     fetchTeams();
@@ -253,11 +210,11 @@ const MobileMatchesPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editingMatchData),
+        body: JSON.stringify({ ...editingMatchData, start_time: toIso(editingMatchData.start_time) }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update match');
+        throw new Error(await errorMessage(response, 'Failed to update match'));
       }
 
       toast.success('Match updated successfully!');
@@ -271,7 +228,7 @@ const MobileMatchesPage = () => {
 
     } catch (error) {
       console.error('Error updating match:', error);
-      toast.error('Failed to update match. Please try again.');
+      toast.error(error.message || 'Failed to update match. Please try again.');
     } finally {
       setIsUpdatingMatch(false);
     }
@@ -293,7 +250,7 @@ const MobileMatchesPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete match');
+        throw new Error(await errorMessage(response, 'Failed to delete match'));
       }
 
       toast.success('Match deleted successfully!');
@@ -307,7 +264,7 @@ const MobileMatchesPage = () => {
 
     } catch (error) {
       console.error('Error deleting match:', error);
-      toast.error('Failed to delete match. Please try again.');
+      toast.error(error.message || 'Failed to delete match. Please try again.');
     } finally {
       setIsDeletingMatch(false);
     }
@@ -328,7 +285,7 @@ const MobileMatchesPage = () => {
     const team1Score = match.team1_score || 0;
     const team2Score = match.team2_score || 0;
 
-    if (team1Score === 0 && team2Score === 0) {
+    if (!match.completed) {
       return {
         bgColor: "bg-white/10",
         scoreColor: "bg-white/20",

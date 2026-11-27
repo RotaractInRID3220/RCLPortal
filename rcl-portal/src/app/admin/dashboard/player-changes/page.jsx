@@ -27,7 +27,7 @@ export default function AdminPlayerChangesPage() {
     const [contextData, setContextData] = useState(null);
     const [loadingContext, setLoadingContext] = useState(false);
 
-    // Club members (from DBMID)
+    // Club members (from the RMIS mirror)
     const [clubMembers, setClubMembers] = useState([]);
     const [loadingMembers, setLoadingMembers] = useState(false);
 
@@ -39,6 +39,7 @@ export default function AdminPlayerChangesPage() {
     const [replacementMember, setReplacementMember] = useState('');
     const [replacementMemberPopoverOpen, setReplacementMemberPopoverOpen] = useState(false);
     const [replacementReason, setReplacementReason] = useState('');
+    const [replacementRi, setReplacementRi] = useState('');
     const [submittingReplacement, setSubmittingReplacement] = useState(false);
 
     // Swap form state
@@ -98,7 +99,7 @@ export default function AdminPlayerChangesPage() {
         }
     }, []);
 
-    // Fetch club members from DBMID
+    // Fetch club members from the RMIS mirror
     const fetchClubMembers = useCallback(async (clubId) => {
         if (!clubId) {
             setClubMembers([]);
@@ -107,11 +108,10 @@ export default function AdminPlayerChangesPage() {
 
         setLoadingMembers(true);
         try {
-            const response = await fetch(`/api/council?clubID=${clubId}`);
+            const response = await fetch(`/api/portal/members?club_id=${clubId}`);
             const data = await response.json();
             if (data.success) {
-                // API returns { success: true, members: [...] }
-                setClubMembers(data.members || []);
+                setClubMembers(data.data || []);
             }
         } catch (error) {
             console.error('Error fetching club members:', error);
@@ -144,8 +144,8 @@ export default function AdminPlayerChangesPage() {
         const registrations = contextData.sportRegistrations[sportId] || [];
         return registrations.map(reg => ({
             registration_id: reg.id,
-            rmis_id: reg.RMIS_ID,
-            name: reg.player?.name || reg.RMIS_ID,
+            rmis_id: reg.member_id,
+            name: reg.player?.name || String(reg.member_id),
             gender: reg.player?.gender,
             main_player: reg.main_player
         }));
@@ -192,29 +192,15 @@ export default function AdminPlayerChangesPage() {
 
         setSubmittingReplacement(true);
         try {
-            const selectedMember = clubMembers.find(m => m.membership_id === replacementMember);
             const response = await fetch('/api/admin/player-changes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'replacement',
-                    club_id: parseInt(selectedClub),
-                    sport_id: parseInt(replacementSport),
-                    registrations_id: selectedPlayer.registration_id,
-                    replacement_member: {
-                        membership_id: replacementMember,
-                        card_name: selectedMember?.card_name || '',
-                        name: selectedMember?.card_name || '',
-                        email: selectedMember?.email || '',
-                        nic: selectedMember?.nic_pp || '',
-                        gender: selectedMember?.gender || '',
-                        status: selectedMember?.status || '',
-                        ri_number: selectedMember?.ri_number || '',
-                        birthdate: selectedMember?.birthdate || ''
-                    },
-                    reason: replacementReason.trim(),
-                    admin_id: userDeets?.membership_id,
-                    admin_name: userDeets?.card_name || userDeets?.m_name
+                    registration_id: selectedPlayer.registration_id,
+                    replacement_member_id: replacementMember,
+                    ri_id: replacementRi.trim() || null,
+                    reason: replacementReason.trim()
                 })
             });
 
@@ -225,6 +211,7 @@ export default function AdminPlayerChangesPage() {
                 setPlayerToReplace('');
                 setReplacementMember('');
                 setReplacementReason('');
+                setReplacementRi('');
                 // Refresh context
                 fetchContext(selectedClub);
             } else {
@@ -277,19 +264,15 @@ export default function AdminPlayerChangesPage() {
             const payload = swapType === 'swap' ? {
                 action: 'swap',
                 club_id: parseInt(selectedClub),
-                player1_registrations_id: selectedPlayer1.registration_id,
-                player2_registrations_id: selectedPlayer2.registration_id,
-                reason: swapReason.trim(),
-                admin_id: userDeets?.membership_id,
-                admin_name: userDeets?.card_name || userDeets?.m_name
+                reg1_id: selectedPlayer1.registration_id,
+                reg2_id: selectedPlayer2.registration_id,
+                reason: swapReason.trim()
             } : {
                 action: 'move',
                 club_id: parseInt(selectedClub),
-                player1_registrations_id: selectedPlayer1.registration_id,
-                sport2_id: parseInt(swapDestinationSport),
-                reason: swapReason.trim(),
-                admin_id: userDeets?.membership_id,
-                admin_name: userDeets?.card_name || userDeets?.m_name
+                reg1_id: selectedPlayer1.registration_id,
+                target_sport_id: parseInt(swapDestinationSport),
+                reason: swapReason.trim()
             };
 
             const response = await fetch('/api/admin/player-changes', {
@@ -595,7 +578,7 @@ export default function AdminPlayerChangesPage() {
                                                                 {loadingMembers
                                                                     ? "Loading members..."
                                                                     : replacementMember
-                                                                        ? clubMembers.find(m => m.membership_id === replacementMember)?.card_name
+                                                                        ? clubMembers.find(m => m.member_id === replacementMember)?.card_name
                                                                         : "Search and select a member..."
                                                                 }
                                                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -609,23 +592,23 @@ export default function AdminPlayerChangesPage() {
                                                                     <CommandGroup>
                                                                         {availableReplacementMembers.map((member) => (
                                                                             <CommandItem
-                                                                                key={member.membership_id}
-                                                                                value={`${member.card_name} ${member.membership_id}`}
+                                                                                key={member.member_id}
+                                                                                value={`${member.card_name} ${member.membership_id || member.member_id}`}
                                                                                 onSelect={() => {
-                                                                                    setReplacementMember(member.membership_id);
+                                                                                    setReplacementMember(member.member_id);
                                                                                     setReplacementMemberPopoverOpen(false);
                                                                                 }}
                                                                             >
                                                                                 <Check
                                                                                     className={cn(
                                                                                         "mr-2 h-4 w-4",
-                                                                                        replacementMember === member.membership_id ? "opacity-100" : "opacity-0"
+                                                                                        replacementMember === member.member_id ? "opacity-100" : "opacity-0"
                                                                                     )}
                                                                                 />
                                                                                 <div className="flex items-center gap-2">
                                                                                     {member.card_name}
                                                                                     <Badge variant="outline" className="text-xs">
-                                                                                        {member.membership_id}
+                                                                                        {member.membership_id || member.member_id}
                                                                                     </Badge>
                                                                                 </div>
                                                                             </CommandItem>
@@ -635,6 +618,20 @@ export default function AdminPlayerChangesPage() {
                                                             </Command>
                                                         </PopoverContent>
                                                     </Popover>
+                                                </div>
+                                            )}
+
+                                            {/* RI number: required when the replacement is a general member (typed by the admin) */}
+                                            {replacementMember && clubMembers.find(m => m.member_id === replacementMember)?.status === 1 && (
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-white/80">RI number (required for general members)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={replacementRi}
+                                                        onChange={(e) => setReplacementRi(e.target.value)}
+                                                        placeholder="RI number"
+                                                        className="w-full px-3 py-2 rounded-md bg-white/10 border border-white/20 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-cranberry"
+                                                    />
                                                 </div>
                                             )}
 

@@ -18,6 +18,7 @@ import { fetchClubPoints, deleteClubPoints } from '@/services/leaderboardService
 const LeaderboardDisplay = React.memo(({ sport, refreshKey, onPointDeleted }) => {
   const [clubPoints, setClubPoints] = useState([])
   const [loading, setLoading] = useState(true)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -42,6 +43,7 @@ const LeaderboardDisplay = React.memo(({ sport, refreshKey, onPointDeleted }) =>
       toast.error('Failed to load leaderboard')
     } finally {
       setLoading(false)
+      setHasLoaded(true)
     }
   }, [sport?.sport_id, sport?.category])
 
@@ -87,9 +89,10 @@ const LeaderboardDisplay = React.memo(({ sport, refreshKey, onPointDeleted }) =>
     >
       <div className="font-medium">
         {entry.clubs?.club_name || 'Unknown Club'}
+        <span className="ml-2 text-xs text-gray-400">{entry.kind}</span>
       </div>
       <div className="text-center">
-        {entry.place}
+        {entry.place ?? '-'}
       </div>
       <div className="text-center font-semibold text-green-400">
         {entry.points}
@@ -99,6 +102,8 @@ const LeaderboardDisplay = React.memo(({ sport, refreshKey, onPointDeleted }) =>
           variant="ghost"
           size="sm"
           onClick={() => onDelete(entry.point_id)}
+          disabled={entry.kind !== 'manual'}
+          title={entry.kind !== 'manual' ? 'Automatic entries are corrected by re-running the award' : 'Delete'}
           className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
         >
           <Trash2 className="w-4 h-4" />
@@ -112,7 +117,7 @@ const LeaderboardDisplay = React.memo(({ sport, refreshKey, onPointDeleted }) =>
     setDeleteId(pointId)
   }, [])
 
-  if (loading) {
+  if (loading && !hasLoaded) {
     return (
       <div className="bg-white/5 rounded-lg p-6">
         <h3 className="text-xl font-medium mb-4">Leaderboard</h3>

@@ -1,174 +1,27 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { z } from 'zod'
+import { requireUser, resolveClubId } from '@/server/auth/guards'
+import { fail, ok, readJson } from '@/server/http.mjs'
+import { refreshClub, syncChangesOnce } from '@/server/rmis/mirror.mjs'
+import { RmisError } from '@/server/rmis/client.mjs'
 
+// Re-read RMIS and update registered players. A club user refreshes their own club; an admin may
+// give a club_id, or omit it to run a full pass of the change feed.
 export async function POST(request) {
+  const auth = await requireUser({ portal: true })
+  if (!auth.ok) return auth.response
+  const body = await readJson(request, z.object({ club_id: z.coerce.number().int().positive().nullish() }).passthrough())
+  if (!body.ok) return body.response
   try {
-    const { club_id } = await request.json();
-
-    // Build query based on whether club_id is provided
-    let playersQuery = supabase
-      .from('players')
-      .select('RMIS_ID, status');
-
-    if (club_id) {
-      playersQuery = playersQuery.eq('club_id', club_id);
+    if (auth.user.hasAdminAccess && !body.data.club_id) {
+      const r = await syncChangesOnce()
+      return ok({ mode: 'all', ...r }, { message: `Synced ${r.seen} members from RMIS${r.playersChanged ? `; ${r.playersChanged} registered players updated` : ''}.` })
     }
-
-    const { data: players, error: playersError } = await playersQuery;
-
-    if (playersError) {
-      console.error('Error fetching players:', playersError);
-      return NextResponse.json(
-        { error: 'Failed to fetch players' },
-        { status: 500 }
-      );
-    }
-
-    if (!players || players.length === 0) {
-      const scope = club_id ? 'this club' : 'the system';
-      return NextResponse.json({
-        success: true,
-        message: `No players found for ${scope}`,
-        updatedCount: 0
-      });
-    }
-
-    // Step 2: Get all RMIS IDs to check
-    const rmisIds = players.map(p => p.RMIS_ID).filter(Boolean);
-
-    if (rmisIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No valid RMIS IDs found',
-        updatedCount: 0
-      });
-    }
-
-    // Step 3: Fetch data from RMIS in one query using IN clause
-    const placeholders = rmisIds.map(() => '?').join(',');
-    const sql = `SELECT membership_id, status, nic_pp FROM club_membership_data WHERE membership_id IN (${placeholders}) AND status IN (1, 3, 5)`;
-
-    const res = await fetch('https://info.rotaract3220.org/api/query', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.NEXT_PUBLIC_DBMID_API_KEY,
-      },
-      body: JSON.stringify({
-        sql,
-        params: rmisIds,
-      }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'RMIS API Error');
-    }
-
-    const rmisData = data.results || [];
-
-    // Step 4: Create a map for quick lookup and normalize status (3 -> 1)
-    const rmisStatusMap = new Map();
-    const rmisNicMap = new Map();
-    rmisData.forEach(record => {
-      const normalizedStatus = record.status === 3 ? 1 : record.status;
-      rmisStatusMap.set(record.membership_id, normalizedStatus);
-      rmisNicMap.set(record.membership_id, record.nic_pp || null);
-    });
-
-    // Step 5: Find players that need updating (status or NIC)
-    const playersToUpdate = [];
-    players.forEach(player => {
-      const rmisStatus = rmisStatusMap.get(player.RMIS_ID);
-      const rmisNic = rmisNicMap.get(player.RMIS_ID);
-      
-      const statusNeedsUpdate = rmisStatus !== undefined && rmisStatus !== player.status;
-      const nicNeedsUpdate = rmisNic !== undefined && rmisNic !== player.NIC && rmisNic !== null;
-      
-      if (statusNeedsUpdate || nicNeedsUpdate) {
-        playersToUpdate.push({
-          RMIS_ID: player.RMIS_ID,
-          oldStatus: player.status,
-          newStatus: rmisStatus,
-          oldNic: player.NIC,
-          newNic: rmisNic,
-          updateStatus: statusNeedsUpdate,
-          updateNic: nicNeedsUpdate
-        });
-      }
-    });
-
-    if (playersToUpdate.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'All players are already up to date',
-        updatedCount: 0
-      });
-    }
-
-    // Step 6: Batch update players in Supabase
-    const updatePromises = playersToUpdate.map(player => {
-      const updateData = {};
-      
-      if (player.updateStatus) {
-        updateData.status = player.newStatus;
-      }
-      
-      if (player.updateNic) {
-        updateData.NIC = player.newNic;
-      }
-
-      let updateQuery = supabase
-        .from('players')
-        .update(updateData)
-        .eq('RMIS_ID', player.RMIS_ID);
-
-      // Only filter by club_id if provided (for club-specific sync)
-      if (club_id) {
-        updateQuery = updateQuery.eq('club_id', club_id);
-      }
-
-      return updateQuery;
-    });
-
-    const updateResults = await Promise.all(updatePromises);
-
-    // Check for any errors in the batch update
-    const errors = updateResults.filter(result => result.error);
-    if (errors.length > 0) {
-      console.error('Some updates failed:', errors);
-    }
-
-    const successfulUpdates = updateResults.filter(result => !result.error).length;
-
-    return NextResponse.json({
-      success: true,
-      message: `Successfully synced ${successfulUpdates} player(s)`,
-      updatedCount: successfulUpdates,
-      updates: playersToUpdate.map(p => ({
-        RMIS_ID: p.RMIS_ID,
-        changes: {
-          ...(p.updateStatus && {
-            status: {
-              from: p.oldStatus === 1 ? 'General' : p.oldStatus === 5 ? 'Prospective' : 'Unknown',
-              to: p.newStatus === 1 ? 'General' : p.newStatus === 5 ? 'Prospective' : 'Unknown'
-            }
-          }),
-          ...(p.updateNic && {
-            nic: {
-              from: p.oldNic || 'Not set',
-              to: p.newNic || 'Not set'
-            }
-          })
-        }
-      }))
-    });
-
-  } catch (error) {
-    console.error('Error syncing with RMIS:', error);
-    return NextResponse.json(
-      { error: 'Failed to sync with RMIS: ' + error.message },
-      { status: 500 }
-    );
+    const club = resolveClubId(auth.user, body.data.club_id)
+    if (!club.ok) return club.response
+    const r = await refreshClub(club.clubId)
+    return ok({ mode: 'club', clubId: club.clubId, members: r.members, changes: r.changes }, { message: `Refreshed ${r.members} members from RMIS${r.changes?.length ? `; ${r.changes.length} registered players updated` : ''}.` })
+  } catch (e) {
+    if (e instanceof RmisError) return fail(503, 'rmis_unavailable', 'RMIS is not reachable right now. Try again shortly.')
+    throw e
   }
 }

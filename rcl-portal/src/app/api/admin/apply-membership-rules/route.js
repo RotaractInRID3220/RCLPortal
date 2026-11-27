@@ -1,108 +1,36 @@
+import { z } from 'zod'
+import { requireUser } from '@/server/auth/guards'
+import { fail, fromResult, ok, optInt, parseQuery, readJson } from '@/server/http.mjs'
+import { applyMembershipRules, revokePenalties } from '@/server/penalties/service.mjs'
+import { RmisError } from '@/server/rmis/client.mjs'
 
-import { supabase } from '@/lib/supabaseClient';
-import { NextResponse } from 'next/server';
+// Penalties change club points, so only super admins can apply or revoke them.
+const guard = () => requireUser({ admin: true, permission: 'super_admin' })
 
-// Calculate deduction points based on general member percentage
-const calculateDeductionPoints = (percentage, totalPlayers) => {
-  // Don't apply deductions to clubs with fewer than 5 players
-  if (totalPlayers < 5) return 0;
-
-  if (percentage >= 67 && percentage < 70) return -25;
-  if (percentage >= 62 && percentage < 67) return -50;
-  if (percentage < 62) return -80;
-  return 0;
-};
-
-export async function POST() {
+// Applying is idempotent: it SETS each club's penalty to the current value (one row per club).
+export async function POST(request) {
+  const auth = await guard()
+  if (!auth.ok) return auth.response
+  const body = await readJson(request, z.object({ refresh: z.boolean().default(true), clean: z.boolean().default(true) }).passthrough())
+  if (!body.ok) return body.response
   try {
-    // Get all clubs
-    const { data: clubs, error: clubsError } = await supabase
-      .from('clubs')
-      .select('club_id, club_name')
-      .order('club_name', { ascending: true });
-
-    if (clubsError) {
-      console.error('Error fetching clubs:', clubsError);
-      return NextResponse.json(
-        { error: 'Failed to fetch clubs' },
-        { status: 500 }
-      );
-    }
-
-    if (!clubs || clubs.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No clubs found to process',
-        deductionsApplied: 0
-      });
-    }
-
-    const deductionsApplied = [];
-    let totalDeductions = 0;
-
-    // Process each club
-    for (const club of clubs) {
-      // Get all players for this club
-      const { data: players, error: playersError } = await supabase
-        .from('players')
-        .select('RMIS_ID, status')
-        .eq('club_id', club.club_id);
-
-      if (playersError) {
-        console.error(`Error fetching players for club ${club.club_id}:`, playersError);
-        continue;
-      }
-
-      // Count general members (status = 1)
-      const generalMembers = players.filter(player => player.status === 1).length;
-      const totalPlayers = players.length;
-
-      // Calculate percentage
-      const generalMemberPercentage = totalPlayers > 0 ? (generalMembers / totalPlayers) * 100 : 0;
-
-      // Calculate deduction points
-      const deductionPoints = calculateDeductionPoints(generalMemberPercentage, totalPlayers);
-
-      if (deductionPoints !== 0) {
-        // Insert deduction record into club_points table
-        const { data: deductionRecord, error: deductionError } = await supabase
-          .from('club_points')
-          .insert([{
-            club_id: club.club_id,
-            points: deductionPoints,
-            created_at: new Date().toISOString()
-            // sport_id and place are null for penalty points
-          }])
-          .select();
-
-        if (deductionError) {
-          console.error(`Error applying deduction for club ${club.club_id}:`, deductionError);
-          continue;
-        }
-
-        deductionsApplied.push({
-          club_id: club.club_id,
-          club_name: club.club_name,
-          general_member_percentage: generalMemberPercentage,
-          deduction_points: deductionPoints
-        });
-
-        totalDeductions++;
-      }
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Successfully applied membership rules. ${totalDeductions} clubs received penalty points.`,
-      deductionsApplied,
-      totalDeductions
-    });
-
-  } catch (error) {
-    console.error('Error applying membership rules:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    const res = await applyMembershipRules({ actor: auth.user, refresh: body.data.refresh, clean: body.data.clean })
+    return fromResult(res, (r) => ok(r.results, {
+      results: r.results, changed: r.changed, penalised: r.penalised, cleaned: r.cleaned, refreshed: r.refreshed,
+      message: r.changed === 0 ? 'Penalties are already up to date. Nothing changed.' : `Updated penalties for ${r.changed} club(s); ${r.penalised} club(s) currently carry a penalty.`,
+    }))
+  } catch (e) {
+    if (e instanceof RmisError) return fail(503, 'rmis_unavailable', 'RMIS could not be reached, so nothing was applied. Try again, or apply without refreshing from RMIS.')
+    throw e
   }
+}
+
+// Remove penalties for one club (?club_id=) or for all clubs.
+export async function DELETE(request) {
+  const auth = await guard()
+  if (!auth.ok) return auth.response
+  const q = parseQuery(request, { club_id: optInt })
+  if (!q.ok) return q.response
+  const r = await revokePenalties({ actor: auth.user, clubId: q.data.club_id ?? null })
+  return ok({ removed: r.removed }, { message: `Removed ${r.removed} penalty row(s).` })
 }

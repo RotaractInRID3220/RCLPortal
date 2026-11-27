@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAtom } from 'jotai'
 import { userDeetsAtom, loadingAtom } from '@/app/state/store'
-import { APP_CONFIG } from '../../../../config/app.config.js'
+import { useEventInfo } from '@/hooks/useEventInfo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,14 +34,15 @@ const PaymentPage = () => {
   const [hasLoadedData, setHasLoadedData] = useState(false)
   const [cleaningPlayers, setCleaningPlayers] = useState(false)
 
-  const registrationFee = parseInt(APP_CONFIG.REGISTRATION_FEE) || 800
+  // The fee is a super-admin setting; it comes with the club's finance figures from the server.
+  const [registrationFee, setRegistrationFee] = useState(null)
 
   // Check if registration deadline has passed
+  const eventInfo = useEventInfo();
   const isAfterDeadline = useMemo(() => {
-    const currentDate = new Date();
-    const deadlineDate = new Date(APP_CONFIG.REGISTRATION_DEADLINE);
-    return currentDate > deadlineDate;
-  }, []);
+    // no generic deadline set = no deadline
+    return eventInfo?.registrationCloseAt ? new Date() > new Date(eventInfo.registrationCloseAt) : false;
+  }, [eventInfo]);
 
   useEffect(() => {
     if (userDetails?.club_id && !hasLoadedData && !dataLoading) {
@@ -56,27 +57,22 @@ const PaymentPage = () => {
     try {
       setDataLoading(true)
       
-      // Fetch player count and payment history
-      const [playersResponse, paymentsResponse] = await Promise.all([
-        fetch(`/api/players?club_id=${userDetails.club_id}`),
-        fetch(`/api/payment-slips?club_id=${userDetails.club_id}`)
+      // Money is calculated on the server (players x fee, approved slips only)
+      const [financeResponse, paymentsResponse] = await Promise.all([
+        fetch('/api/portal/finance'),
+        fetch('/api/payment-slips')
       ])
 
-      if (playersResponse.ok && paymentsResponse.ok) {
-        const playersData = await playersResponse.json()
+      if (financeResponse.ok && paymentsResponse.ok) {
+        const finance = (await financeResponse.json()).data
         const paymentsData = await paymentsResponse.json()
 
-        const playerCount = playersData.count || 0
-        const totalAmount = playerCount * registrationFee
-        const approvedPayments = paymentsData.payments?.filter(p => p.approved) || []
-        const paidAmount = approvedPayments.reduce((sum, payment) => sum + payment.value, 0)
-        const remainingAmount = Math.max(0, totalAmount - paidAmount)
-
+        setRegistrationFee(finance.fee)
         setPaymentStats({
-          totalPlayers: playerCount,
-          totalAmount,
-          paidAmount,
-          remainingAmount
+          totalPlayers: finance.totalPlayers,
+          totalAmount: finance.totalAmount ?? 0,
+          paidAmount: finance.paidAmount,
+          remainingAmount: finance.remainingAmount ?? 0
         })
 
         setPreviousPayments(paymentsData.payments || [])
@@ -88,7 +84,7 @@ const PaymentPage = () => {
     } finally {
       setDataLoading(false)
     }
-  }, [userDetails?.club_id, registrationFee])
+  }, [userDetails?.club_id])
 
   const cleanPlayers = async () => {
     if (!userDetails?.club_id) return;
@@ -111,7 +107,7 @@ const PaymentPage = () => {
         toast.success(`Successfully removed ${result.deletedCount} players without registrations`)
         
         // Refresh payment data to update counts
-        setHasLoadedData(false)
+        fetchPaymentData()
       } else {
         const error = await response.json()
         throw new Error(error.error || 'Failed to clean players')
@@ -190,37 +186,6 @@ const PaymentPage = () => {
     })
   }
 
-  const uploadImage = async (file) => {
-    try {
-      setUploading(true)
-      
-      // Compress image
-      const compressedFile = await compressImage(file)
-      
-      // Create form data for upload
-      const uploadData = new FormData()
-      uploadData.append('file', compressedFile)
-      uploadData.append('club_id', userDetails.club_id)
-      
-      const response = await fetch('/api/payment-slips/upload', {
-        method: 'POST',
-        body: uploadData
-      })
-
-      if (!response.ok) {
-        throw new Error('Upload failed')
-      }
-
-      const result = await response.json()
-      return result.publicUrl
-    } catch (error) {
-      console.error('Error uploading image:', error)
-      throw error
-    } finally {
-      setUploading(false)
-    }
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     
@@ -237,22 +202,15 @@ const PaymentPage = () => {
     try {
       setSubmitting(true)
       
-      // Upload image first
-      const imageUrl = await uploadImage(formData.image)
-      
-      // Submit payment slip data
-      const response = await fetch('/api/payment-slips', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          value: parseFloat(formData.value),
-          slip_number: formData.slip_number,
-          link: imageUrl,
-          club_id: userDetails.club_id
-        })
-      })
+      // One request: the image (compressed in the browser) with the amount and slip number.
+      // The club is taken from the signed-in session on the server.
+      setUploading(true)
+      const compressedFile = await compressImage(formData.image)
+      const body = new FormData()
+      body.append('file', compressedFile)
+      body.append('value', String(parseFloat(formData.value)))
+      body.append('slip_number', formData.slip_number)
+      const response = await fetch('/api/payment-slips', { method: 'POST', body })
 
       if (response.ok) {
         toast.success('Payment slip submitted successfully')
@@ -263,14 +221,16 @@ const PaymentPage = () => {
         if (fileInput) fileInput.value = ''
         
         // Refresh payment data
-        setHasLoadedData(false)
+        fetchPaymentData()
       } else {
-        throw new Error('Failed to submit payment slip')
+        const err = await response.json().catch(() => null)
+        throw new Error(err?.error || 'Failed to submit payment slip')
       }
     } catch (error) {
       console.error('Error submitting payment:', error)
-      toast.error('Failed to submit payment slip')
+      toast.error(error.message || 'Failed to submit payment slip')
     } finally {
+      setUploading(false)
       setSubmitting(false)
     }
   }

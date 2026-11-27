@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { useAtom } from 'jotai';
 import { sportsDataAtom, sportsLoadingAtom, lastFetchTimestampAtom, isCacheValid, userDeetsAtom } from '@/app/state/store';
 import { getClubByClubId } from '@/services/clubServices';
-import { APP_CONFIG } from '@/config/app.config';
+import { useEventInfo, formatColombo } from '@/hooks/useEventInfo';
 import { Clock, Lock, Calendar } from "lucide-react";
 
 // Memoized Event Card component
@@ -61,18 +61,19 @@ const PortalRegistrationPage = React.memo(() => {
     }, [router]);
 
     // Check if registrations have opened (common opening date from config)
+    const eventInfo = useEventInfo();
     const registrationOpeningDate = useMemo(() => {
-        return new Date(APP_CONFIG.REGISTRATION_OPENING_DATE);
-    }, []);
+        return eventInfo?.registrationOpenAt ? new Date(eventInfo.registrationOpenAt) : null;
+    }, [eventInfo]);
 
     const isRegistrationOpen = useMemo(() => {
-        const currentDate = new Date();
-        return currentDate >= registrationOpeningDate;
+        // not scheduled yet = closed
+        return registrationOpeningDate ? new Date() >= registrationOpeningDate : false;
     }, [registrationOpeningDate]);
 
     // Calculate days until opening
     const daysUntilOpening = useMemo(() => {
-        if (isRegistrationOpen) return 0;
+        if (isRegistrationOpen || !registrationOpeningDate) return 0;
         const currentDate = new Date();
         const diffTime = registrationOpeningDate - currentDate;
         return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -198,12 +199,7 @@ const PortalRegistrationPage = React.memo(() => {
                             </div>
                             <p className="text-white/70 mb-4">
                                 Player registrations will open on <span className="font-semibold text-blue-300">
-                                    {registrationOpeningDate.toLocaleDateString('en-US', { 
-                                        weekday: 'long', 
-                                        year: 'numeric', 
-                                        month: 'long', 
-                                        day: 'numeric' 
-                                    })}
+                                    {registrationOpeningDate ? formatColombo(eventInfo.registrationOpenAt) : 'a date that has not been announced yet'}
                                 </span>
                             </p>
                             <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">

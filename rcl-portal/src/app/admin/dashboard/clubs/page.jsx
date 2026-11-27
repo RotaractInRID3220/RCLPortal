@@ -1,165 +1,84 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { createClub, fetchClubs } from "@/services/clubServices";
-import { clubsAtom, clubsLoadingAtom, clubsErrorAtom } from "@/app/state/store";
-import { useAtom } from "jotai";
-import React, { useState, useEffect } from "react";
+import { fetchAllClubsAdmin, syncClubsFromRmis } from "@/services/clubServices";
+import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import PrivateRoute from "@/lib/PrivateRoute";
 
+// Clubs come from RMIS (name, category, open/closed). Nothing is typed in here: use "Sync from RMIS"
+// to pull the latest list now; the worker also does it every hour.
 const page = () => {
-  const [addClub, setAddClub] = useState(false);
-  const [clubName, setClubName] = useState("");
-  const [clubId, setClubId] = useState("");
-  const [clubCategory, setClubCategory] = useState("");
-  
-  // Jotai atoms for clubs
-  const [clubs, setClubs] = useAtom(clubsAtom);
-  const [loading, setLoading] = useAtom(clubsLoadingAtom);
-  const [error, setError] = useAtom(clubsErrorAtom);
+  const [clubs, setClubs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Fetch clubs on component mount
-  useEffect(() => {
-    fetchClubsData();
-  }, []);
-
-  const fetchClubsData = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const clubsData = await fetchClubs();
-      setClubs(clubsData);
-    } catch (error) {
-      console.error('Error fetching clubs:', error);
-      setError(error.message || 'Failed to fetch clubs');
-      toast.error("Failed to fetch clubs: " + error.message);
+      setClubs(await fetchAllClubsAdmin());
+    } catch (e) {
+      setError(e.message);
+      toast.error("Failed to fetch clubs: " + e.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const isFormValid = () => {
-    return clubCategory !== "" && clubName !== "" && clubId !== "";
-  };
+  useEffect(() => { load(); }, [load]);
 
-  const handleCreateClub = async () => {
+  const handleSync = async () => {
     try {
-      const clubData = {
-        club_id: clubId,
-        club_name: clubName,
-        category: clubCategory,
-      };
-
-      const createdClub = await createClub(clubData);
-      toast.success("Club created successfully!");
-      
-      // Add the new club to the existing clubs array
-      setClubs(prevClubs => [...prevClubs, createdClub]);
-      
-      // Reset form fields
-      setClubId("");
-      setClubName("");
-      setClubCategory("");
-    } catch (error) {
-      toast.error("Failed to create club: " + error.message);
+      setSyncing(true);
+      const r = await syncClubsFromRmis();
+      toast.success(`Synced ${r.clubs} clubs from RMIS`);
+      await load();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setSyncing(false);
     }
   };
 
+  const active = clubs.filter((c) => c.status === 1).length;
+  const lastSync = clubs.map((c) => c.synced_at).filter(Boolean).sort().at(-1);
+
   return (
-    <PrivateRoute requiredPermission="super_admin"  accessType="admin">
-    <div>
-      <div className="flex w-full justify-between items-center mb-8">
-        <h1 className="text-3xl font-semibold tracking-wide">CLUB MANAGEMENT</h1>
-        {addClub ? (
-          <Button
-            className="bg-red-500/20 border border-cursor hover:bg-red-500 cursor-pointer text-white"
-            onClick={() => setAddClub(false)}
-          >
-            x
-          </Button>
-        ) : (
+    <PrivateRoute requiredPermission="super_admin" accessType="admin">
+      <div>
+        <div className="flex w-full justify-between items-center mb-2">
+          <h1 className="text-3xl font-semibold tracking-wide">CLUBS</h1>
           <Button
             className="bg-cranberry/20 border border-cursor hover:bg-cranberry cursor-pointer text-white"
-            onClick={() => setAddClub(true)}
+            onClick={handleSync}
+            disabled={syncing}
           >
-            Add Club
+            {syncing ? "Syncing..." : "Sync from RMIS"}
           </Button>
-        )}
-      </div>
-
-      {/* Add Club component */}
-      {addClub && (
-        <div className="bg-white/5 rounded-lg p-8">
-          <h2 className="text-xl font-semibold mb-2">Add Club</h2>
-          <div className="grid grid-cols-2 gap-4 mt-4 ">
-            <Input placeholder="Club ID" onChange={(e) => setClubId(e.target.value)} />
-            <Input placeholder="Club Name" onChange={(e) => setClubName(e.target.value)} />
-            <div className="w-full">
-              <Select
-                onValueChange={(value) => setClubCategory(value)}
-                value={clubCategory}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Club Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="community">Community Based</SelectItem>
-                  <SelectItem value="institute">Institute Based</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-          </div>
-            <Button
-              className={`mt-5 w-1/4 ${
-                isFormValid()
-                  ? "bg-cranberry/80 hover:bg-cranberry border border-cranberry hover:shadow hover:shadow-cranberry text-white cursor-pointer"
-                  : "bg-gray-500/50 border border-gray-500 text-gray-300 cursor-not-allowed"
-              }`}
-              disabled={!isFormValid()}
-              onClick={handleCreateClub}
-            >
-              Add Event
-            </Button>
         </div>
-      )}
+        <p className="text-white/50 text-sm mb-8">
+          Clubs are managed in RMIS and mirrored here. {clubs.length > 0 && `${active} active of ${clubs.length}.`}
+          {lastSync && ` Last synced ${new Date(lastSync).toLocaleString()}.`}
+        </p>
 
-      <div className="mt-8">
-
-        
-        {loading && (
-          <div className="text-center py-4">
-            <p>Loading clubs...</p>
-          </div>
-        )}
-        
-        
+        {loading && <div className="text-center py-4"><p>Loading clubs...</p></div>}
+        {error && !loading && <div className="text-center py-4 text-red-400"><p>{error}</p></div>}
         {!loading && !error && clubs.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            <p>No clubs found. Add one to get started!</p>
-          </div>
+          <div className="text-center py-8 text-gray-500"><p>No clubs yet. Press "Sync from RMIS".</p></div>
         )}
-        
-        <div className="space-y-4">
-          {clubs.map((club, index) => (
-            <div key={club.id || index} className="bg-white/5 rounded-lg py-4 px-6 w-full grid grid-cols-4">
-              <h1 className="col-span-2">{club.club_name}</h1>
-              <h1 className="col-span-1 text-white/50 text-sm">ID: <span className=" ml-2 text-white text-base">{club.club_id}</span></h1>
-              <h1 className="col-span-1 text-white/50 text-sm">Category: <span className=" ml-2 text-white text-base">{club.category}</span></h1>
 
+        <div className="space-y-4">
+          {clubs.map((club) => (
+            <div key={club.club_id} className={`bg-white/5 rounded-lg py-4 px-6 w-full grid grid-cols-5 ${club.status === 1 ? "" : "opacity-50"}`}>
+              <h1 className="col-span-2">{club.club_name}</h1>
+              <h1 className="col-span-1 text-white/50 text-sm">ID: <span className="ml-2 text-white text-base">{club.club_id}</span></h1>
+              <h1 className="col-span-1 text-white/50 text-sm">Category: <span className="ml-2 text-white text-base">{club.category}</span></h1>
+              <h1 className="col-span-1 text-sm">{club.status === 1 ? <span className="text-green-300">Active</span> : <span className="text-red-300">Closed</span>}</h1>
             </div>
           ))}
         </div>
       </div>
-    </div>
     </PrivateRoute>
   );
 };

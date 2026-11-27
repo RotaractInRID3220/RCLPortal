@@ -1,208 +1,51 @@
-import { supabase } from '../../../lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { z } from 'zod'
+import { requireUser, resolveClubId } from '@/server/auth/guards'
+import { fail, fromResult, ok, optInt, parseQuery, readJson } from '@/server/http.mjs'
+import { listRegistrations, registerPlayer, unregisterPlayer } from '@/server/registration/service.mjs'
+
+// Identity always comes from the session: portal users act for their own club only; a `club_id`
+// sent by the browser is checked against it. Admins may pass a club_id.
 
 export async function GET(request) {
-    try {
-        // Parse URL search parameters
-        const { searchParams } = new URL(request.url);
-        
-        // Check for filter parameters in the query string
-        const filterParams = searchParams.get('filter');
-        
-        let query = supabase.from('registrations').select('*');
-        
-        // Apply filters if they exist
-        if (filterParams) {
-            try {
-                // Parse the JSON filter parameters
-                const filters = JSON.parse(filterParams);
-                
-                // Apply each filter
-                if (Array.isArray(filters)) {
-                    // Handle array of filter objects
-                    filters.forEach(filter => {
-                        Object.entries(filter).forEach(([key, value]) => {
-                            query = query.eq(key, value);
-                        });
-                    });
-                } else {
-                    // Handle single filter object
-                    Object.entries(filters).forEach(([key, value]) => {
-                        query = query.eq(key, value);
-                    });
-                }
-            } catch (parseError) {
-                console.error('API: Error parsing filter parameters:', parseError);
-                return NextResponse.json({ error: 'Invalid filter format' }, { status: 400 });
-            }
-        }
-        
-        // Execute the query
-        console.log('API: Executing registration query with filters:', filterParams);
-        const { data, error } = await query;
-        
-        if (error) {
-            console.error('API: Error fetching registrations:', error);
-            return NextResponse.json({ error: 'Failed to fetch registrations' }, { status: 500 });
-        }
-        
-        console.log(`API: Successfully fetched ${data?.length || 0} registrations`);
-        
-        return NextResponse.json({ 
-            success: true,
-            data,
-            count: data.length
-        }, { status: 200 });
-    } catch (err) {
-        console.error('API: Exception occurred during GET:', err);
-        return NextResponse.json({ error: 'Server error fetching registrations' }, { status: 500 });
-    }
+  const auth = await requireUser()
+  if (!auth.ok) return auth.response
+  const q = parseQuery(request, { club_id: optInt, sport_id: optInt, member_id: optInt })
+  if (!q.ok) return q.response
+  const club = resolveClubId(auth.user, q.data.club_id)
+  if (!club.ok) return club.response
+  const rows = await listRegistrations({ clubId: club.clubId, sportId: q.data.sport_id ?? null, memberId: q.data.member_id ?? null })
+  return ok(rows, { count: rows.length })
+}
+
+const postSchema = z.object({
+  member_id: z.coerce.number().int().positive(),
+  sport_id: z.coerce.number().int().positive(),
+  main_player: z.boolean().default(true),
+  ri_id: z.string().trim().max(30).nullish(),
+  club_id: z.coerce.number().int().positive().nullish(),
+})
+
+export async function POST(request) {
+  const auth = await requireUser({ portal: true })
+  if (!auth.ok) return auth.response
+  const body = await readJson(request, postSchema)
+  if (!body.ok) return body.response
+  const club = resolveClubId(auth.user, body.data.club_id)
+  if (!club.ok) return club.response
+  const res = await registerPlayer({
+    actor: auth.user, clubId: club.clubId, memberId: body.data.member_id, sportId: body.data.sport_id,
+    mainPlayer: body.data.main_player, riId: body.data.ri_id ?? null,
+  })
+  return fromResult(res, (r) => ok(r.registration, { message: 'Player registered' }, 201))
 }
 
 export async function DELETE(request) {
-    try {
-        // Parse URL search parameters
-        const { searchParams } = new URL(request.url);
-        const RMIS_ID = searchParams.get('RMIS_ID');
-        const sport_id = searchParams.get('sport_id');
-        
-        // Validate required parameters
-        if (!RMIS_ID || !sport_id) {
-            console.log('API: Missing required parameters for DELETE:', { RMIS_ID, sport_id });
-            return NextResponse.json({ error: 'Missing required parameters: RMIS_ID and sport_id are required' }, { status: 400 });
-        }
-        
-        console.log(`API: Attempting to delete registration with RMIS_ID: ${RMIS_ID} and sport_id: ${sport_id}`);
-        
-        // Delete the matching row
-        const { data, error } = await supabase
-            .from('registrations')
-            .delete()
-            .eq('RMIS_ID', RMIS_ID)
-            .eq('sport_id', sport_id);
-        
-        if (error) {
-            console.error('API: Error deleting registration:', error);
-            return NextResponse.json({ error: 'Failed to delete registration' }, { status: 500 });
-        }
-        
-        console.log('API: Registration deleted successfully');
-        return NextResponse.json({ 
-            success: true, 
-            message: 'Registration deleted successfully' 
-        }, { status: 200 });
-        
-    } catch (err) {
-        console.error('API: Exception occurred during DELETE:', err);
-        return NextResponse.json({ error: 'Server error deleting registration' }, { status: 500 });
-    }
+  const auth = await requireUser({ portal: true })
+  if (!auth.ok) return auth.response
+  const q = parseQuery(request, { member_id: z.coerce.number().int().positive(), sport_id: z.coerce.number().int().positive(), club_id: optInt })
+  if (!q.ok) return q.response
+  const club = resolveClubId(auth.user, q.data.club_id)
+  if (!club.ok) return club.response
+  const res = await unregisterPlayer({ actor: auth.user, clubId: club.clubId, memberId: q.data.member_id, sportId: q.data.sport_id })
+  return fromResult(res, () => ok({ deleted: true }))
 }
-
-export async function PUT(request) {
-    try {
-        const requestData = await request.json();
-        const { RMIS_ID, sport_id, converted_by } = requestData;
-
-        // Validate required parameters
-        if (!RMIS_ID || !sport_id || !converted_by) {
-            console.log('API: Missing required parameters for PUT:', { RMIS_ID, sport_id, converted_by });
-            return NextResponse.json({ 
-                error: 'Missing required parameters: RMIS_ID, sport_id, and converted_by are required' 
-            }, { status: 400 });
-        }
-
-        console.log(`API: Converting registration for RMIS_ID: ${RMIS_ID}, sport_id: ${sport_id}, converted_by: ${converted_by}`);
-
-        // Update the registration
-        const { data, error } = await supabase
-            .from('registrations')
-            .update({ 
-                status: 5,
-                converted: true,
-                converted_by: converted_by
-                        })
-            .eq('RMIS_ID', RMIS_ID)
-            .eq('sport_id', sport_id)
-            .select('RMIS_ID, sport_id, status, converted, converted_by, updated_at');
-
-        if (error) {
-            console.error('API: Error updating registration:', error);
-            return NextResponse.json({ error: 'Failed to convert registration' }, { status: 500 });
-        }
-
-        if (!data || data.length === 0) {
-            console.log('API: No registration found to update');
-            return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
-        }
-
-        console.log('API: Registration converted successfully');
-        return NextResponse.json({ 
-            success: true,
-            message: 'Registration converted successfully',
-            data: data[0]
-        }, { status: 200 });
-
-    } catch (err) {
-        console.error('API: Exception occurred during PUT:', err);
-        return NextResponse.json({ error: 'Server error converting registration' }, { status: 500 });
-    }
-}
-
-export async function POST(request) {
-    const requestData = await request.json();
-    const { member, sport_id, isMainPlayer } = requestData;
-
-    // Validate input
-    if (!member || !sport_id) {
-        console.log('API: Missing member or sport_id');
-        return NextResponse.json({ error: 'Invalid input: member and sportId are required' }, { status: 400 });
-    }
-
-    try {
-        // First check if registration already exists - optimized query
-        const { data: existingRegistration, error: checkError } = await supabase
-            .from('registrations')
-            .select('RMIS_ID, sport_id, main_player, club_id')
-            .eq('RMIS_ID', member.membership_id)
-            .eq('sport_id', sport_id)
-            .maybeSingle();
-        
-        if (checkError) {
-            console.error('API: Error checking existing registration:', checkError);
-            return NextResponse.json({ error: 'Failed to check registration status' }, { status: 500 });
-        }
-        
-        // If registration already exists, return success with existing data
-        if (existingRegistration) {
-            console.log('API: Member already registered for this sport');
-            return NextResponse.json({ 
-                message: 'Member already registered for this sport',
-                data: existingRegistration,
-                alreadyRegistered: true
-            }, { status: 200 });
-        }
-        
-        // If registration doesn't exist yet, insert a new record - optimized insert
-        const { data, error } = await supabase
-            .from('registrations')
-            .insert({ 
-                RMIS_ID: member.membership_id,
-                sport_id: sport_id,
-                main_player: isMainPlayer,
-                club_id: member.club_id
-            })
-            .select('RMIS_ID, sport_id, main_player, club_id');
-
-        if (error) {
-            console.error('API: Error registering member:', error);
-            return NextResponse.json({ error: 'Failed to register member' }, { status: 500 });
-        }
-
-        return NextResponse.json({ message: 'Member registered successfully', data }, { status: 201 });
-    } catch (err) {
-        console.error('API: Exception occurred:', err);
-        return NextResponse.json({ error: 'Server error processing registration' }, { status: 500 });
-    }
-}
-
-

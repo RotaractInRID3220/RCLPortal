@@ -5,7 +5,7 @@ import Footer from './components/Footer'
 import GameCard from './components/GameCard'
 import { FaInfoCircle, FaBolt } from 'react-icons/fa'
 import { useState, useEffect } from 'react'
-import { APP_CONFIG } from '@/config/app.config'
+import { useEventInfo } from '@/hooks/useEventInfo'
 
 export default function EArenaPage() {
   const games = [
@@ -31,15 +31,18 @@ export default function EArenaPage() {
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false)
   const [isRegistrationClosed, setIsRegistrationClosed] = useState(false)
 
+  const info = useEventInfo()
+
   useEffect(() => {
+    if (!info) return
     const calculateTimeLeft = () => {
-      const targetDate = new Date(APP_CONFIG.REGISTRATION_OPENING_DATE)
-      const registrationDeadline = new Date(APP_CONFIG.REGISTRATION_DEADLINE)
-      const eventDay = new Date(APP_CONFIG.EVENT_DAY)
+      const targetDate = info.registrationOpenAt ? new Date(info.registrationOpenAt) : null
+      const registrationDeadline = info.registrationCloseAt ? new Date(info.registrationCloseAt) : null
+      const eventDay = info.eventStartAt ? new Date(info.eventStartAt) : null
       const now = new Date()
-      const difference = targetDate - now
-      const registrationClosed = now > registrationDeadline
-      const eventDifference = eventDay - now
+      const difference = targetDate ? targetDate - now : 0
+      const registrationClosed = registrationDeadline ? now > registrationDeadline : false
+      const eventDifference = eventDay ? eventDay - now : 0
 
       // Check if registrations are closed
       setIsRegistrationClosed(registrationClosed)
@@ -54,7 +57,7 @@ export default function EArenaPage() {
         setIsRegistrationOpen(false)
       } else {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-        setIsRegistrationOpen(true)
+        setIsRegistrationOpen(Boolean(targetDate)) // no opening date set = not open
       }
 
       // Calculate event day countdown
@@ -74,7 +77,7 @@ export default function EArenaPage() {
     const timer = setInterval(calculateTimeLeft, 1000)
 
     return () => clearInterval(timer)
-  }, [])
+  }, [info])
 
   return (
     <>

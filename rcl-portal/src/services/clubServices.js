@@ -1,6 +1,6 @@
 /**
  * Service for managing clubs data
- * Handles all club-related API operations including fetch, create, and update
+ * Club reads, and the admin sync from RMIS (clubs are never typed in here)
  */
 
 /**
@@ -24,77 +24,22 @@ export const fetchClubs = async () => {
 };
 
 /**
- * Creates a new club
- * @param {Object} clubData - Club data to create
- * @param {string} clubData.club_id - Unique club identifier
- * @param {string} clubData.club_name - Name of the club
- * @param {string} clubData.category - Category of the club (community/institute)
- * @returns {Promise<Object>} Created club object
+ * Clubs are not created or edited here: they come from RMIS. Admin: pull the latest club list now
+ * (the worker also does this hourly).
  */
-export const createClub = async (clubData) => {
-  try {
-    const { club_id, club_name, category } = clubData;
-
-    // Validate required fields
-    if (!club_id || !club_name || !category) {
-      throw new Error('Missing required fields: club_id, club_name, category');
-    }
-
-    const response = await fetch('/api/clubs', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ club_id, club_name, category }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.club;
-  } catch (error) {
-    console.error('Error creating club:', error);
-    throw error;
-  }
+export const syncClubsFromRmis = async () => {
+  const response = await fetch('/api/clubs', { method: 'POST' });
+  const body = await response.json();
+  if (!body.success) throw new Error(body.error || 'Could not sync clubs from RMIS');
+  return body.data;
 };
 
-/**
- * Updates an existing club
- * @param {number} id - The database ID of the club to update
- * @param {Object} updateData - Data to update
- * @param {string} [updateData.club_id] - Updated club identifier
- * @param {string} [updateData.club_name] - Updated club name
- * @param {string} [updateData.category] - Updated club category
- * @returns {Promise<Object>} Updated club object
- */
-export const updateClub = async (id, updateData) => {
-  try {
-    if (!id) {
-      throw new Error('Club ID is required for update');
-    }
-
-    const response = await fetch('/api/clubs', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ id, ...updateData }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.club;
-  } catch (error) {
-    console.error('Error updating club:', error);
-    throw error;
-  }
+/** Admin: every club including closed ones. */
+export const fetchAllClubsAdmin = async () => {
+  const response = await fetch('/api/clubs?include_inactive=1', { cache: 'no-store' });
+  const body = await response.json();
+  if (!body.success) throw new Error(body.error || 'Failed to fetch clubs');
+  return body.data || [];
 };
 
 /**

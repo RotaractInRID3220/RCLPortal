@@ -1,63 +1,11 @@
-import { supabase } from '@/lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { fail, ok } from '@/server/http.mjs'
+import { getPlayerPublic } from '@/server/registration/service.mjs'
 
-/**
- * Fetches a single player by RMIS_ID
- * GET /api/players/[rmisId]
- */
-export async function GET(request, { params }) {
-  try {
-    const { rmisId } = await params;
-
-    if (!rmisId) {
-      return NextResponse.json(
-        { success: false, error: 'RMIS_ID is required' },
-        { status: 400 }
-      );
-    }
-
-    // Fetch player with club information
-    const { data: player, error } = await supabase
-      .from('players')
-      .select(`
-        RMIS_ID,
-        name,
-        NIC,
-        club_id,
-        clubs (
-          club_name,
-          category
-        )
-      `)
-      .eq('RMIS_ID', rmisId)
-      .single();
-
-    if (error) {
-      console.error('Supabase error:', error);
-      return NextResponse.json(
-        { success: false, error: 'Player not found' },
-        { status: 404 }
-      );
-    }
-
-    if (!player) {
-      return NextResponse.json(
-        { success: false, error: 'Player not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: player,
-      message: 'Player retrieved successfully'
-    });
-
-  } catch (error) {
-    console.error('Error fetching player:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+// PUBLIC (QR page). The path segment is the player's member_id. No NIC in the answer.
+export async function GET(_request, { params }) {
+  const { rmisId } = await params
+  if (!/^\d{1,9}$/.test(rmisId)) return fail(400, 'invalid_request', 'Bad player id.')
+  const player = await getPlayerPublic(Number(rmisId))
+  if (!player) return fail(404, 'player_not_found', 'Player not found.')
+  return Response.json({ success: true, data: player }, { headers: { 'Cache-Control': 'no-store' } })
 }

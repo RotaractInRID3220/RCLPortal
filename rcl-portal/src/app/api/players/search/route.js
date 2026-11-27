@@ -1,90 +1,16 @@
-import { supabase } from '@/lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { z } from 'zod'
+import { ok, parseQuery } from '@/server/http.mjs'
+import { searchPlayersPublic } from '@/server/registration/service.mjs'
 
-/**
- * Searches for players by name, NIC, or RMIS_ID
- * GET /api/players/search?name=&nic=&rmisId=&page=1&limit=10
- */
+// PUBLIC (QR page). Find a registered player by name (>= 3 characters, partial), NIC (exact) or
+// membership id (exact). Never returns the NIC; at most 20 results.
 export async function GET(request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const name = searchParams.get('name') || '';
-    const nic = searchParams.get('nic') || '';
-    const rmisId = searchParams.get('rmisId') || '';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-
-    // Check if at least one search field has a value
-    if (!name.trim() && !nic.trim() && !rmisId.trim()) {
-      return NextResponse.json({
-        success: true,
-        data: { players: [], total: 0, page, limit }
-      });
-    }
-
-    const offset = (page - 1) * limit;
-
-    // Build the query dynamically based on which fields are provided
-    let query = supabase
-      .from('players')
-      .select(`
-        RMIS_ID,
-        name,
-        NIC,
-        club_id,
-        clubs (
-          club_name,
-          category
-        )
-      `, { count: 'exact' });
-
-    // Build OR conditions for search
-    const conditions = [];
-    if (name.trim()) {
-      conditions.push(`name.ilike.%${name.trim()}%`);
-    }
-    if (nic.trim()) {
-      conditions.push(`NIC.ilike.%${nic.trim()}%`);
-    }
-    if (rmisId.trim()) {
-      conditions.push(`RMIS_ID.ilike.%${rmisId.trim()}%`);
-    }
-
-    // Apply OR filter if we have conditions
-    if (conditions.length > 0) {
-      query = query.or(conditions.join(','));
-    }
-
-    // Execute query with ordering and pagination
-    const { data: players, error, count } = await query
-      .order('name', { ascending: true })
-      .range(offset, offset + limit - 1);
-
-    if (error) {
-      console.error('Supabase search error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        players: players || [],
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit)
-      },
-      message: `Found ${players?.length || 0} players`
-    });
-
-  } catch (error) {
-    console.error('Player search error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  const q = parseQuery(request, {
+    name: z.string().max(100).optional(), nic: z.string().max(20).optional(),
+    membershipId: z.string().max(20).optional(), rmisId: z.string().max(20).optional(), // rmisId: old parameter name
+  })
+  if (!q.ok) return q.response
+  const res = await searchPlayersPublic({ name: q.data.name, nic: q.data.nic, membershipId: q.data.membershipId ?? q.data.rmisId })
+  return Response.json({ success: true, data: { players: res.players, total: res.players.length, page: 1, limit: 20, totalPages: 1 }, reason: res.reason ?? undefined },
+    { headers: { 'Cache-Control': 'no-store' } })
 }

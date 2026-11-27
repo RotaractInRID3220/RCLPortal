@@ -19,10 +19,11 @@ import {
   Loader2,
   IdCard,
 } from 'lucide-react';
-import { APP_CONFIG } from '@/config/app.config';
+import { useSportDays } from '@/hooks/useEventInfo';
 
 export default function PlayerNumberMobileLookupage() {
   const router = useRouter();
+  const { currentDay } = useSportDays();
   const [playerNumberQuery, setPlayerNumberQuery] = useState('');
   const [nicQuery, setNicQuery] = useState('');
   const [rmisIdQuery, setRmisIdQuery] = useState('');
@@ -37,13 +38,18 @@ export default function PlayerNumberMobileLookupage() {
       return;
     }
 
+    if (!currentDay) {
+      toast.error('No check-in day is selected yet. Ask a super admin to set the current day.');
+      return;
+    }
+
     try {
       setLoading(searchType);
       setError(null);
       setPlayerData(null);
 
       const response = await fetch(
-        `/api/admin/player-numbers/lookup?query=${encodeURIComponent(query)}&searchType=${searchType}&sportDay=${APP_CONFIG.CURRENT_SPORT_DAY}`
+        `/api/admin/player-numbers/lookup?query=${encodeURIComponent(query)}&searchType=${searchType}&sportDay=${currentDay}`
       );
 
       if (!response.ok) {
@@ -94,7 +100,7 @@ export default function PlayerNumberMobileLookupage() {
             Player Lookup
           </h1>
           <p className="text-gray-400 text-sm">
-            Search by player number, NIC, or RMIS ID for {APP_CONFIG.CURRENT_SPORT_DAY}
+            Search by player number, NIC, or RMIS ID for {currentDay ?? '(no day set)'}
           </p>
         </div>
       </div>
@@ -218,6 +224,17 @@ export default function PlayerNumberMobileLookupage() {
             <div className="p-4 space-y-4">
               {/* Details Grid */}
               <div className="space-y-3">
+                {/* Bib number (track events, swimming, road race): fixed once assigned */}
+                {playerData.bib_number && (
+                  <div className="bg-cranberry/10 border border-cranberry/40 rounded-lg p-3">
+                    <div className="flex items-center text-gray-300 text-xs mb-1">
+                      <Hash className="h-3.5 w-3.5 mr-1.5" />
+                      <span>BIB NUMBER</span>
+                    </div>
+                    <p className="text-white text-3xl font-mono font-bold tracking-widest">{playerData.bib_number}</p>
+                  </div>
+                )}
+
                 {/* RMIS ID */}
                 <div className="bg-white/5 border border-white/10 rounded-lg p-3">
                   <div className="flex items-center text-gray-400 text-xs mb-1">
@@ -277,7 +294,7 @@ export default function PlayerNumberMobileLookupage() {
                 <Trophy className="h-5 w-5 text-cranberry" />
                 <div>
                   <h3 className="text-lg font-bold text-white">Registered Sports</h3>
-                  <p className="text-gray-400 text-xs">For {APP_CONFIG.CURRENT_SPORT_DAY}</p>
+                  <p className="text-gray-400 text-xs">For {currentDay ?? '(no day set)'}</p>
                 </div>
               </div>
             </div>

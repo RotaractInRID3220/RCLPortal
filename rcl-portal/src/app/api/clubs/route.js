@@ -1,120 +1,30 @@
-import { supabase } from '../../../lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { z } from 'zod'
+import { requireUser } from '@/server/auth/guards'
+import { fail, ok, optInt, parseQuery } from '@/server/http.mjs'
+import { query } from '@/server/db.mjs'
+import { syncClubs } from '@/server/rmis/mirror.mjs'
+import { RmisError } from '@/server/rmis/client.mjs'
 
-export async function GET() {
-  try {
-    const { data, error } = await supabase
-      .from('clubs')
-      .select('*')
-      .order('club_name', { ascending: true });
-
-    if (error) {
-      console.error('Error fetching clubs:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch clubs' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ clubs: data || [] });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+// Clubs come from RMIS (synced, not typed in). Signed-in users may list them.
+export async function GET(request) {
+  const auth = await requireUser()
+  if (!auth.ok) return auth.response
+  const q = parseQuery(request, { club_id: optInt, category: z.enum(['community', 'institute']).optional(), include_inactive: z.enum(['0', '1']).optional() })
+  if (!q.ok) return q.response
+  // inactive (closed) clubs are only listed for admins who ask for them
+  const withInactive = q.data.include_inactive === '1' && auth.user.hasAdminAccess
+  const { rows } = await query(
+    `SELECT club_id, club_name, category, status, synced_at FROM clubs WHERE ($3::boolean OR status = 1) AND ($1::int IS NULL OR club_id = $1) AND ($2::text IS NULL OR category = $2) ORDER BY club_name`,
+    [q.data.club_id ?? null, q.data.category ?? null, withInactive])
+  return ok(rows, { clubs: rows, count: rows.length })
 }
 
-export async function POST(request) {
-  try {
-    const body = await request.json();
-    const { club_id, club_name, category } = body;
-
-    // Validate required fields
-    if (!club_id || !club_name || !category) {
-      return NextResponse.json(
-        { error: 'Missing required fields: club_id, club_name, category' },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from('clubs')
-      .insert([{ club_id, club_name, category }])
-      .select();
-
-    if (error) {
-      console.error('Error creating club:', error);
-      return NextResponse.json(
-        { error: 'Failed to create club' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ club: data[0] });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(request) {
-  try {
-    const body = await request.json();
-    const { id, club_id, club_name, category } = body;
-
-    // Validate required fields
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Missing required field: id' },
-        { status: 400 }
-      );
-    }
-
-    // Build update object with only provided fields
-    const updateData = {};
-    if (club_id !== undefined) updateData.club_id = club_id;
-    if (club_name !== undefined) updateData.club_name = club_name;
-    if (category !== undefined) updateData.category = category;
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { error: 'No fields to update' },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from('clubs')
-      .update(updateData)
-      .eq('id', id)
-      .select();
-
-    if (error) {
-      console.error('Error updating club:', error);
-      return NextResponse.json(
-        { error: 'Failed to update club' },
-        { status: 500 }
-      );
-    }
-
-    if (data.length === 0) {
-      return NextResponse.json(
-        { error: 'Club not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ club: data[0] });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+// Super admin: pull the club list from RMIS now (the worker also does it hourly).
+export async function POST() {
+  const auth = await requireUser({ admin: true, permission: 'super_admin' })
+  if (!auth.ok) return auth.response
+  try { return ok(await syncClubs()) } catch (e) {
+    if (e instanceof RmisError) return fail(503, 'rmis_unavailable', 'RMIS is not reachable right now.')
+    throw e
   }
 }

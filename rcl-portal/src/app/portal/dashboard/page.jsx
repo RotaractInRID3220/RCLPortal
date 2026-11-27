@@ -1,174 +1,54 @@
 'use client';
 
-import { 
-  loadingAtom, 
-  userDeetsAtom, 
-  portalDashboardDataAtom,
-  portalStatsAtom,
-  portalStatsLoadingAtom,
-  portalStatsErrorAtom,
-  portalLeaderboardAtom,
-  portalLeaderboardLoadingAtom,
-  lastFetchTimestampAtom,
-  isCacheValid
-} from '@/app/state/store';
+import { loadingAtom, userDeetsAtom } from '@/app/state/store';
 import { useAtom } from 'jotai';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getOptimizedPortalDashboardData } from '@/services/portalServices';
-import { getLeaderboardPreview } from '@/services/adminServices';
 import { toast } from 'sonner';
 import StatsCard from '@/components/StatsCard';
 import LeaderboardPreview from '@/components/LeaderboardPreview';
 import AnnouncementsCard from '@/components/AnnouncementsCard';
+import { PortalLiveSummary } from '@/components/LiveSummary';
 import PieStatCard from './components/PieStatCard';
+
+const REFRESH_MS = 30000; // live numbers: always re-read from the server, never reuse an old copy
 
 const PortalDashboardPage = React.memo(() => {
   const [userDeets] = useAtom(userDeetsAtom);
   const [loading] = useAtom(loadingAtom);
-  const [dashboardData, setDashboardData] = useAtom(portalDashboardDataAtom);
-  const [lastFetchTimestamp, setLastFetchTimestamp] = useAtom(lastFetchTimestampAtom);
-  
-  // Portal-specific atoms
-  const [portalStats, setPortalStats] = useAtom(portalStatsAtom);
-  const [statsLoading, setStatsLoading] = useAtom(portalStatsLoadingAtom);
-  const [statsError, setStatsError] = useAtom(portalStatsErrorAtom);
-  const [leaderboardData, setLeaderboardData] = useAtom(portalLeaderboardAtom);
-  const [leaderboardLoading, setLeaderboardLoading] = useAtom(portalLeaderboardLoadingAtom);
-  
-  const [currentLeaderboardCategory, setCurrentLeaderboardCategory] = useState('community');
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  // Debug: Log the current loading states
-  console.log('Current loading states:', { 
-    statsLoading, 
-    leaderboardLoading, 
-    isRefreshing,
-    hasData: leaderboardData?.length > 0
-  });
+  const [data, setData] = useState(null);
+  const [statsError, setStatsError] = useState(null);
+  const [category, setCategory] = useState('community');
 
-  // Memoized values
-  const isDataCacheValid = useMemo(() => {
-    return isCacheValid(lastFetchTimestamp.portalDashboard, 'portalDashboard');
-  }, [lastFetchTimestamp.portalDashboard]);
-
-  // Match admin logic for stats display
-  const displayStats = useMemo(() => ({
-    registeredEvents: statsLoading ? 0 : portalStats.registeredEvents,
-    registeredPlayers: statsLoading ? 0 : portalStats.registeredPlayers,
-    totalPoints: statsLoading ? 0 : portalStats.totalPoints,
-    clubRank: statsLoading ? 0 : portalStats.clubRank
-  }), [statsLoading, portalStats]);
-
-  // PieStat breakdown for registered players
-  const playerBreakdown = portalStats?.playerBreakdown || { general: 0, prospective: 0, total: 0 };
-  const pieStatLoading = statsLoading || !portalStats?.playerBreakdown;
-
-  // Optimized data fetching with smart caching (match admin logic)
-  const fetchOptimizedDashboardData = useCallback(async (forceRefresh = false) => {
+  const load = useCallback(async (cat, { quiet = true } = {}) => {
     try {
-      if (!userDeets?.club_id) {
-        console.error('No club ID found in user details:', userDeets);
-        return;
-      }
-
-      // Check cache validity unless forcing refresh
-      if (!forceRefresh && isDataCacheValid && dashboardData.stats?.registeredEvents > 0) {
-        console.log('Using cached portal dashboard data');
-        return;
-      }
-
-      setStatsLoading(true);
-      setLeaderboardLoading(true);
+      setData(await getOptimizedPortalDashboardData(userDeets.club_id, cat, 10));
       setStatsError(null);
-
-      // Single optimized API call
-      const data = await getOptimizedPortalDashboardData(
-        userDeets.club_id,
-        currentLeaderboardCategory,
-        10
-      );
-
-      // Update all data at once
-      setDashboardData(data);
-      setLastFetchTimestamp(prev => ({
-        ...prev,
-        portalDashboard: Date.now()
-      }));
-
-      // Update individual atoms for backward compatibility
-      setPortalStats(data.stats);
-      setLeaderboardData(data.leaderboard);
-
     } catch (error) {
-      console.error('Error fetching optimized portal dashboard data:', error);
+      console.error('Error fetching portal dashboard data:', error);
       setStatsError(error.message);
-      if (forceRefresh) {
-        toast.error('Failed to refresh dashboard data');
-      } else {
-        toast.error('Failed to load dashboard data');
-      }
-    } finally {
-      setStatsLoading(false);
-      setLeaderboardLoading(false);
-      setIsRefreshing(false);
+      if (!quiet) toast.error('Failed to load dashboard data');
     }
-  }, [
-    userDeets?.club_id,
-    isDataCacheValid,
-    dashboardData.stats?.registeredEvents,
-    currentLeaderboardCategory,
-    setDashboardData,
-    setLastFetchTimestamp,
-    setPortalStats,
-    setLeaderboardData,
-    setStatsLoading,
-    setLeaderboardLoading,
-    setStatsError
-  ]);
+  }, [userDeets?.club_id]);
 
-  // Handles leaderboard category filter changes (match admin logic)
-  const handleLeaderboardCategoryChange = useCallback(async (category) => {
-    try {
-      setLeaderboardLoading(true);
-      setCurrentLeaderboardCategory(category);
-
-      // Fetch only leaderboard data for category change
-      const leaderboard = await getLeaderboardPreview(category);
-      setLeaderboardData(leaderboard);
-
-    } catch (error) {
-      console.error('Error fetching filtered leaderboard:', error);
-      toast.error('Failed to load leaderboard data');
-    } finally {
-      setLeaderboardLoading(false);
-    }
-  }, [setLeaderboardData, setLeaderboardLoading]);
-
-  // Background refresh handler
-  const handleRefresh = useCallback(() => {
-    if (!isRefreshing) {
-      setIsRefreshing(true);
-      fetchOptimizedDashboardData(true);
-    }
-  }, [isRefreshing, fetchOptimizedDashboardData]);
-
-  // Initial data fetch
   useEffect(() => {
-    if (!loading && userDeets?.club_id) {
-      fetchOptimizedDashboardData();
-    }
-  }, [loading, userDeets?.club_id, fetchOptimizedDashboardData]);
+    if (loading || !userDeets?.club_id) return;
+    load(category, { quiet: false });
+    const interval = setInterval(() => load(category), REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [loading, userDeets?.club_id, category, load]);
 
-  // Smart background refresh - only when cache is invalid
-  useEffect(() => {
-    if (!loading && userDeets?.club_id && !isDataCacheValid) {
-      const interval = setInterval(() => {
-        fetchOptimizedDashboardData();
-      }, 60000); // 60 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [loading, userDeets?.club_id, isDataCacheValid, fetchOptimizedDashboardData]);
+  const portalStats = data?.stats;
+  const statsLoading = !portalStats;
+  const leaderboardData = data?.leaderboard ?? [];
+  const displayStats = {
+    registeredEvents: portalStats?.registeredEvents ?? 0,
+    registeredPlayers: portalStats?.registeredPlayers ?? 0,
+    totalPoints: portalStats?.totalPoints ?? 0,
+    clubRank: portalStats?.clubRank ?? 0,
+  };
+  const playerBreakdown = portalStats?.playerBreakdown || { general: 0, prospective: 0, total: 0 };
+  const pieStatLoading = statsLoading;
 
   if (loading) {
     return (
@@ -244,7 +124,7 @@ const PortalDashboardPage = React.memo(() => {
           <div className="col-span-8">
             <LeaderboardPreview 
               leaderboardData={leaderboardData} 
-              onCategoryChange={handleLeaderboardCategoryChange}
+              onCategoryChange={setCategory}
             />
           </div>
           <div className='col-span-4'>
@@ -252,6 +132,12 @@ const PortalDashboardPage = React.memo(() => {
             <AnnouncementsCard />
           </div>
       </div>
+
+      {portalStats && (
+        <div className="mt-6">
+          <PortalLiveSummary stats={portalStats} />
+        </div>
+      )}
 
       {statsError && (
         <div className="text-center text-red-400 mt-4">

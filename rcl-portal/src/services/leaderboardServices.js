@@ -4,107 +4,56 @@
  */
 
 /**
- * Fetch aggregated leaderboard data with caching
- * @param {Object} options - Query options
- * @param {string} options.category - Club category filter ('community' or 'institute')
- * @param {number} options.limit - Number of results to return
- * @param {number} options.offset - Pagination offset
- * @returns {Promise<Object>} Leaderboard data with pagination info
+ * Public leaderboard from the server snapshot. No client cache and no cache-busting query:
+ * `cache: 'no-cache'` makes the browser revalidate with the ETag on every call (a 304 costs almost
+ * nothing, a changed leaderboard is returned at once).
+ * @param {{category?: 'community'|'institute', limit?: number, offset?: number}} options
  */
 export const fetchLeaderboardData = async (options = {}) => {
   try {
-    const { category, limit, offset = 0, _t } = options;
-    
+    const { category, limit, offset = 0 } = options;
     const params = new URLSearchParams();
     if (category) params.append('category', category);
-    if (limit) params.append('limit', limit.toString());
-    if (offset) params.append('offset', offset.toString());
-    // Add cache-busting timestamp to prevent browser/CDN caching
-    params.append('_t', _t || Date.now().toString());
+    if (limit) params.append('limit', String(limit));
+    if (offset) params.append('offset', String(offset));
 
-    const response = await fetch(`/api/leaderboard/aggregated?${params}`, {
-      cache: 'no-store', // Prevent browser caching
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: Failed to fetch leaderboard data`);
-    }
-
+    const response = await fetch(`/api/leaderboard/aggregated?${params}`, { cache: 'no-cache' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch leaderboard data`);
     const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to fetch leaderboard data');
-    }
+    if (!result.success) throw new Error(result.error || 'Failed to fetch leaderboard data');
 
     return {
       success: true,
       data: result.data,
       total: result.total,
       pagination: result.pagination,
-      usedFallback: result.usedFallback || false
+      version: result.version,
+      generatedAt: result.generated_at
     };
   } catch (error) {
     console.error('Error fetching leaderboard data:', error);
-    return {
-      success: false,
-      error: error.message,
-      data: []
-    };
+    return { success: false, error: error.message, data: [] };
   }
 };
 
 /**
- * Fetch detailed club information with points breakdown
- * @param {string|number} clubId - Club ID
- * @param {number} _t - Cache-busting timestamp (optional)
- * @returns {Promise<Object>} Club details with points breakdown
+ * Detailed points breakdown of one club (from the snapshot).
+ * @param {string|number} clubId
  */
-export const fetchClubDetails = async (clubId, _t) => {
+export const fetchClubDetails = async (clubId) => {
   try {
-    if (!clubId) {
-      throw new Error('Club ID is required');
-    }
-
-    // Add cache-busting timestamp
-    const params = new URLSearchParams();
-    params.append('_t', _t || Date.now().toString());
-
-    const response = await fetch(`/api/leaderboard/club-details/${clubId}?${params}`, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
-    });
-    
+    if (!clubId) throw new Error('Club ID is required');
+    const response = await fetch(`/api/leaderboard/club-details/${clubId}`, { cache: 'no-cache' });
     if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('Club not found');
-      }
+      if (response.status === 404) throw new Error('Club not found');
       throw new Error(`HTTP ${response.status}: Failed to fetch club details`);
     }
-
     const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to fetch club details');
-    }
-
-    return {
-      success: true,
-      data: result.data
-    };
+    if (!result.success) throw new Error(result.error || 'Failed to fetch club details');
+    return { success: true, data: result.data, version: result.version, generatedAt: result.generated_at };
   } catch (error) {
     console.error('Error fetching club details:', error);
-    return {
-      success: false,
-      error: error.message,
-      data: null
-    };
+    return { success: false, error: error.message, data: null };
   }
 };
 
@@ -127,7 +76,7 @@ export const fetchClubPoints = async (options = {}) => {
     if (limit) params.append('limit', limit.toString());
     if (offset) params.append('offset', offset.toString());
 
-    const response = await fetch(`/api/club-points?${params}`);
+    const response = await fetch(`/api/club-points?${params}`, { cache: 'no-store' });
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: Failed to fetch club points`);
@@ -155,56 +104,37 @@ export const fetchClubPoints = async (options = {}) => {
 };
 
 /**
- * Add club points entry
- * @param {Object} pointData - Points data to add
- * @param {string|number} pointData.clubId - Club ID
- * @param {string|number} pointData.sportId - Sport ID
- * @param {number} pointData.points - Points value
- * @param {number} pointData.place - Place/rank
- * @returns {Promise<Object>} Result of the operation
+ * Add a manual club points entry (admin). Points: any non-zero whole number (negative = deduction).
+ * @param {{clubId: number|string, sportId?: number|string|null, points: number|string, place?: number|string, note?: string}} pointData
  */
 export const addClubPoints = async (pointData) => {
   try {
-    const { clubId, sportId, points, place } = pointData;
-
-    if (!clubId || !sportId || !points || !place) {
-      throw new Error('All fields are required: clubId, sportId, points, place');
+    const { clubId, sportId, points, place, note } = pointData;
+    const pointsNum = parseInt(points, 10);
+    if (!clubId || !Number.isInteger(pointsNum) || pointsNum === 0) {
+      throw new Error('Club and a non-zero points value are required');
     }
 
     const response = await fetch('/api/club-points', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        club_id: clubId,
-        sport_id: sportId,
-        points: parseInt(points),
-        place: parseInt(place)
+        club_id: Number(clubId),
+        sport_id: sportId ? Number(sportId) : null,
+        points: pointsNum,
+        place: place ? parseInt(place, 10) : null,
+        note: note || null
       })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP ${response.status}: Failed to add points`);
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || `HTTP ${response.status}: Failed to add points`);
     }
-
-    const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to add points');
-    }
-
-    return {
-      success: true,
-      data: result.data
-    };
+    return { success: true, data: result.data };
   } catch (error) {
     console.error('Error adding club points:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+    return { success: false, error: error.message };
   }
 };
 

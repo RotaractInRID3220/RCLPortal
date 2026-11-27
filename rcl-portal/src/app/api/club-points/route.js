@@ -1,219 +1,51 @@
-import { supabase } from '../../../lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { z } from 'zod'
+import { requireUser } from '@/server/auth/guards'
+import { fail, fromResult, ok, optInt, parseQuery, readJson } from '@/server/http.mjs'
+import { addManualPoints, deleteManualPoints, listPoints, normaliseCategory } from '@/server/leaderboard/service.mjs'
 
+export const dynamic = 'force-dynamic'
+const NO_STORE = { 'Cache-Control': 'no-store' }
+
+/** GET /api/club-points?sport_id=&club_id=&category=&limit=&offset=  (PUBLIC, live rows, never cached). */
 export async function GET(request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const sport_id = searchParams.get('sport_id');
-    const club_id = searchParams.get('club_id');
-    const category = searchParams.get('category');
-    const limit = searchParams.get('limit');
-    const offset = searchParams.get('offset') || '0';
-
-    let query = supabase
-      .from('club_points')
-      .select(`
-        point_id,
-        club_id,
-        sport_id,
-        points,
-        place,
-        clubs:club_id (
-          club_name,
-          category
-        )
-      `)
-      .order('points', { ascending: false });
-
-    // Apply filters
-    if (sport_id) {
-      query = query.eq('sport_id', sport_id);
-    }
-    
-    if (club_id) {
-      query = query.eq('club_id', club_id);
-    }
-
-    // Filter by club category if provided
-    if (category) {
-      query = query.eq('clubs.category', category);
-    }
-
-    // Apply pagination if provided
-    if (limit) {
-      query = query.range(
-        parseInt(offset), 
-        parseInt(offset) + parseInt(limit) - 1
-      );
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching club points:', error);
-      return NextResponse.json(
-        { error: 'Failed to fetch club points' },
-        { status: 500 }
-      );
-    }
-
-    // Get total count for pagination info
-    let totalCount = null;
-    if (limit) {
-      let countQuery = supabase
-        .from('club_points')
-        .select('point_id', { count: 'exact', head: true });
-      
-      if (sport_id) {
-        countQuery = countQuery.eq('sport_id', sport_id);
-      }
-      if (club_id) {
-        countQuery = countQuery.eq('club_id', club_id);
-      }
-      
-      const { count } = await countQuery;
-      totalCount = count;
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      data: data || [],
-      pagination: limit ? {
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        total: totalCount,
-        hasMore: totalCount ? (parseInt(offset) + parseInt(limit)) < totalCount : false
-      } : null
-    });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  const q = parseQuery(request, {
+    sport_id: optInt, club_id: optInt, category: z.string().max(20).optional(), limit: optInt,
+    offset: z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().min(0).default(0)),
+  })
+  if (!q.ok) return q.response
+  const category = normaliseCategory(q.data.category)
+  if (category === undefined) return fail(400, 'invalid_request', 'category must be community or institute.')
+  const r = await listPoints({ sportId: q.data.sport_id, clubId: q.data.club_id, category, limit: q.data.limit, offset: q.data.offset })
+  return Response.json({
+    success: true, data: r.data,
+    pagination: q.data.limit ? { limit: r.limit, offset: r.offset, total: r.total, hasMore: r.offset + r.limit < r.total } : null,
+  }, { headers: NO_STORE })
 }
 
+const manualBody = z.object({
+  club_id: z.coerce.number().int().positive(),
+  sport_id: z.coerce.number().int().positive().nullish(),
+  points: z.coerce.number().int().min(-1000).max(1000).refine((n) => n !== 0, 'points must not be 0'),
+  place: z.coerce.number().int().min(1).max(999).nullish(),
+  note: z.string().trim().max(200).nullish(),
+})
+
+/** POST: admin manual points entry (kind='manual'). Actor = session. */
 export async function POST(request) {
-  try {
-    const body = await request.json();
-    const { club_id, sport_id, points, place } = body;
-
-    // Validate required fields
-    if (!club_id || !sport_id || !points || !place) {
-      return NextResponse.json(
-        { error: 'Missing required fields: club_id, sport_id, points, place' },
-        { status: 400 }
-      );
-    }
-
-    // Validate that points and place are numbers
-    if (isNaN(points) || isNaN(place)) {
-      return NextResponse.json(
-        { error: 'Points and place must be valid numbers' },
-        { status: 400 }
-      );
-    }
-
-    // Validate points must be double digits (10-99)
-    if (points < 10 || points > 99) {
-      return NextResponse.json(
-        { error: 'Points must be double digits (10-99)' },
-        { status: 400 }
-      );
-    }
-
-    // Validate place must be positive
-    if (place < 1) {
-      return NextResponse.json(
-        { error: 'Place must be a positive number' },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from('club_points')
-      .insert([{ 
-        club_id: club_id,
-        sport_id: parseInt(sport_id),
-        points: parseInt(points),
-        place: parseInt(place)
-      }])
-      .select(`
-        point_id,
-        club_id,
-        sport_id,
-        points,
-        place,
-        clubs:club_id (
-          club_name,
-          category
-        )
-      `);
-
-    if (error) {
-      console.error('Error creating club point entry:', error);
-      return NextResponse.json(
-        { error: 'Failed to create club point entry' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      data: data[0] 
-    });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  const auth = await requireUser({ admin: true })
+  if (!auth.ok) return auth.response
+  const body = await readJson(request, manualBody)
+  if (!body.ok) return body.response
+  const d = body.data
+  const r = await addManualPoints({ actor: auth.user, clubId: d.club_id, sportId: d.sport_id ?? null, points: d.points, place: d.place ?? null, note: d.note || null })
+  return fromResult(r, (res) => ok(res.row, {}, 201))
 }
 
+/** DELETE ?point_id=: remove a MANUAL entry. */
 export async function DELETE(request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const point_id = searchParams.get('point_id');
-
-    if (!point_id) {
-      return NextResponse.json(
-        { error: 'Missing required parameter: point_id' },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from('club_points')
-      .delete()
-      .eq('point_id', parseInt(point_id))
-      .select();
-
-    if (error) {
-      console.error('Error deleting club point entry:', error);
-      return NextResponse.json(
-        { error: 'Failed to delete club point entry' },
-        { status: 500 }
-      );
-    }
-
-    if (data.length === 0) {
-      return NextResponse.json(
-        { error: 'Club point entry not found' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      message: 'Club point entry deleted successfully' 
-    });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  const auth = await requireUser({ admin: true })
+  if (!auth.ok) return auth.response
+  const q = parseQuery(request, { point_id: z.coerce.number().int().positive() })
+  if (!q.ok) return q.response
+  return fromResult(await deleteManualPoints({ actor: auth.user, pointId: q.data.point_id }), () => ok(null, { message: 'Club point entry deleted successfully' }))
 }

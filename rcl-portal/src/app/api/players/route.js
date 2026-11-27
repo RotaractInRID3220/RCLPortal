@@ -1,167 +1,28 @@
-import { supabase } from '../../../lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { z } from 'zod'
+import { requireUser, resolveClubId } from '@/server/auth/guards'
+import { fromResult, ok, optInt, parseQuery, readJson } from '@/server/http.mjs'
+import { convertPlayer, listPlayersByClub } from '@/server/registration/service.mjs'
 
+// A club's players (own club; admins pass club_id).
 export async function GET(request) {
-    const { searchParams } = new URL(request.url);
-    const club_id = searchParams.get('club_id');
-    const listMode = searchParams.get('list') === 'true';
-
-    if (!club_id) {
-        return NextResponse.json({ error: 'club_id is required' }, { status: 400 });
-    }
-
-    try {
-        if (listMode) {
-            // Return all players for the club (no pagination)
-            const { data, error } = await supabase
-                .from('players')
-                .select('*')
-                .eq('club_id', club_id);
-
-            if (error) {
-                console.error('Error fetching players:', error);
-                return NextResponse.json({ error: 'Failed to fetch players' }, { status: 500 });
-            }
-
-            return NextResponse.json({
-                success: true,
-                players: data || [],
-                count: data?.length || 0
-            });
-        } else {
-            // Get count of players for the club
-            const { count, error } = await supabase
-                .from('players')
-                .select('*', { count: 'exact', head: true })
-                .eq('club_id', club_id);
-
-            if (error) {
-                console.error('Error counting players:', error);
-                return NextResponse.json({ error: 'Failed to count players' }, { status: 500 });
-            }
-
-            return NextResponse.json({ 
-                success: true, 
-                count: count || 0 
-            });
-        }
-    } catch (error) {
-        console.error('Unexpected error:', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-    }
+  const auth = await requireUser()
+  if (!auth.ok) return auth.response
+  const q = parseQuery(request, { club_id: optInt })
+  if (!q.ok) return q.response
+  const club = resolveClubId(auth.user, q.data.club_id)
+  if (!club.ok) return club.response
+  const players = await listPlayersByClub(club.clubId)
+  return ok(players, { players, count: players.length }) // `players` kept for the existing page code
 }
 
-export async function POST(request) {
-    const requestData = await request.json();
-    const { member } = requestData;
-
-    // Validate input
-    if (!member) {
-        console.log('API: Missing member data');
-        return NextResponse.json({ error: 'Invalid input: member and sportId are required' }, { status: 400 });
-    }
-
-    try {
-        // First check if player already exists with this membership_id
-        const { data: existingPlayer, error: checkError } = await supabase
-            .from('players')
-            .select()
-            .eq('RMIS_ID', member.membership_id)
-            .single();
-            
-        // console.log('API: Existing player check result:', existingPlayer);
-        // console.log('API: Existing player check error:', checkError);
-
-        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-            console.log('API: Error checking player registration status:', checkError);
-            return NextResponse.json({ error: 'Failed to check player registration status' }, { status: 500 });
-        }
-
-        // If player doesn't exist yet, insert a new record
-        if (!existingPlayer) {
-            const { data, error: insertError } = await supabase
-                .from('players')
-                .insert([{ 
-                    RMIS_ID: member.membership_id,
-                    RI_ID : member.ri_number || null,
-                    name : member.full_name,
-                    club_id : member.club_id,
-                    NIC : member.nic_pp,
-                    birthdate : member.dob,
-                    gender : member.gender,
-                    status : member.status,
-                }])
-                .select();
-
-            if (insertError) {
-                console.log('API: Error inserting player:', insertError);
-                return NextResponse.json({ error: 'Failed to register player', details: insertError }, { status: 500 });
-            }
-            console.log('API: Player inserted successfully');
-            return NextResponse.json({ 
-                message: 'Player registered successfully',
-                player: data?.[0] || null
-            }, { status: 200 });
-        }
-
-        // Return success if player was already registered
-        return NextResponse.json({ 
-            message: 'Player already registered',
-            player: existingPlayer
-        }, { status: 200 });
-
-    } catch (err) {
-        console.error('Error registering player:', err);
-        console.log('API: Exception stack trace:', err.stack);
-        return NextResponse.json({ error: 'Server error processing registration' }, { status: 500 });
-    }
-}
+// Players are created by registering them (server-side, from RMIS data), never from a client-sent
+// member object. Only the admin conversion (general -> prospective) is left here.
+const putSchema = z.object({ member_id: z.coerce.number().int().positive() })
 
 export async function PUT(request) {
-    try {
-        const requestData = await request.json();
-        const { RMIS_ID, converted_by } = requestData;
-
-        // Validate required parameters
-        if (!RMIS_ID || !converted_by) {
-            console.log('API: Missing required parameters for PUT:', { RMIS_ID, converted_by });
-            return NextResponse.json({ 
-                error: 'Missing required parameters: RMIS_ID and converted_by are required' 
-            }, { status: 400 });
-        }
-
-        console.log(`API: Converting player for RMIS_ID: ${RMIS_ID}, converted_by: ${converted_by}`);
-
-        // Update the player
-        const { data, error } = await supabase
-            .from('players')
-            .update({ 
-                status: 5,
-                converted: true,
-                converted_by: converted_by
-            })
-            .eq('RMIS_ID', RMIS_ID)
-            .select('RMIS_ID, status, converted, converted_by');
-
-        if (error) {
-            console.error('API: Error updating player:', error);
-            return NextResponse.json({ error: 'Failed to convert player' }, { status: 500 });
-        }
-
-        if (!data || data.length === 0) {
-            console.log('API: No player found to update');
-            return NextResponse.json({ error: 'Player not found' }, { status: 404 });
-        }
-
-        console.log('API: Player converted successfully');
-        return NextResponse.json({ 
-            success: true,
-            message: 'Player converted successfully',
-            data: data[0]
-        }, { status: 200 });
-
-    } catch (err) {
-        console.error('API: Exception occurred during PUT:', err);
-        return NextResponse.json({ error: 'Server error converting player' }, { status: 500 });
-    }
+  const auth = await requireUser({ admin: true })
+  if (!auth.ok) return auth.response
+  const body = await readJson(request, putSchema)
+  if (!body.ok) return body.response
+  return fromResult(await convertPlayer({ actor: auth.user, memberId: body.data.member_id }), () => ok({ converted: true }))
 }

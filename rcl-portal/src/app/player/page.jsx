@@ -107,7 +107,7 @@ export default function PlayerSearchPage() {
               </h1>
             </div>
             <p className="text-muted-foreground">
-              Search by Name, RMIS ID, or NIC
+              Search by Name, Membership ID, or NIC (full NIC)
             </p>
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function PlayerSearchPage() {
               {/* RMIS ID Input */}
               <div>
                 <Label htmlFor="rmisId" className="text-foreground mb-2 block">
-                  RMIS ID
+                  Membership ID
                 </Label>
                 <Input
                   id="rmisId"
@@ -272,8 +272,8 @@ export default function PlayerSearchPage() {
           <div className="space-y-3 mb-6">
             {players.map((player) => (
               <Card
-                key={player.RMIS_ID}
-                onClick={() => handlePlayerClick(player.RMIS_ID)}
+                key={player.member_id}
+                onClick={() => handlePlayerClick(player.member_id)}
                 className="p-4 cursor-pointer hover:border-cranberry transition-all duration-200 hover:shadow-lg hover:shadow-cranberry/20 active:scale-[0.98] bg-card border-border"
               >
                 <div className="flex items-center justify-between">
@@ -282,11 +282,11 @@ export default function PlayerSearchPage() {
                       {player.name || '-'}
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {player.clubs?.club_name || '-'}
+                      {player.club_name || '-'}
                     </p>
                     <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>RMIS: {player.RMIS_ID}</span>
-                      {player.NIC && <span>NIC: {player.NIC}</span>}
+                      <span>ID: {player.membership_id || player.member_id}</span>
+                      {player.masked_nic && <span>NIC: {player.masked_nic}</span>}
                     </div>
                   </div>
                   <QrCode className="w-6 h-6 text-cranberry flex-shrink-0 ml-3" />

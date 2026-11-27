@@ -9,35 +9,20 @@ import { toast } from 'sonner';
 import { UserMinus, RefreshCw, Shield, Search, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import PrivateRoute from '@/lib/PrivateRoute';
 
-// Calculates deduction points based on general member percentage
-const calculateDeductionPoints = (percentage, totalPlayers = 0) => {
-  // Don't apply deductions to clubs with less than 5 players
-  if (totalPlayers < 5) return 0;
-
-  if (percentage >= 67 && percentage < 70) return -25;
-  if (percentage >= 62 && percentage < 67) return -50;
-  if (percentage < 62) return -80;
-  return 0;
-};
-
-// Gets color class based on deduction points
-const getDeductionColor = (points) => {
-  if (points === -80) return 'text-red-500'; // critical
-  if (points === -50) return 'text-orange-500'; // medium
-  if (points === -25) return 'text-yellow-500'; // low
-  return 'text-gray-500'; // none
-};
-
-// Gets severity label based on deduction points
-const getSeverityLabel = (points) => {
-  if (points === -80) return 'Critical';
-  if (points === -50) return 'Medium';
-  if (points === -25) return 'Low';
-  return 'None';
-};
+// The penalty comes from the server (tiers and minimum players are admin settings); this page only
+// colours it. Tiers are ordered harshest first (lowest threshold).
+const TIER_STYLES = [
+  { color: 'text-red-500', label: 'Critical' },
+  { color: 'text-orange-500', label: 'Medium' },
+  { color: 'text-yellow-500', label: 'Low' },
+];
+const tierIndex = (points, tiers) => [...tiers].sort((x, y) => x.lt - y.lt).findIndex((t) => t.points === points);
+const getDeductionColor = (points, tiers) => points === 0 ? 'text-gray-500' : (TIER_STYLES[tierIndex(points, tiers)] ?? { color: 'text-red-500' }).color;
+const getSeverityLabel = (points, tiers) => points === 0 ? 'None' : (TIER_STYLES[tierIndex(points, tiers)] ?? { label: 'Penalty' }).label;
 
 const MembershipManagementPage = () => {
   const [membershipData, setMembershipData] = useState([]);
+  const [rules, setRules] = useState({ tiers: [], minPlayers: 0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [cleaningPlayers, setCleaningPlayers] = useState(false);
@@ -45,14 +30,15 @@ const MembershipManagementPage = () => {
   const [applyingRules, setApplyingRules] = useState(false);
 
   // Fetch membership data
-  const fetchMembershipData = async () => {
+  const fetchMembershipData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const response = await fetch('/api/admin/membership-data');
       const result = await response.json();
 
       if (response.ok) {
         setMembershipData(result.data);
+        if (result.rules) setRules(result.rules);
       } else {
         throw new Error(result.error);
       }
@@ -79,9 +65,9 @@ const MembershipManagementPage = () => {
       });
       const result = await response.json();
       if (response.ok) {
-        toast.success(result.message);
+        toast.success(`Removed ${result.data?.removed ?? 0} player(s) without registrations`);
         // Refresh membership data after cleaning
-        fetchMembershipData();
+        fetchMembershipData(true);
       } else {
         throw new Error(result.error);
       }
@@ -103,9 +89,9 @@ const MembershipManagementPage = () => {
       });
       const result = await response.json();
       if (response.ok) {
-        toast.success(result.message);
+        toast.success(`RMIS sync done: ${result.data?.seen ?? 0} member record(s) checked, ${result.data?.playersChanged ?? 0} player(s) updated`);
         // Refresh membership data after syncing
-        fetchMembershipData();
+        fetchMembershipData(true);
       } else {
         throw new Error(result.error);
       }
@@ -116,27 +102,24 @@ const MembershipManagementPage = () => {
     }
   };
 
-  // Handle apply rules
-  const handleApplyRules = async () => {
+  // Handle apply rules: ONE request. The server refreshes from RMIS, removes players without
+  // registrations, then SETS each club's penalty (one row per club). Running it again changes nothing.
+  const handleApplyRules = async (refresh = true) => {
+    if (applyingRules) return; // never fire twice
     try {
       setApplyingRules(true);
-
-      // First run global clean and sync
-      await handleGlobalCleanPlayers();
-      await handleSyncRMIS();
-
-      // Then apply deduction rules
       const response = await fetch('/api/admin/apply-membership-rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ refresh, clean: true }),
       });
       const result = await response.json();
 
       if (response.ok) {
         toast.success(result.message);
-        // Refresh membership data after applying rules
-        fetchMembershipData();
+        fetchMembershipData(true);
+      } else if (result.code === 'rmis_unavailable') {
+        toast.error(result.error, { duration: 15000, action: { label: 'Apply without RMIS refresh', onClick: () => handleApplyRules(false) } });
       } else {
         throw new Error(result.error);
       }
@@ -155,8 +138,8 @@ const MembershipManagementPage = () => {
 
     // Sort by deduction points (ascending), then by name (ascending)
     filtered.sort((a, b) => {
-      const aPoints = calculateDeductionPoints(a.general_member_percentage, a.total_players_count);
-      const bPoints = calculateDeductionPoints(b.general_member_percentage, b.total_players_count);
+      const aPoints = a.deduction;
+      const bPoints = b.deduction;
 
       if (aPoints !== bPoints) {
         return aPoints - bPoints; // Lower deduction (more negative) first
@@ -169,7 +152,7 @@ const MembershipManagementPage = () => {
   }, [membershipData, searchTerm]);
 
   return (
-    <PrivateRoute requiredPermission="admin" accessType="admin">
+    <PrivateRoute requiredPermission="super_admin" accessType="admin">
       <div className="min-h-screen">
         {/* Header */}
         <div className="text-center mb-8">
@@ -179,7 +162,7 @@ const MembershipManagementPage = () => {
 
         {/* Summary Stats */}
         {!loading && membershipData.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
             <Card className="bg-white/5 border-white/20">
               <CardContent className="p-4">
                 <div className="text-center">
@@ -189,45 +172,25 @@ const MembershipManagementPage = () => {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/5 border-white/20">
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <p className="text-white/70 text-sm">Critical Violations</p>
-                  <p className="text-red-500 text-2xl font-bold">
-                    {membershipData.filter(club => calculateDeductionPoints(club.general_member_percentage, club.total_players_count) === -80).length}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/5 border-white/20">
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <p className="text-white/70 text-sm">Medium Violations</p>
-                  <p className="text-orange-500 text-2xl font-bold">
-                    {membershipData.filter(club => calculateDeductionPoints(club.general_member_percentage, club.total_players_count) === -50).length}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/5 border-white/20">
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <p className="text-white/70 text-sm">Low Violations</p>
-                  <p className="text-yellow-500 text-2xl font-bold">
-                    {membershipData.filter(club => calculateDeductionPoints(club.general_member_percentage, club.total_players_count) === -25).length}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {[...rules.tiers].sort((x, y) => x.lt - y.lt).map((t, i) => (
+              <Card key={`${t.lt}-${t.points}`} className="bg-white/5 border-white/20">
+                <CardContent className="p-4">
+                  <div className="text-center">
+                    <p className="text-white/70 text-sm">{(TIER_STYLES[i]?.label ?? 'Penalty')}: {t.points} pts (below {t.lt}%)</p>
+                    <p className={`${TIER_STYLES[i]?.color ?? 'text-red-500'} text-2xl font-bold`}>
+                      {membershipData.filter((club) => club.deduction === t.points).length}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
 
             <Card className="bg-white/5 border-white/20">
               <CardContent className="p-4">
                 <div className="text-center">
                   <p className="text-white/70 text-sm">Compliant Clubs</p>
                   <p className="text-green-500 text-2xl font-bold">
-                    {membershipData.filter(club => calculateDeductionPoints(club.general_member_percentage, club.total_players_count) === 0).length}
+                    {membershipData.filter((club) => club.deduction === 0).length}
                   </p>
                 </div>
               </CardContent>
@@ -316,12 +279,12 @@ const MembershipManagementPage = () => {
                 <AlertDialogHeader>
                   <AlertDialogTitle className="text-white">Confirm Apply Membership Rules</AlertDialogTitle>
                   <AlertDialogDescription className="text-gray-300">
-                    This will run global clean and sync operations, then apply penalty points to clubs based on their general member registration percentages. This action cannot be undone.
+                    This refreshes members from RMIS, removes players without registrations, then sets each club's penalty from its general-member share. It is safe to run again: it sets the penalty, it never adds to it.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel className="bg-gray-700">Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleApplyRules} className="bg-purple-600 hover:bg-purple-700">
+                  <AlertDialogAction disabled={applyingRules} onClick={() => handleApplyRules(true)} className="bg-purple-600 hover:bg-purple-700">
                     Confirm Apply Rules
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -361,9 +324,9 @@ const MembershipManagementPage = () => {
                   </thead>
                   <tbody>
                     {filteredAndSortedData.map((club) => {
-                      const deductionPoints = calculateDeductionPoints(club.general_member_percentage, club.total_players_count);
-                      const severityColor = getDeductionColor(deductionPoints);
-                      const severityLabel = getSeverityLabel(deductionPoints);
+                      const deductionPoints = club.deduction;
+                      const severityColor = getDeductionColor(deductionPoints, rules.tiers);
+                      const severityLabel = getSeverityLabel(deductionPoints, rules.tiers);
 
                       return (
                         <tr key={club.club_id} className="border-b border-white/10 hover:bg-white/5">
@@ -394,6 +357,13 @@ const MembershipManagementPage = () => {
                                   </span>
                                 </>
                               )}
+                              {club.pending_change ? (
+                                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-200 border border-yellow-400">
+                                  Not applied yet{club.applied_penalty !== 0 ? ` (currently ${club.applied_penalty})` : ''}
+                                </span>
+                              ) : club.applied_penalty !== 0 ? (
+                                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-white/10 text-white/70">Applied</span>
+                              ) : null}
                             </div>
                           </td>
                         </tr>

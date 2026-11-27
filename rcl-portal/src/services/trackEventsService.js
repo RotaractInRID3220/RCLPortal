@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 // Fetch track-type sports (trackIndividual + trackTeam)
 export const fetchTrackSports = async () => {
   try {
-    const response = await fetch('/api/events?type=trackIndividual,trackTeam')
+    const response = await fetch('/api/events?type=trackIndividual,trackTeam', { cache: 'no-store' })
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
@@ -43,7 +43,7 @@ export const syncTrackEvents = async (sportId = null) => {
 export const getTrackEntries = async (sportId) => {
   if (!sportId) throw new Error('sportId is required')
   try {
-    const response = await fetch(`/api/track-events?sport_id=${sportId}`)
+    const response = await fetch(`/api/track-events?sport_id=${sportId}`, { cache: 'no-store' })
     const result = await response.json()
     if (!response.ok || !result.success) {
       throw new Error(result.error || 'Failed to fetch track entries')
@@ -56,27 +56,27 @@ export const getTrackEntries = async (sportId) => {
   }
 }
 
-// Updates score/place for a track event entry
-export const updateTrackEntry = async ({ id, score, place }) => {
+// Saves times and positions for one event. results: [{ member_id | team_id, score, place }]
+export const saveTrackResults = async (sportId, results) => {
   try {
     const response = await fetch('/api/track-events', {
-      method: 'PATCH',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, score, place }),
+      body: JSON.stringify({ sport_id: Number(sportId), results }),
     })
     const result = await response.json()
     if (!response.ok || !result.success) {
-      throw new Error(result.error || 'Failed to update entry')
+      throw new Error(result.error || 'Failed to save results')
     }
     return result.data
   } catch (error) {
-    console.error('Error updating track entry:', error)
-    toast.error('Failed to update entry')
+    console.error('Error saving track results:', error)
+    toast.error(error.message || 'Failed to save results')
     throw error
   }
 }
 
-// Awards points to clubs for a track sport
+// Awards points to clubs for a track sport (repeatable: replaces that event's track points)
 export const awardTrackPoints = async (sportId) => {
   try {
     const response = await fetch('/api/track-events/award', {
@@ -91,7 +91,7 @@ export const awardTrackPoints = async (sportId) => {
     return result
   } catch (error) {
     console.error('Error awarding track points:', error)
-    toast.error('Failed to award points')
+    toast.error(error.message || 'Failed to award points')
     throw error
   }
 }

@@ -33,7 +33,7 @@ export const fetchSportMatches = async (sportId) => {
 };
 
 /**
- * Awards tournament points to teams based on their placement
+ * Awards tournament placement points (computed on the server from the match results)
  * @param {number} sportId - The sport ID
  * @param {Array} standings - Array of {club_id, place, points}
  * @returns {Promise<Object>} Result with success status
@@ -46,19 +46,14 @@ export const awardTournamentPoints = async (sportId, standings) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        sport_id: sportId,
-        standings
+        sport_id: sportId // the server recomputes the standings itself
       })
     });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to award points');
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.error?.message || result?.error || 'Failed to award points');
     }
     
     return result;

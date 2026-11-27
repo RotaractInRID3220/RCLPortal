@@ -85,23 +85,18 @@ export default function PortalSettingsPage() {
       return;
     }
 
-    if (!userRmisId) {
-      toast.error('User session not found. Please log in again.');
-      return;
-    }
-
     try {
       setUpdating(true);
       const newStatus = !portalStatus.isOpen;
       
-      const result = await updatePortalStatus(newStatus, userRmisId);
+      const result = await updatePortalStatus(newStatus);
       
       if (result.success) {
         setPortalStatus(result.data);
         toast.success(
           newStatus 
-            ? 'Registration portal is now OPEN' 
-            : 'Registration portal is now CLOSED',
+            ? 'Check-in is now OPEN' 
+            : 'Check-in is now CLOSED',
           {
             description: newStatus 
               ? 'Players can now be registered for the sport day'
@@ -296,7 +291,7 @@ export default function PortalSettingsPage() {
                 <p className={`text-sm ${portalStatus.isOpen ? 'text-green-400' : 'text-yellow-400'}`}>
                   {portalStatus.isOpen 
                     ? 'The registration scanner and manual entry are active. Admins can register players for the current sport day.'
-                    : 'The registration portal is closed. All scanner and manual entry functions are disabled until the portal is reopened.'
+                    : 'Check-in is closed. Scanner and manual entry are disabled until it is reopened.'
                   }
                 </p>
               </div>

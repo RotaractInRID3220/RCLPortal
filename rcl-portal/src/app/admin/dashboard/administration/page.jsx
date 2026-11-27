@@ -9,6 +9,7 @@ import StatsCard from '@/components/StatsCard';
 import { getAdministrationStats } from '@/services/adminServices';
 import { UserMinus, RefreshCw, Users, UserCheck, Calendar, Trophy, CreditCard, BarChart3, UserCog, Award } from 'lucide-react';
 import PrivateRoute from '@/lib/PrivateRoute';
+import { AdminLiveSummary } from '@/components/LiveSummary';
 
 const AdministrationPage = () => {
   const [stats, setStats] = useState(null);
@@ -67,7 +68,7 @@ const AdministrationPage = () => {
       });
       const result = await response.json();
       if (response.ok) {
-        toast.success(result.message);
+        toast.success(result.message || 'RMIS sync complete');
         // Refresh stats after syncing
         fetchStats();
       } else {
@@ -328,6 +329,38 @@ const AdministrationPage = () => {
                   <span className="text-white/80">Female Players</span>
                   <span className="text-white font-semibold">{stats.playersByGender.female}</span>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {stats && (
+        <div className="mt-6 space-y-6">
+          <AdminLiveSummary payments={stats.payments} checkin={stats.checkin} membership={stats.membership} />
+
+          <Card className="bg-white/5 border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">Registrations per sport</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-white/80">
+                  <thead>
+                    <tr className="text-left text-white/60">
+                      <th className="py-1 pr-4">Sport</th><th className="pr-4">Day</th><th className="pr-4">Clubs</th>
+                      <th className="pr-4">Players</th><th>Reserves</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.registrationsBySport?.map((e) => (
+                      <tr key={e.sport_id} className="border-t border-white/10">
+                        <td className="py-1 pr-4">{e.sport_name}</td><td className="pr-4">{e.sport_day ?? '-'}</td>
+                        <td className="pr-4">{e.clubs}</td><td className="pr-4">{e.main_players}</td><td>{e.reserves}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>

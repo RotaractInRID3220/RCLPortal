@@ -8,7 +8,7 @@ import {
   clubMembersAtom,
   userDeetsAtom,
 } from '@/app/state/store'
-import { APP_CONFIG } from '@/config/app.config'
+import { useEventInfo } from '@/hooks/useEventInfo'
 import { getReplacementContext, submitReplacementRequest } from '@/services/replacementService'
 import {
   Select,
@@ -59,8 +59,8 @@ const STATUS_META = {
 }
 
 const formatStatus = (value) => {
-  if (value === true) return STATUS_META.approved
-  if (value === false) return STATUS_META.rejected
+  if (value === 1) return STATUS_META.approved
+  if (value === 2) return STATUS_META.rejected
   return STATUS_META.pending
 }
 
@@ -71,26 +71,7 @@ const formatDateTime = (value) => {
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 }
 
-const isGeneralStatus = (status) => status === 1 || status === 3
-
-const buildConstraintSnapshot = (registrations = []) => {
-  const track = {}
-  const combined = {}
-
-  registrations.forEach((entry) => {
-    if (!entry?.sport_type || !entry?.sport_day) return
-
-    if (entry.sport_type === 'trackIndividual') {
-      track[entry.sport_day] = (track[entry.sport_day] || 0) + 1
-    }
-
-    if (entry.sport_type === 'team' || entry.sport_type === 'individual') {
-      combined[entry.sport_day] = (combined[entry.sport_day] || 0) + 1
-    }
-  })
-
-  return { track, combined }
-}
+const isGeneralStatus = (status) => status === 1 // members from the server come with a normalised status (1 general, 5 prospective)
 
 const ReplacementRequestsPage = () => {
   const [userDeets] = useAtom(userDeetsAtom)
@@ -116,24 +97,26 @@ const ReplacementRequestsPage = () => {
 
   const replacementCacheRef = useRef(null)
 
+  // Fetch once per club. (An empty list is a valid answer, e.g. before the cutoff is set, so "empty" must not trigger a re-fetch.)
+  const membersFetchedFor = useRef(null)
   const ensureClubMembers = useCallback(async () => {
     if (!userDeets?.club_id) return
-    const hasMembersLoaded = Array.isArray(clubMembers) && clubMembers.length > 0
-    if (hasMembersLoaded) return
+    if (membersFetchedFor.current === userDeets.club_id) return
+    membersFetchedFor.current = userDeets.club_id
 
     try {
       setMembersLoading(true)
-      const response = await fetch(`/api/council?clubID=${userDeets.club_id}`)
+      const response = await fetch('/api/portal/members')
       const data = await response.json()
-      if (data.success && Array.isArray(data.members)) {
-        setClubMembers(data.members)
+      if (data.success && Array.isArray(data.data)) {
+        setClubMembers(data.data)
       }
     } catch (error) {
       console.error('Failed to fetch club members for replacements:', error)
     } finally {
       setMembersLoading(false)
     }
-  }, [clubMembers, setClubMembers, userDeets?.club_id])
+  }, [setClubMembers, userDeets?.club_id])
 
   const loadContext = useCallback(
     async (force = false) => {
@@ -202,33 +185,13 @@ const ReplacementRequestsPage = () => {
     return registeredPlayers.find((player) => player.id === numericId) || null
   }, [registeredPlayers, selectedRegistrationId])
 
+  // Only the obvious client-side filter: not already in this sport. Gender, cutoff, the per-player
+  // limits and the one-per-day rule are checked by the server when the request is submitted.
   const canMemberRegisterForSport = useCallback(
     (memberId, sport) => {
       if (!memberId || !sport) return false
-
-      const registrationHistory = context.playerRegistrationMap?.[memberId] || []
-
-      if (
-        registrationHistory.some(
-          (entry) => Number(entry?.sport_id) === Number(sport.sport_id)
-        )
-      ) {
-        return false
-      }
-
-      const { track, combined } = buildConstraintSnapshot(registrationHistory)
-
-      if (sport.sport_type === 'trackIndividual') {
-        const dayCount = track[sport.sport_day] || 0
-        return dayCount < 2
-      }
-
-      if (sport.sport_type === 'team' || sport.sport_type === 'individual') {
-        const dayCount = combined[sport.sport_day] || 0
-        return dayCount < 1
-      }
-
-      return true
+      const history = context.playerRegistrationMap?.[memberId] || []
+      return !history.some((entry) => Number(entry?.sport_id) === Number(sport.sport_id))
     },
     [context.playerRegistrationMap]
   )
@@ -236,18 +199,14 @@ const ReplacementRequestsPage = () => {
   const eligibleMembers = useMemo(() => {
     if (!selectedSport) return []
 
-    const registeredIds = new Set(registeredPlayers.map((record) => record.RMIS_ID))
+    const registeredIds = new Set(registeredPlayers.map((record) => record.member_id))
     const members = Array.isArray(clubMembers) ? clubMembers : []
     const sportGender = selectedSport.gender_type?.toLowerCase()
 
     return members
       .filter((member) => {
-        if (!member?.membership_id) return false
-        if (registeredIds.has(member.membership_id)) return false
-
-        if (![1, 3, 5].includes(member.status)) {
-          return false
-        }
+        if (!member?.member_id) return false
+        if (registeredIds.has(member.member_id)) return false
 
         if (sportGender === 'male' && member.gender !== 'M') {
           return false
@@ -257,7 +216,7 @@ const ReplacementRequestsPage = () => {
           return false
         }
 
-        return canMemberRegisterForSport(member.membership_id, selectedSport)
+        return canMemberRegisterForSport(member.member_id, selectedSport)
       })
       .sort((a, b) => (a.card_name || '').localeCompare(b.card_name || ''))
   }, [clubMembers, registeredPlayers, selectedSport, canMemberRegisterForSport])
@@ -265,9 +224,9 @@ const ReplacementRequestsPage = () => {
   const selectedReplacementMember = useMemo(() => {
     if (!selectedReplacementId) return null
     return (
-      eligibleMembers.find((member) => member.membership_id === selectedReplacementId) ||
+      eligibleMembers.find((member) => member.member_id === selectedReplacementId) ||
       (Array.isArray(clubMembers)
-        ? clubMembers.find((member) => member.membership_id === selectedReplacementId)
+        ? clubMembers.find((member) => member.member_id === selectedReplacementId)
         : null)
     )
   }, [clubMembers, eligibleMembers, selectedReplacementId])
@@ -305,10 +264,10 @@ const ReplacementRequestsPage = () => {
     }
 
     const member = Array.isArray(clubMembers)
-      ? clubMembers.find((entry) => entry.membership_id === selectedReplacementId)
+      ? clubMembers.find((entry) => entry.member_id === selectedReplacementId)
       : null
 
-    setRiNumber(member?.ri_number || '')
+    setRiNumber('') // typed by the club (general members need one)
     replacementCacheRef.current = selectedReplacementId
   }, [clubMembers, selectedReplacementId])
 
@@ -348,34 +307,12 @@ const ReplacementRequestsPage = () => {
       return
     }
 
-    // Check if replacement player is already registered for another sport on the same day
-    const replacementHistory = context.playerRegistrationMap?.[selectedReplacementMember.membership_id] || []
-    const hasDayConflict = replacementHistory.some(
-      (entry) => entry?.sport_day === selectedSport.sport_day
-    )
-
-    if (hasDayConflict) {
-      toast.error('This player is already registered for another sport on the same day')
-      return
-    }
-
     const payload = {
-      club_id: userDeets.club_id,
-      sport_id: selectedSport.sport_id,
-      registrations_id: selectedRegistration.id,
-      replacement_member: {
-        membership_id: selectedReplacementMember.membership_id,
-        card_name: selectedReplacementMember.card_name,
-        status: selectedReplacementMember.status,
-        ri_number: selectedReplacementMember.ri_number,
-        gender: selectedReplacementMember.gender,
-        nic: selectedReplacementMember.nic || null,
-        birthdate: selectedReplacementMember.birthdate || null,
-      },
+      registration_id: selectedRegistration.id,
+      replacement_member_id: selectedReplacementMember.member_id,
       reason: reason.trim(),
       supporting_link: supportingLink?.trim() || null,
-      ri_number: riNumber?.trim() || null,
-      requested_by: userDeets?.membership_id || null,
+      ri_id: riNumber?.trim() || null,
     }
 
     try {
@@ -439,8 +376,8 @@ const ReplacementRequestsPage = () => {
     if (!selectedRegistration) return null
     const player = selectedRegistration.player
     return {
-      name: player?.name || selectedRegistration.RMIS_ID,
-      id: selectedRegistration.RMIS_ID,
+      name: player?.name || selectedRegistration.member_id,
+      id: player?.membership_id || selectedRegistration.member_id,
       role: selectedRegistration.main_player ? 'Main Player' : 'Reserve',
     }
   }, [selectedRegistration])
@@ -449,7 +386,7 @@ const ReplacementRequestsPage = () => {
     if (!selectedReplacementMember) return null
     return {
       name: selectedReplacementMember.card_name,
-      id: selectedReplacementMember.membership_id,
+      id: selectedReplacementMember.membership_id || selectedReplacementMember.member_id,
       status: isGeneralStatus(selectedReplacementMember.status) ? 'General Member' : 'Prospective Member',
     }
   }, [selectedReplacementMember])
@@ -457,16 +394,19 @@ const ReplacementRequestsPage = () => {
   const loadingState = loading || membersLoading
 
   // Deadline checks
+  // Window dates are set by a super admin (settings). Not scheduled = not open.
+  const eventInfo = useEventInfo()
   const now = new Date()
-  const replacementOpening = new Date(APP_CONFIG.REPLACEMENT_OPENING)
-  const replacementDeadline = new Date(APP_CONFIG.REPLACEMENT_DEADLINE)
-  const eventDay = new Date(APP_CONFIG.EVENT_DAY)
+  const replacementOpening = eventInfo?.replacementOpenAt ? new Date(eventInfo.replacementOpenAt) : null
+  const replacementDeadline = eventInfo?.replacementCloseAt ? new Date(eventInfo.replacementCloseAt) : null
+  const eventDay = eventInfo?.eventStartAt ? new Date(eventInfo.eventStartAt) : null
 
-  const isBeforeRegistrationClose = now < replacementOpening
-  const isAfterReplacementDeadline = now > replacementDeadline
-  const isWithinReplacementWindow = !isBeforeRegistrationClose && !isAfterReplacementDeadline
+  const isBeforeRegistrationClose = !replacementOpening || now < replacementOpening
+  const isAfterReplacementDeadline = replacementDeadline ? now > replacementDeadline : false
+  const isWithinReplacementWindow = Boolean(replacementOpening) && !isBeforeRegistrationClose && !isAfterReplacementDeadline
 
   const formatDeadlineDate = (date) => {
+    if (!date) return 'not announced yet'
     return date.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
@@ -607,7 +547,7 @@ const ReplacementRequestsPage = () => {
                     <SelectContent className="bg-black/90 border border-white/15 text-white max-h-72">
                       {registeredPlayers.map((player) => (
                         <SelectItem key={player.id} value={String(player.id)}>
-                          {player.player?.name || player.RMIS_ID}
+                          {player.player?.name || player.member_id}
                           {player.main_player ? ' • Main' : ' • Reserve'}
                         </SelectItem>
                       ))}
@@ -643,14 +583,14 @@ const ReplacementRequestsPage = () => {
                           <CommandGroup>
                             {eligibleMembers.map((member) => (
                               <CommandItem
-                                key={member.membership_id}
+                                key={member.member_id}
                                 value={member.card_name}
-                                onSelect={() => handleReplacementSelect(member.membership_id)}
+                                onSelect={() => handleReplacementSelect(member.member_id)}
                                 className="text-white"
                               >
                                 <div className="flex flex-col">
                                   <span className="font-medium">{member.card_name}</span>
-                                  <span className="text-xs text-white/50">{member.membership_id}</span>
+                                  <span className="text-xs text-white/50">{member.membership_id || member.member_id}</span>
                                 </div>
                                 <Badge
                                   className={`ml-auto ${
@@ -782,13 +722,13 @@ const ReplacementRequestsPage = () => {
                     <TableCell className="text-white/80">
                       <div className="flex flex-col">
                         <span className="font-medium">{request.original_player?.name || 'Unknown Player'}</span>
-                        <span className="text-xs text-white/50">{request.original_player?.RMIS_ID || 'N/A'}</span>
+                        <span className="text-xs text-white/50">{request.original_player?.member_id || 'N/A'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-white/80">
                       <div className="flex flex-col">
                         <span className="font-medium">{request.replacement_player?.name || 'Unknown Player'}</span>
-                        <span className="text-xs text-white/50">{request.replacement_player?.RMIS_ID || 'N/A'}</span>
+                        <span className="text-xs text-white/50">{request.replacement_player?.membership_id || request.replacement_player?.member_id || 'N/A'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-white/70 max-w-xs">

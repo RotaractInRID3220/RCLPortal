@@ -1,90 +1,14 @@
-import { supabase } from '@/lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { z } from 'zod'
+import { requireUser } from '@/server/auth/guards'
+import { fromResult, ok, readJson } from '@/server/http.mjs'
+import { decideSwap } from '@/server/changes/service.mjs'
 
+// The deciding admin comes from the session (any approved_by/rejected_by in the body is ignored).
+// A request is decided once; approving re-checks everything against the current data.
 export async function POST(request) {
-  try {
-    const { request_id, approved_by } = await request.json();
-
-    if (!request_id || !approved_by) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    // Fetch request details
-    const { data: swapRequest, error: fetchError } = await supabase
-      .from('swap_requests')
-      .select('*')
-      .eq('id', request_id)
-      .single();
-
-    if (fetchError || !swapRequest) {
-      return NextResponse.json(
-        { success: false, error: 'Swap request not found' },
-        { status: 404 }
-      );
-    }
-
-    if (swapRequest.status !== null) {
-      return NextResponse.json(
-        { success: false, error: 'Request already processed' },
-        { status: 400 }
-      );
-    }
-
-    // Perform the swap
-    if (swapRequest.player2_registrations_id) {
-      // Player-to-Player Swap
-      // Update Player 1 -> Sport 2
-      const { error: update1 } = await supabase
-        .from('registrations')
-        .update({ sport_id: swapRequest.sport2_id })
-        .eq('id', swapRequest.player1_registrations_id);
-
-      if (update1) throw update1;
-
-      // Update Player 2 -> Sport 1
-      const { error: update2 } = await supabase
-        .from('registrations')
-        .update({ sport_id: swapRequest.sport1_id })
-        .eq('id', swapRequest.player2_registrations_id);
-
-      if (update2) throw update2;
-
-    } else {
-      // Single Move
-      // Update Player 1 -> Sport 2
-      const { error: update1 } = await supabase
-        .from('registrations')
-        .update({ sport_id: swapRequest.sport2_id })
-        .eq('id', swapRequest.player1_registrations_id);
-
-      if (update1) throw update1;
-    }
-
-    // Update request status
-    const { error: updateStatus } = await supabase
-      .from('swap_requests')
-      .update({
-        status: true,
-        approved_by,
-        approved_at: new Date().toISOString()
-      })
-      .eq('id', request_id);
-
-    if (updateStatus) throw updateStatus;
-
-    return NextResponse.json({
-      success: true,
-      message: 'Swap approved successfully'
-    });
-
-  } catch (error) {
-    console.error('Error approving swap:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to approve swap' },
-      { status: 500 }
-    );
-  }
+  const auth = await requireUser({ admin: true })
+  if (!auth.ok) return auth.response
+  const body = await readJson(request, z.object({ request_id: z.coerce.number().int().positive() }).passthrough())
+  if (!body.ok) return body.response
+  return fromResult(await decideSwap({ actor: auth.user, id: body.data.request_id, approve: true }), () => ok({ id: body.data.request_id }, { message: 'Request approved' }))
 }

@@ -15,7 +15,7 @@ export const getOptimizedDashboardData = async (leaderboardCategory = 'community
     if (leaderboardCategory) params.append('leaderboard_category', leaderboardCategory);
     if (leaderboardLimit) params.append('leaderboard_limit', leaderboardLimit.toString());
 
-    const response = await fetch(`/api/admin/dashboard/optimized?${params}`);
+    const response = await fetch(`/api/admin/dashboard/optimized?${params}`, { cache: 'no-store' });
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -40,7 +40,7 @@ export const getOptimizedDashboardData = async (leaderboardCategory = 'community
  */
 export const getAdminDashboardStats = async () => {
   try {
-    const response = await fetch('/api/admin/dashboard-stats');
+    const response = await fetch('/api/admin/dashboard-stats', { cache: 'no-store' });
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -96,7 +96,7 @@ export const getLeaderboardPreview = async (category = null) => {
       url += `&category=${category}`;
     }
     
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-cache' }); // revalidate (ETag) every time
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -121,7 +121,7 @@ export const getLeaderboardPreview = async (category = null) => {
  */
 export const getAdministrationStats = async () => {
   try {
-    const response = await fetch('/api/admin/administration/stats');
+    const response = await fetch('/api/admin/administration/stats', { cache: 'no-store' });
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

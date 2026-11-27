@@ -1,38 +1,14 @@
-import { supabase } from '@/lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { z } from 'zod'
+import { requireUser } from '@/server/auth/guards'
+import { fromResult, ok, readJson } from '@/server/http.mjs'
+import { decideSwap } from '@/server/changes/service.mjs'
 
+// The deciding admin comes from the session (any approved_by/rejected_by in the body is ignored).
+// A request is decided once; approving re-checks everything against the current data.
 export async function POST(request) {
-  try {
-    const { request_id, rejected_by } = await request.json();
-
-    if (!request_id || !rejected_by) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    const { error } = await supabase
-      .from('swap_requests')
-      .update({
-        status: false,
-        approved_by: rejected_by, // Using approved_by field for rejecter as per schema
-        approved_at: new Date().toISOString()
-      })
-      .eq('id', request_id);
-
-    if (error) throw error;
-
-    return NextResponse.json({
-      success: true,
-      message: 'Swap request rejected'
-    });
-
-  } catch (error) {
-    console.error('Error rejecting swap:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to reject swap' },
-      { status: 500 }
-    );
-  }
+  const auth = await requireUser({ admin: true })
+  if (!auth.ok) return auth.response
+  const body = await readJson(request, z.object({ request_id: z.coerce.number().int().positive() }).passthrough())
+  if (!body.ok) return body.response
+  return fromResult(await decideSwap({ actor: auth.user, id: body.data.request_id, approve: false }), () => ok({ id: body.data.request_id }, { message: 'Request rejected' }))
 }

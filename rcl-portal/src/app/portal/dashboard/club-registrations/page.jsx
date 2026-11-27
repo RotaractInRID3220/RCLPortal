@@ -132,7 +132,7 @@ const ClubRegistrationsPage = React.memo(() => {
         if (!userDeets?.club_id || filteredSportsData.length === 0) return;
 
         try {
-            const response = await fetch(`/api/registrations?filter=${JSON.stringify({ club_id: userDeets.club_id })}`);
+            const response = await fetch('/api/registrations'); // the club comes from the session
             const data = await response.json();
             
             if (data.success && data.data) {

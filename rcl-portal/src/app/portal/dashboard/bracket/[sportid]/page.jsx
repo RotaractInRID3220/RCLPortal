@@ -2,7 +2,6 @@
 import React, { useEffect } from "react";
 import { useParams } from 'next/navigation';
 import { useAtom } from 'jotai';
-import { createClient } from '@supabase/supabase-js';
 import { Bracket, Seed, SeedItem, SeedTeam } from 'react-brackets';
 import BracketService from '@/services/bracketServices';
 import {
@@ -12,9 +11,8 @@ import {
   selectedSportAtom
 } from '@/app/state/store';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Live data is never cached in the browser: re-read from the server every few seconds (paused while hidden).
+const POLL_MS = 15000;
 
 const BracketPage = () => {
   const params = useParams();
@@ -30,141 +28,31 @@ const BracketPage = () => {
     }
   }, [params.sportid, setSelectedSport]);
 
-  // Fetch bracket data when component mounts or sport changes
+  // Fetch bracket data when the sport changes, then poll (no realtime socket, no browser cache)
   useEffect(() => {
     if (!params.sportid) return; // Don't run if no sportid in URL
 
     const currentSportId = parseInt(params.sportid);
-    let subscription;
+    let cancelled = false;
 
-    async function fetchBracketData() {
+    async function load({ quiet }) {
       try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch initial bracket data using URL params directly
+        if (!quiet) { setLoading(true); setError(null); }
         const bracketData = await BracketService.getBracketData(currentSportId);
-        setRounds(bracketData);
+        if (!cancelled) { setRounds(bracketData); setError(null); }
       } catch (error) {
         console.error('Error fetching bracket data:', error);
-        setError(error.message);
-        setRounds([]);
+        if (!cancelled && !quiet) { setError(error.message); setRounds([]); }
       } finally {
-        setLoading(false);
+        if (!cancelled && !quiet) setLoading(false);
       }
     }
 
-    async function setupRealTimeSubscription() {
-      // Fetch matches data first to get the current structure
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select(`
-          match_id,
-          team1_id,
-          team2_id,
-          team1_score,
-          team2_score,
-          round_id,
-          match_order,
-          parent_match1_id,
-          parent_match2_id,
-          sport_id,
-          start_time,
-          team1:teams!matches_team1_id_fkey (
-            team_id,
-            club:clubs (
-              club_id,
-              club_name
-            )
-          ),
-          team2:teams!matches_team2_id_fkey (
-            team_id,
-            club:clubs (
-              club_id,
-              club_name
-            )
-          )
-        `)
-        .eq('sport_id', currentSportId);
-
-      if (!matchesError && matchesData) {
-        // Set up real-time subscription
-        subscription = supabase
-          .channel('matches-changes')
-          .on('postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'matches',
-              filter: `sport_id=eq.${currentSportId}`
-            },
-            (payload) => {
-              console.log('Real-time match update:', payload);
-
-              // Re-fetch and transform the data when matches change
-              fetchUpdatedBracketData();
-            }
-          )
-          .subscribe();
-      }
-    }
-
-    async function fetchUpdatedBracketData() {
-      try {
-        // Fetch updated matches data
-        const { data: updatedMatchesData, error: updatedMatchesError } = await supabase
-          .from('matches')
-          .select(`
-            match_id,
-            team1_id,
-            team2_id,
-            team1_score,
-            team2_score,
-            round_id,
-            match_order,
-            parent_match1_id,
-            parent_match2_id,
-            sport_id,
-            start_time,
-            team1:teams!matches_team1_id_fkey (
-              team_id,
-              club:clubs (
-                club_id,
-                club_name
-              )
-            ),
-            team2:teams!matches_team2_id_fkey (
-              team_id,
-              club:clubs (
-                club_id,
-                club_name
-              )
-            )
-          `)
-          .eq('sport_id', currentSportId)
-          .order('round_id', { ascending: false })
-          .order('match_order', { ascending: true });
-
-        if (!updatedMatchesError && updatedMatchesData) {
-          // Transform the updated data
-          const transformedData = BracketService.transformToBracketFormat(updatedMatchesData);
-          setRounds(transformedData);
-        }
-      } catch (error) {
-        console.error('Error fetching updated bracket data:', error);
-      }
-    }
-
-    // Initialize data and subscription
-    fetchBracketData();
-    setupRealTimeSubscription();
-
-    // Cleanup subscription on unmount or sport change
-    return () => {
-      if (subscription) {
-        supabase.removeChannel(subscription);
-      }
-    };
+    load({ quiet: false });
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') load({ quiet: true });
+    }, POLL_MS);
+    return () => { cancelled = true; clearInterval(timer); };
   }, [params.sportid, setRounds, setLoading, setError]);
 
   // Custom seed component with glassmorphism styling and read-only display

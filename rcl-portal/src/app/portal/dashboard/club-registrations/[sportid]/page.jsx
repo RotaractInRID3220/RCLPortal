@@ -17,11 +17,11 @@ import * as XLSX from 'xlsx'
 // Memoized Player Card component
 const PlayerCard = React.memo(({ registration, clubMembers }) => {
     const memberInfo = Array.isArray(clubMembers) ? 
-        clubMembers.find(member => member.membership_id === registration.RMIS_ID) : null;
+        clubMembers.find(member => member.member_id === registration.member_id) : null;
     
-    const playerName = memberInfo?.card_name || registration.RMIS_ID;
+    const playerName = registration.player_name || memberInfo?.card_name || registration.member_id;
     const isMain = registration.main_player;
-    const memberStatus = memberInfo?.status;
+    const memberStatus = registration.player_status ?? memberInfo?.status;
     
     return (
         <div 
@@ -34,7 +34,7 @@ const PlayerCard = React.memo(({ registration, clubMembers }) => {
                         {isMain ? 'Main' : 'Reserve'}
                     </Badge>
                 </div>
-                <p className="text-xs text-white/50">{registration.RMIS_ID}</p>
+                <p className="text-xs text-white/50">{registration.membership_id || registration.member_id}</p>
             </div>
             <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs bg-white/5 border-white/20">
@@ -95,10 +95,8 @@ const SportRegistrationsPage = React.memo(() => {
         
         const searchLower = debouncedSearchTerm.toLowerCase().trim();
         return registrations.filter(reg => {
-            const memberInfo = Array.isArray(clubMembers) ? 
-                clubMembers.find(member => member.membership_id === reg.RMIS_ID) : null;
-            const playerName = memberInfo?.card_name?.toLowerCase() || '';
-            const rmisId = reg.RMIS_ID?.toLowerCase() || '';
+            const playerName = (reg.player_name || '').toLowerCase();
+            const rmisId = String(reg.membership_id ?? reg.member_id ?? '').toLowerCase();
             
             return playerName.includes(searchLower) || rmisId.includes(searchLower);
         });
@@ -139,10 +137,7 @@ const SportRegistrationsPage = React.memo(() => {
             if (showToast) setRefreshing(true);
             else setLoading(true);
             
-            const result = await getRegistrations({ 
-                club_id: userDeets.club_id, 
-                sport_id: parseInt(sportId) 
-            });
+            const result = await getRegistrations({ sport_id: parseInt(sportId) });
             
             if (result.success) {
                 setRegistrations(result.data || []);
@@ -191,15 +186,12 @@ const SportRegistrationsPage = React.memo(() => {
             }
 
             const excelData = registrations.map(reg => {
-                const memberInfo = Array.isArray(clubMembers) ? 
-                    clubMembers.find(member => member.membership_id === reg.RMIS_ID) : null;
-                
                 return {
-                    'RMIS ID': reg.RMIS_ID || '',
-                    'Player Name': memberInfo?.card_name || 'Unknown',
+                    'Member ID': reg.membership_id || reg.member_id || '',
+                    'Player Name': reg.player_name || 'Unknown',
                     'Player Type': reg.main_player ? 'Main Player' : 'Reserve Player',
-                    'Gender': memberInfo?.gender === 'M' ? 'Male' : memberInfo?.gender === 'F' ? 'Female' : 'Unknown',
-                    'Member Status': memberInfo?.status === 1 ? 'General' : memberInfo?.status === 5 ? 'Prospective' : 'Unknown',
+                    'Gender': reg.gender === 'M' ? 'Male' : reg.gender === 'F' ? 'Female' : 'Unknown',
+                    'Member Status': reg.player_status === 1 ? 'General' : reg.player_status === 5 ? 'Prospective' : 'Unknown',
                     'Registration Date': reg.created_at ? new Date(reg.created_at).toLocaleDateString() : '',
                 };
             });
@@ -335,7 +327,7 @@ const SportRegistrationsPage = React.memo(() => {
                                     .filter(r => r.main_player)
                                     .map((reg, index) => (
                                         <PlayerCard
-                                            key={`${reg.RMIS_ID}-${reg.sport_id}-${index}`}
+                                            key={`${reg.member_id}-${reg.sport_id}-${index}`}
                                             registration={reg}
                                             clubMembers={clubMembers}
                                         />
@@ -359,7 +351,7 @@ const SportRegistrationsPage = React.memo(() => {
                                     .filter(r => !r.main_player)
                                     .map((reg, index) => (
                                         <PlayerCard
-                                            key={`${reg.RMIS_ID}-${reg.sport_id}-${index}`}
+                                            key={`${reg.member_id}-${reg.sport_id}-${index}`}
                                             registration={reg}
                                             clubMembers={clubMembers}
                                         />

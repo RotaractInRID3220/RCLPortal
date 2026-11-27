@@ -53,7 +53,7 @@ const TrackEventScorecard = () => {
     const rank = entry.place || index + 1
     return (
       <div
-        key={entry.id || entry.rmis_id || entry.team_id}
+        key={entry.id || entry.team_id || `${entry.club_id}-${entry.name}-${index}`}
         className={`flex items-center gap-4 p-4 rounded-lg border ${rankStyles(entry)}`}
       >
         <div className="w-11 h-11 rounded-full flex items-center justify-center font-semibold bg-black/20 border border-white/10">
@@ -63,9 +63,7 @@ const TrackEventScorecard = () => {
           <p className="text-white font-semibold">{nameLabel(entry, isTeam)}</p>
           {isTeam ? (
             <p className="text-sm text-white/60">Team #{entry.team_id}</p>
-          ) : (
-            <p className="text-sm text-white/60">{entry.rmis_id}</p>
-          )}
+          ) : null}
         </div>
         <div className="text-right">
           <p className="text-white font-semibold">{scoreLabel(entry)}</p>

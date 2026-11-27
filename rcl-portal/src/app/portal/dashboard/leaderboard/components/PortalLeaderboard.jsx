@@ -1,87 +1,40 @@
 'use client'
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { useAtom } from 'jotai'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, Trophy, Medal, Award } from 'lucide-react'
 import { fetchLeaderboardData } from '@/services/leaderboardServices'
-import { 
-  leaderboardDataAtom, 
-  leaderboardLoadingAtom, 
-  lastFetchTimestampAtom
-} from '@/app/state/store'
+import { useLivePoll } from '@/hooks/useLivePoll'
 
 const PortalLeaderboard = React.memo(({ category }) => {
   const router = useRouter()
-  const [leaderboardData, setLeaderboardData] = useAtom(leaderboardDataAtom)
-  const [loading, setLoading] = useAtom(leaderboardLoadingAtom)
-  const [lastFetchTimestamp, setLastFetchTimestamp] = useAtom(lastFetchTimestampAtom)
   const [currentPage, setCurrentPage] = useState(1)
   
   const itemsPerPage = 10
 
-  // Get category-specific data from cache
-  const categoryData = useMemo(() => {
-    return leaderboardData[category] || []
-  }, [leaderboardData, category])
+  // Live data: polled every 20 s with ETag revalidation, never stored in the browser.
+  const { data, loading, error, updatedAt } = useLivePoll(
+    () => fetchLeaderboardData({ category }),
+    [category],
+    { intervalMs: 20_000 }
+  )
+  const categoryData = useMemo(() => data || [], [data])
 
   // Calculate total pages
   const totalPages = useMemo(() => {
     return Math.ceil(categoryData.length / itemsPerPage)
   }, [categoryData.length])
 
-  // Fetch data for category - using useEffect directly to avoid stale closure issues
   useEffect(() => {
-    const fetchData = async () => {
-      // Get category-specific timestamp key
-      const timestampKey = category === 'institute' ? 'leaderboardInstitute' : 'leaderboardCommunity'
-      const currentCategoryData = leaderboardData[category] || []
-      const categoryTimestamp = lastFetchTimestamp[timestampKey] || 0
-
-      // Check cache validity for this specific category
-      const cacheValid = currentCategoryData.length > 0 && 
-        (Date.now() - categoryTimestamp < 2 * 60 * 1000) // 2 minute cache
-
-      if (cacheValid) {
-        console.log('Using cached leaderboard data for category:', category)
-        return
-      }
-
-      try {
-        setLoading(true)
-        // Add cache-busting timestamp to prevent browser caching
-        const result = await fetchLeaderboardData({ category, _t: Date.now() })
-        
-        if (result.success) {
-          // Update cache for this category
-          setLeaderboardData(prev => ({
-            ...prev,
-            [category]: result.data
-          }))
-          setLastFetchTimestamp(prev => ({ 
-            ...prev, 
-            [timestampKey]: Date.now() 
-          }))
-          console.log(`Leaderboard data loaded and cached for ${category}:`, result.data.length, 'clubs')
-        } else {
-          toast.error(result.error || 'Failed to load leaderboard')
-        }
-      } catch (error) {
-        console.error('Error fetching leaderboard data:', error)
-        toast.error('Failed to load leaderboard')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
     setCurrentPage(1) // Reset to first page when category changes
-  }, [category, leaderboardData, lastFetchTimestamp, setLeaderboardData, setLastFetchTimestamp, setLoading])
+  }, [category])
+
+  useEffect(() => {
+    if (error && !data) toast.error(error)
+  }, [error, data])
 
   const handleClubClick = useCallback((club) => {
-    console.log('Clicking on club:', club)
-    console.log('Club ID being navigated to:', club.club_id)
     router.push(`/portal/dashboard/leaderboard/${club.club_id}`)
   }, [router])
 
@@ -171,7 +124,7 @@ const PortalLeaderboard = React.memo(({ category }) => {
     )
   })
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="flex justify-center items-center py-20">
         <img src="/load.svg" alt="" className="w-20" />
@@ -197,6 +150,7 @@ const PortalLeaderboard = React.memo(({ category }) => {
         <h2 className="text-2xl font-semibold mb-2 capitalize">{category} Leaderboard</h2>
         <p className="text-gray-400">
           Showing {startIndex + 1}-{Math.min(startIndex + itemsPerPage, categoryData.length)} of {categoryData.length} clubs
+          {updatedAt && <span className="block text-xs text-gray-500 mt-1">Updated {updatedAt.toLocaleTimeString()}</span>}
         </p>
       </div>
 

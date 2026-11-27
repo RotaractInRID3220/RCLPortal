@@ -56,6 +56,7 @@ const AdminPaymentsPage = () => {
         const data = await response.json()
         setStats({
           totalPlayers: data.totalPlayers || 0,
+          registrationFee: data.registrationFee || 0,
           totalIncome: data.totalIncome || 0,
           totalPaymentsReceived: data.totalPaymentsReceived || 0,
           amountYetToCome: data.amountYetToCome || 0
@@ -123,7 +124,6 @@ const AdminPaymentsPage = () => {
         },
         body: JSON.stringify({
           payment_id: paymentId,
-          approved_by: userDetails.membership_id
         })
       })
 
@@ -154,7 +154,6 @@ const AdminPaymentsPage = () => {
         },
         body: JSON.stringify({
           payment_id: paymentId,
-          rejected_by: userDetails.membership_id
         })
       })
 
@@ -331,7 +330,7 @@ const AdminPaymentsPage = () => {
                 ) : (
                   <p className="text-xl font-bold">Rs. {stats.totalIncome.toLocaleString()}</p>
                 )}
-                <p className="text-xs text-gray-500">{stats.totalPlayers} players × Rs. 800</p>
+                <p className="text-xs text-gray-500">{stats.totalPlayers} players × Rs. {Number(stats.registrationFee ?? 0).toLocaleString()}</p>
               </div>
             </div>
           </CardContent>

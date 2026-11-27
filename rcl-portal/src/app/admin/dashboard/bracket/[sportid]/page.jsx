@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from 'next/navigation';
 import { useAtom } from 'jotai';
-import { createClient } from '@supabase/supabase-js';
 import { Bracket, Seed, SeedItem, SeedTeam } from 'react-brackets';
 import BracketService from '@/services/bracketServices';
 import { 
@@ -44,9 +43,18 @@ import {
 import { Check, ChevronsUpDown, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Live data is never cached in the browser: the bracket is re-read from the server every few seconds
+// (paused while the tab is hidden) and right after every change.
+const POLL_MS = 10000;
+const toLocalInput = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+const toIso = (local) => (local ? new Date(local).toISOString() : null);
+const errorMessage = async (response, fallback) => {
+  try { const body = await response.json(); return body?.error?.message || body?.error || fallback; } catch { return fallback; }
+};
 
 const BracketXPage = () => {
   const params = useParams();
@@ -107,150 +115,31 @@ const BracketXPage = () => {
   }, [params.sportid, setSelectedSport]);
 
 
-  // Fetch bracket data when component mounts or sport changes
+  // Fetch bracket data when the sport changes, then poll (no realtime socket, no browser cache)
+  const refreshBracket = async (currentSportId, { quiet = false } = {}) => {
+    try {
+      if (!quiet) { setLoading(true); setError(null); }
+      const bracketData = await BracketService.getBracketData(currentSportId);
+      setRounds(bracketData);
+      setTournamentStats(BracketService.calculateTournamentStats(bracketData));
+      if (quiet) setError(null);
+    } catch (error) {
+      console.error('Error fetching bracket data:', error);
+      if (!quiet) { setError(error.message); setRounds([]); }
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (!params.sportid) return; // Don't run if no sportid in URL
-    
+    if (!params.sportid) return;
     const currentSportId = parseInt(params.sportid);
-    let subscription;
-
-    async function fetchBracketData() {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Fetch initial bracket data using URL params directly
-        const bracketData = await BracketService.getBracketData(currentSportId);
-        setRounds(bracketData);
-        
-        // Calculate tournament statistics
-        const stats = BracketService.calculateTournamentStats(bracketData);
-        setTournamentStats(stats);
-      } catch (error) {
-        console.error('Error fetching bracket data:', error);
-        setError(error.message);
-        setRounds([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    async function setupRealTimeSubscription() {
-      // Fetch matches data first to get the current structure
-      const { data: matchesData, error: matchesError } = await supabase
-        .from('matches')
-        .select(`
-          match_id,
-          team1_id,
-          team2_id,
-          team1_score,
-          team2_score,
-          round_id,
-          match_order,
-          parent_match1_id,
-          parent_match2_id,
-          sport_id,
-          start_time,
-          team1:teams!matches_team1_id_fkey (
-            team_id,
-            club:clubs (
-              club_id,
-              club_name
-            )
-          ),
-          team2:teams!matches_team2_id_fkey (
-            team_id,
-            club:clubs (
-              club_id,
-              club_name
-            )
-          )
-        `)
-        .eq('sport_id', currentSportId);
-
-      if (!matchesError && matchesData) {
-        // Set up real-time subscription
-        subscription = supabase
-          .channel('matches-changes')
-          .on('postgres_changes', 
-            { 
-              event: '*', 
-              schema: 'public', 
-              table: 'matches',
-              filter: `sport_id=eq.${currentSportId}`
-            },
-            (payload) => {
-              console.log('Real-time match update:', payload);
-              
-              // Re-fetch and transform the data when matches change
-              fetchUpdatedBracketData();
-            }
-          )
-          .subscribe();
-      }
-    }
-
-    async function fetchUpdatedBracketData() {
-      try {
-        // Fetch updated matches data
-        const { data: updatedMatchesData, error: updatedMatchesError } = await supabase
-          .from('matches')
-          .select(`
-            match_id,
-            team1_id,
-            team2_id,
-            team1_score,
-            team2_score,
-            round_id,
-            match_order,
-            parent_match1_id,
-            parent_match2_id,
-            sport_id,
-            start_time,
-            team1:teams!matches_team1_id_fkey (
-              team_id,
-              club:clubs (
-                club_id,
-                club_name
-              )
-            ),
-            team2:teams!matches_team2_id_fkey (
-              team_id,
-              club:clubs (
-                club_id,
-                club_name
-              )
-            )
-          `)
-          .eq('sport_id', currentSportId)
-          .order('round_id', { ascending: false })
-          .order('match_order', { ascending: true });
-
-        if (!updatedMatchesError && updatedMatchesData) {
-          // Transform the updated data
-          const transformedData = BracketService.transformToBracketFormat(updatedMatchesData);
-          setRounds(transformedData);
-          
-          // Update tournament statistics
-          const stats = BracketService.calculateTournamentStats(transformedData);
-          setTournamentStats(stats);
-        }
-      } catch (error) {
-        console.error('Error fetching updated bracket data:', error);
-      }
-    }
-
-    // Initialize data and subscription
-    fetchBracketData();
-    setupRealTimeSubscription();
-
-    // Cleanup subscription on unmount or sport change
-    return () => {
-      if (subscription) {
-        supabase.removeChannel(subscription);
-      }
-    };
-  }, [params.sportid, setRounds, setLoading, setError]);
+    refreshBracket(currentSportId);
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') refreshBracket(currentSportId, { quiet: true });
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [params.sportid]);
 
   // SCORE EDITING FUNCTIONS - COMMENT OUT THIS ENTIRE SECTION TO DISABLE SCORE EDITING
   const handleMatchClick = (seed) => {
@@ -269,87 +158,57 @@ const BracketXPage = () => {
 
   const handleSaveScores = async () => {
     if (!editingMatch || !editingMatch.id) return;
+    if (tempScores.team1 === tempScores.team2) {
+      toast.error('A knockout match needs a winner: the scores cannot be equal.');
+      return;
+    }
 
     setIsSaving(true);
     try {
-      // Update scores in database
-      const { error } = await supabase
-        .from('matches')
-        .update({
-          team1_score: tempScores.team1,
-          team2_score: tempScores.team2
-        })
-        .eq('match_id', editingMatch.id);
-
-      if (error) {
-        console.error('Error updating scores:', error);
-        toast.error('Failed to update scores. Please try again.');
-        return;
-      }
-
-      // Check if match is completed and advance winner to parent matches
-      const team1Score = tempScores.team1;
-      const team2Score = tempScores.team2;
-      
-      if (team1Score > 0 && team2Score > 0 && team1Score !== team2Score) {
-        const winnerId = team1Score > team2Score ? editingMatch.teams[0]?.id : editingMatch.teams[1]?.id;
-        const winnerName = team1Score > team2Score ? editingMatch.teams[0]?.name : editingMatch.teams[1]?.name;
-        
-        if (winnerId && winnerName !== 'TBD') {
-          try {
-            // Find parent matches that reference this match
-            const { data: parentMatches, error: parentError } = await supabase
-              .from('matches')
-              .select('match_id, parent_match1_id, parent_match2_id, team1_id, team2_id')
-              .or(`parent_match1_id.eq.${editingMatch.id},parent_match2_id.eq.${editingMatch.id}`)
-              .eq('sport_id', parseInt(params.sportid));
-
-            if (!parentError && parentMatches) {
-              for (const parentMatch of parentMatches) {
-                let updateData = {};
-                
-                if (parentMatch.parent_match1_id === editingMatch.id) {
-                  // This match feeds into team1 position of parent match
-                  updateData.team1_id = winnerId;
-                } else if (parentMatch.parent_match2_id === editingMatch.id) {
-                  // This match feeds into team2 position of parent match
-                  updateData.team2_id = winnerId;
-                }
-
-                if (Object.keys(updateData).length > 0) {
-                  const { error: updateError } = await supabase
-                    .from('matches')
-                    .update(updateData)
-                    .eq('match_id', parentMatch.match_id);
-
-                  if (updateError) {
-                    console.error('Error advancing winner to parent match:', updateError);
-                  } else {
-                    console.log(`Advanced winner (Team ID: ${winnerId}) to parent match ${parentMatch.match_id}`);
-                  }
-                }
-              }
-            }
-          } catch (advanceError) {
-            console.error('Error in winner advancement logic:', advanceError);
-            // Don't show error toast for advancement failures to avoid confusing users
-          }
-        }
-      }
-
+      // One server transaction saves the score and advances the winner to the next match
+      await BracketService.updateMatchResult(editingMatch.id, tempScores.team1, tempScores.team2);
       toast.success('Scores updated successfully!');
-
-      // Close dialog and reset state
       setIsScoreDialogOpen(false);
       setEditingMatch(null);
       setTempScores({ team1: 0, team2: 0 });
-
-      // Note: Real-time subscription will automatically update the UI
     } catch (error) {
-      console.error('Error saving scores:', error);
-      toast.error('Failed to update scores. Please try again.');
+      toast.error(error.message || 'Failed to update scores. Please try again.');
     } finally {
       setIsSaving(false);
+      await refreshBracket(parseInt(params.sportid), { quiet: true });
+    }
+  };
+
+  const handleClearResult = async () => {
+    if (!editingMatch || !editingMatch.id) return;
+    setIsSaving(true);
+    try {
+      await BracketService.clearMatchResult(editingMatch.id);
+      toast.success('Result cleared.');
+      setIsScoreDialogOpen(false);
+      setEditingMatch(null);
+    } catch (error) {
+      toast.error(error.message || 'Failed to clear the result.');
+    } finally {
+      setIsSaving(false);
+      await refreshBracket(parseInt(params.sportid), { quiet: true });
+    }
+  };
+
+  const handleGenerateBracket = async () => {
+    const currentSportId = parseInt(params.sportid);
+    const hasMatches = rounds.length > 0;
+    const hasResults = tournamentStats.matchesPlayed > 0;
+    if (hasMatches && !window.confirm(hasResults
+      ? 'This event already has results. Rebuilding the bracket DELETES every match and result. Continue?'
+      : 'This event already has matches. Rebuild the bracket from the registered teams?')) return;
+    try {
+      await BracketService.generateBracket(currentSportId, { replace: hasMatches, force: hasResults });
+      toast.success('Bracket created from the registered teams.');
+    } catch (error) {
+      toast.error(error.message || 'Failed to create the bracket.');
+    } finally {
+      await refreshBracket(currentSportId, { quiet: true });
     }
   };
 
@@ -421,14 +280,12 @@ const BracketXPage = () => {
         },
         body: JSON.stringify({
           ...newMatch,
-          team1_score: 0,
-          team2_score: 0,
-          start_time: newMatch.start_time || null,
+          start_time: toIso(newMatch.start_time),
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create match');
+        throw new Error(await errorMessage(response, 'Failed to create match'));
       }
 
       toast.success('Match created successfully!');
@@ -457,7 +314,7 @@ const BracketXPage = () => {
 
     } catch (error) {
       console.error('Error creating match:', error);
-      toast.error('Failed to create match. Please try again.');
+      toast.error(error.message || 'Failed to create match. Please try again.');
     } finally {
       setIsCreatingMatch(false);
     }
@@ -481,7 +338,7 @@ const BracketXPage = () => {
       match_order: seed.match_order,
       parent_match1_id: seed.parent_match1_id || null,
       parent_match2_id: seed.parent_match2_id || null,
-      start_time: seed.date !== 'TBD' ? seed.date : '',
+      start_time: toLocalInput(seed.start_time),
       sport_id: parseInt(params.sportid)
     });
     fetchTeams();
@@ -509,11 +366,11 @@ const BracketXPage = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editingMatchData),
+        body: JSON.stringify({ ...editingMatchData, start_time: toIso(editingMatchData.start_time) }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update match');
+        throw new Error(await errorMessage(response, 'Failed to update match'));
       }
 
       toast.success('Match updated successfully!');
@@ -533,7 +390,7 @@ const BracketXPage = () => {
 
     } catch (error) {
       console.error('Error updating match:', error);
-      toast.error('Failed to update match. Please try again.');
+      toast.error(error.message || 'Failed to update match. Please try again.');
     } finally {
       setIsUpdatingMatch(false);
     }
@@ -555,7 +412,7 @@ const BracketXPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete match');
+        throw new Error(await errorMessage(response, 'Failed to delete match'));
       }
 
       toast.success('Match deleted successfully!');
@@ -575,7 +432,7 @@ const BracketXPage = () => {
 
     } catch (error) {
       console.error('Error deleting match:', error);
-      toast.error('Failed to delete match. Please try again.');
+      toast.error(error.message || 'Failed to delete match. Please try again.');
     } finally {
       setIsDeletingMatch(false);
     }
@@ -767,12 +624,20 @@ const BracketXPage = () => {
     <div className="min-h-screen">
         <div className="flex w-full justify-between items-center mb-8">
             <h1 className="text-3xl font-semibold tracking-wide">Event Brackets</h1>
-            <Button 
-              onClick={handleAddMatchClick}
-              className="bg-cranberry/20 border border-cursor hover:bg-cranberry cursor-pointer text-white"
-            >
-              Add Matches
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleGenerateBracket}
+                className="bg-white/10 border border-white/20 hover:bg-white/20 cursor-pointer text-white"
+              >
+                Create bracket from teams
+              </Button>
+              <Button 
+                onClick={handleAddMatchClick}
+                className="bg-cranberry/20 border border-cursor hover:bg-cranberry cursor-pointer text-white"
+              >
+                Add Matches
+              </Button>
+            </div>
         </div>
 
 
@@ -1429,6 +1294,16 @@ const BracketXPage = () => {
           )}
 
           <DialogFooter className="gap-2">
+            {editingMatch?.status === 'completed' && (
+              <Button
+                variant="outline"
+                onClick={handleClearResult}
+                className="border-red-500/60 text-red-400 hover:bg-red-950 cursor-pointer mr-auto"
+                disabled={isSaving}
+              >
+                Clear result
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => setIsScoreDialogOpen(false)}

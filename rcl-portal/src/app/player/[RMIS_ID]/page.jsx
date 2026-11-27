@@ -161,12 +161,12 @@ export default function PlayerLanyardPage({ params }) {
       // Club name
       ctx.font = '28px Poppins, sans-serif';
       ctx.fillStyle = '#666666';
-      ctx.fillText(player.clubs?.club_name || '-', width / 2, lineY + 50);
+      ctx.fillText(player.club_name || '-', width / 2, lineY + 50);
 
       // RMIS ID at bottom
       ctx.font = 'bold 32px Poppins, sans-serif';
       ctx.fillStyle = '#9B1B3A';
-      ctx.fillText(`RMIS: ${player.RMIS_ID}`, width / 2, cardY + cardHeight - 40);
+      ctx.fillText(`ID: ${player.membership_id || player.member_id}`, width / 2, cardY + cardHeight - 40);
 
       // Footer text
       ctx.font = '24px Poppins, sans-serif';
@@ -265,13 +265,13 @@ export default function PlayerLanyardPage({ params }) {
 
                 {/* Club Name */}
                 <p className="text-base text-gray-600 text-center mb-4">
-                  {player.clubs?.club_name || '-'}
+                  {player.club_name || '-'}
                 </p>
 
                 {/* RMIS ID */}
                 <div className="text-center">
                   <span className="inline-block px-4 py-2 bg-cranberry/10 text-cranberry font-bold rounded-lg text-sm">
-                    RMIS: {player.RMIS_ID}
+                    ID: {player.membership_id || player.member_id}
                   </span>
                 </div>
               </div>
@@ -291,7 +291,7 @@ export default function PlayerLanyardPage({ params }) {
             <Card className="p-6 bg-card border-border">
               <p className="text-sm text-muted-foreground mb-2">RMIS ID</p>
               <p className="text-2xl font-mono font-bold text-foreground">
-                {player.RMIS_ID}
+                {player.membership_id || player.member_id}
               </p>
             </Card>
 
@@ -307,19 +307,14 @@ export default function PlayerLanyardPage({ params }) {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Club</p>
                   <p className="text-base text-foreground">
-                    {player.clubs?.club_name || '-'}
+                    {player.club_name || '-'}
                   </p>
-                  {player.clubs?.category && (
-                    <p className="text-sm text-muted-foreground">
-                      {player.clubs.category}
-                    </p>
-                  )}
                 </div>
-                {player.NIC && (
+                {player.masked_nic && (
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">NIC</p>
                     <p className="text-base font-medium text-foreground">
-                      {player.NIC}
+                      {player.masked_nic}
                     </p>
                   </div>
                 )}

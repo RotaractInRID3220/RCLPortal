@@ -1,84 +1,25 @@
 'use client'
-import React, { useState, useEffect } from 'react'
-import { toast } from 'sonner'
+import React, { useMemo } from 'react'
+
+const KIND_LABEL = {
+  placement: 'Placement',
+  participation: 'Participation',
+  track: 'Track',
+  penalty: 'Membership penalty',
+  manual: 'Manual adjustment',
+}
+
+// Entries come with their sport info from the leaderboard snapshot (no extra request needed).
+const entryTitle = (e) => {
+  if (e.sport?.sport_name) return e.kind === 'manual' || e.kind === 'participation' ? `${e.sport.sport_name} (${KIND_LABEL[e.kind].toLowerCase()})` : e.sport.sport_name
+  return e.kind === 'manual' && e.note ? e.note : KIND_LABEL[e.kind] || 'Points'
+}
 
 const ClubDetailsDisplay = ({ clubPoints }) => {
-  const [detailedPoints, setDetailedPoints] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchSportNames = async () => {
-      if (!clubPoints || clubPoints.length === 0) {
-        setDetailedPoints([])
-        setLoading(false)
-        return
-      }
-
-      try {
-        setLoading(true)
-        
-        // Get unique sport IDs
-        const sportIds = [...new Set(clubPoints.map(point => point.sport_id))]
-        
-        // Fetch events to get sport names
-        const response = await fetch('/api/events')
-        if (!response.ok) {
-          throw new Error('Failed to fetch sports data')
-        }
-
-        const result = await response.json()
-        const sports = result.data || []
-
-        // Create sport lookup map
-        const sportMap = {}
-        sports.forEach(sport => {
-          sportMap[sport.sport_id] = sport
-        })
-
-        // Combine club points with sport names
-        const enrichedPoints = clubPoints.map(point => ({
-          ...point,
-          sport: sportMap[point.sport_id] || { sport_name: 'Penalty' }
-        }))
-
-        // Sort by points descending, then by sport name ascending
-        enrichedPoints.sort((a, b) => {
-          if (b.points !== a.points) {
-            return b.points - a.points
-          }
-          return (a.sport.sport_name || '').localeCompare(b.sport.sport_name || '')
-        })
-
-        setDetailedPoints(enrichedPoints)
-      } catch (error) {
-        console.error('Error fetching sport names:', error)
-        toast.error('Failed to load sport details')
-        
-        // Fallback: show points without sport names
-        const fallbackPoints = clubPoints.map(point => ({
-          ...point,
-          sport: { sport_name: 'Unknown Sport' }
-        })).sort((a, b) => b.points - a.points)
-        
-        setDetailedPoints(fallbackPoints)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchSportNames()
-  }, [clubPoints])
-
-  if (loading) {
-    return (
-      <div className="bg-white/5 rounded-lg p-6">
-        <h3 className="text-xl font-medium mb-4">Points Breakdown</h3>
-        <div className="flex justify-center py-8">
-          <img src="/load.svg" alt="" className="w-8" />
-        </div>
-      </div>
-    )
-  }
+  const detailedPoints = useMemo(
+    () => [...(clubPoints || [])].sort((a, b) => b.points - a.points || entryTitle(a).localeCompare(entryTitle(b))),
+    [clubPoints]
+  )
 
   if (!detailedPoints || detailedPoints.length === 0) {
     return (
@@ -113,9 +54,9 @@ const ClubDetailsDisplay = ({ clubPoints }) => {
             {/* Sport Info */}
             <div className="col-span-1 sm:col-span-2 lg:col-span-2">
               <div className="font-medium text-white">
-                {entry.sport.sport_name || 'Penalty'}
+                {entryTitle(entry)}
               </div>
-              {entry.sport.category && entry.sport.gender_type && (
+              {entry.sport?.category && entry.sport?.gender_type && (
                 <div className="text-sm text-gray-400 mt-1">
                   <span className="capitalize">{entry.sport.category}</span>
                   {entry.sport.gender_type && (
@@ -137,7 +78,7 @@ const ClubDetailsDisplay = ({ clubPoints }) => {
             {/* Place */}
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-10 h-10 bg-white/10 rounded-full font-semibold text-white">
-                {entry.place}
+                {entry.place ?? '-'}
               </div>
             </div>
             

@@ -14,7 +14,7 @@ export const getPortalDashboardStats = async (clubId) => {
       throw new Error('Club ID is required');
     }
 
-    const response = await fetch(`/api/portal/dashboard-stats?club_id=${clubId}`);
+    const response = await fetch('/api/portal/dashboard-stats', { cache: 'no-store' })  // the club comes from the session;
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -46,14 +46,11 @@ export const getOptimizedPortalDashboardData = async (clubId, leaderboardCategor
       throw new Error('Club ID is required');
     }
 
-    console.log(`Fetching portal dashboard data for club ${clubId}, category: ${leaderboardCategory}`);
-
     const params = new URLSearchParams();
-    params.append('club_id', clubId.toString());
     if (leaderboardCategory) params.append('leaderboard_category', leaderboardCategory);
     if (leaderboardLimit) params.append('leaderboard_limit', leaderboardLimit.toString());
 
-    const response = await fetch(`/api/portal/dashboard?${params}`);
+    const response = await fetch(`/api/portal/dashboard?${params}`, { cache: 'no-store' });
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -68,7 +65,6 @@ export const getOptimizedPortalDashboardData = async (clubId, leaderboardCategor
       throw new Error(result.error || 'Failed to fetch dashboard data');
     }
     
-    console.log('Portal dashboard data fetched successfully:', result.data);
     return result.data;
   } catch (error) {
     console.error('Error fetching optimized portal dashboard data:', error);

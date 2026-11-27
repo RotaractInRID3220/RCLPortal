@@ -1,49 +1,14 @@
-import { supabase } from '@/lib/supabaseClient';
-import { NextResponse } from 'next/server';
+import { z } from 'zod'
+import { requireUser } from '@/server/auth/guards'
+import { fromResult, ok, readJson } from '@/server/http.mjs'
+import { decideReplacement } from '@/server/changes/service.mjs'
 
-// Rejects a replacement request
+// The deciding admin comes from the session (any approved_by/rejected_by in the body is ignored).
+// A request is decided once; approving re-checks everything against the current data.
 export async function POST(request) {
-  try {
-    const requestData = await request.json();
-    const { request_id, rejected_by } = requestData;
-
-    if (!request_id || !rejected_by) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: request_id and rejected_by',
-        },
-        { status: 400 }
-      );
-    }
-
-    // Update the replacement request to rejected
-    const { data, error } = await supabase
-      .from('replacement_requests')
-      .update({
-        status: false,
-        approved_at: new Date().toISOString(),
-        approved_by: rejected_by,
-      })
-      .eq('id', request_id)
-      .select();
-
-    if (error) {
-      console.error('Error rejecting replacement request:', error);
-      return NextResponse.json({ success: false, error: 'Failed to reject replacement request' }, { status: 500 });
-    }
-
-    if (!data || data.length === 0) {
-      return NextResponse.json({ success: false, error: 'Replacement request not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      success: true,
-      request: data[0],
-      message: 'Replacement request rejected successfully',
-    });
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
-  }
+  const auth = await requireUser({ admin: true, permission: 'super_admin' })
+  if (!auth.ok) return auth.response
+  const body = await readJson(request, z.object({ request_id: z.coerce.number().int().positive() }).passthrough())
+  if (!body.ok) return body.response
+  return fromResult(await decideReplacement({ actor: auth.user, id: body.data.request_id, approve: false }), () => ok({ id: body.data.request_id }, { message: 'Replacement rejected' }))
 }

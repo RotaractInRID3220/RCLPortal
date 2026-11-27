@@ -27,7 +27,8 @@ import {
   Activity,
   Volleyball,
   ScanLine,
-  CalendarCheck
+  CalendarCheck,
+  Megaphone
 } from "lucide-react";
 
 // Navigation items configuration with permission requirements
@@ -65,12 +66,14 @@ const NAV_GROUPS = [
     items: [
       { label: "Administration", path: "/admin/dashboard/administration", icon: Settings, permission: "admin" },
       { label: "Player Numbers", path: "/admin/dashboard/player-numbers", icon: Hash, permission: "admin" },
+      { label: "Announcements", path: "/admin/dashboard/announcements", icon: Megaphone, permission: "super_admin" },
     ],
   },
   {
     label: "Configurations",
     icon: Wrench,
     items: [
+      { label: "Event Settings", path: "/admin/dashboard/settings", icon: Settings, permission: "super_admin" },
       { label: "Portal Settings", path: "/admin/dashboard/portal-settings", icon: ScanLine, permission: "administrator" },
       { label: "Clubs", path: "/admin/dashboard/clubs", icon: Users, permission: "super_admin" },
       { label: "Permissions", path: "/admin/dashboard/permissions", icon: Shield, permission: "super_admin" },

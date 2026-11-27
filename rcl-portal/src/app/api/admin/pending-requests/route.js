@@ -1,25 +1,14 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { requireUser } from '@/server/auth/guards'
+import { ok } from '@/server/http.mjs'
+import { query } from '@/server/db.mjs'
 
-// Fetches count of pending replacement requests for admin dashboard
+// Real counts (this used to return a hard-coded 10).
 export async function GET() {
-  try {
-    // For now, we'll return a mock count since replacement requests table structure isn't clear
-    // This can be updated when the actual replacement requests functionality is implemented
-    const pendingCount = 10; // Mock data as shown in Figma
-    
-    return NextResponse.json({
-      success: true,
-      data: {
-        pendingCount
-      }
-    });
-
-  } catch (error) {
-    console.error('Unexpected error in pending requests:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  const auth = await requireUser({ admin: true })
+  if (!auth.ok) return auth.response
+  const { rows: [r] } = await query(
+    `SELECT (SELECT count(*)::int FROM replacement_requests WHERE status = 0) AS replacements,
+            (SELECT count(*)::int FROM swap_requests WHERE status = 0) AS swaps`)
+  const count = r.replacements + r.swaps
+  return ok({ pendingCount: count, count, ...r })   // `pendingCount` is what the dashboard reads
 }

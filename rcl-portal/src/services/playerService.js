@@ -1,4 +1,3 @@
-import { SPORT_DAYS } from '@/config/app.config';
 
 /**
  * Service for player-related operations
@@ -31,29 +30,11 @@ export const generatePlayerNumber = (sportDayValue, registrationId) => {
     return null;
   }
   
-  // Validate sport day value
-  const validSportDays = Object.values(SPORT_DAYS).map(d => d.value);
-  if (!validSportDays.includes(sportDayValue)) {
-    console.warn(`Invalid sport day value: ${sportDayValue}`);
-    return null;
-  }
-  
   // Pad the registration ID to 4 digits
   const paddedId = String(registrationId).padStart(4, '0');
   
   // Combine sport day prefix with padded ID
   return `${paddedId}`;
-};
-
-/**
- * Gets the sport day label from a sport day value
- * 
- * @param {string} sportDayValue - The sport day value (e.g., 'D-00')
- * @returns {string|null} The label (e.g., 'E-Sport') or null if not found
- */
-export const getSportDayLabel = (sportDayValue) => {
-  const sportDay = Object.values(SPORT_DAYS).find(d => d.value === sportDayValue);
-  return sportDay ? sportDay.label : null;
 };
 
 /**
@@ -85,7 +66,7 @@ export const getPlayerNumbersForPlayer = async (rmisId, sportDay) => {
     }
     
     // Filter to only return records for the specific player
-    return result.data.filter(p => p.rmisId === rmisId);
+    return result.data.filter(p => String(p.memberId) === String(rmisId));
   } catch (error) {
     console.error('Error fetching player numbers:', error);
     throw error;
@@ -93,7 +74,7 @@ export const getPlayerNumbersForPlayer = async (rmisId, sportDay) => {
 };
 
 /**
- * Searches for players by name, NIC, or RMIS_ID
+ * Searches registered players by name (3+ characters), NIC (exact) or membership ID (exact)
  * @param {string} name - The name to search for
  * @param {string} nic - The NIC to search for
  * @param {string} rmisId - The RMIS_ID to search for
@@ -101,19 +82,17 @@ export const getPlayerNumbersForPlayer = async (rmisId, sportDay) => {
  * @param {number} limit - Number of results per page (default: 10)
  * @returns {Promise<Object>} Search results with players array and pagination info
  */
-export const searchPlayers = async (name = '', nic = '', rmisId = '', page = 1, limit = 10) => {
+export const searchPlayers = async (name = '', nic = '', membershipId = '', page = 1, limit = 10) => {
   try {
-    // Check if at least one search field has a value
-    if (!name.trim() && !nic.trim() && !rmisId.trim()) {
-      return { players: [], total: 0, page, limit };
+    // Name needs 3+ characters; NIC and membership ID are exact matches (the server enforces this too)
+    if (!name.trim() && !nic.trim() && !membershipId.trim()) {
+      return { players: [], total: 0, page, limit, totalPages: 1 };
     }
 
     const params = new URLSearchParams();
     if (name.trim()) params.append('name', name.trim());
     if (nic.trim()) params.append('nic', nic.trim());
-    if (rmisId.trim()) params.append('rmisId', rmisId.trim());
-    params.append('page', page.toString());
-    params.append('limit', limit.toString());
+    if (membershipId.trim()) params.append('membershipId', membershipId.trim());
 
     const response = await fetch(`/api/players/search?${params}`);
     

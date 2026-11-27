@@ -1,155 +1,51 @@
 'use client'
-import { 
-  loadingAtom, 
-  userDeetsAtom, 
-  adminDashboardDataAtom,
-  adminStatsAtom, 
-  adminStatsLoadingAtom, 
-  adminStatsErrorAtom,
-  adminLeaderboardAtom,
-  adminLeaderboardLoadingAtom,
-  pendingRequestsAtom,
-  lastFetchTimestampAtom,
-  isCacheValid
-} from '@/app/state/store';
+import { loadingAtom, userDeetsAtom } from '@/app/state/store';
 import { useAtom } from 'jotai'
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { getOptimizedDashboardData, getLeaderboardPreview } from '@/services/adminServices';
+import React, { useState, useEffect, useCallback } from 'react'
+import { getOptimizedDashboardData } from '@/services/adminServices';
 import { toast } from 'sonner';
 import StatsCard from '@/components/StatsCard';
 import PieStatCard from '@/components/PieStatCard';
-import { getRegisteredClubStats } from '@/services/adminClubStatsService';
 import LeaderboardPreview from '@/components/LeaderboardPreview';
 import AnnouncementsCard from '@/components/AnnouncementsCard';
 import PendingRequestsCard from '@/components/PendingRequestsCard';
+import { AdminLiveSummary } from '@/components/LiveSummary';
+
+const REFRESH_MS = 30000; // live numbers: always re-read from the server, never reuse an old copy
 
 const AdminDashboardPage = React.memo(() => {
   const [userDeets] = useAtom(userDeetsAtom);
   const [loading] = useAtom(loadingAtom);
-  const [dashboardData, setDashboardData] = useAtom(adminDashboardDataAtom);
-  const [lastFetchTimestamp, setLastFetchTimestamp] = useAtom(lastFetchTimestampAtom);
-  
-  // Legacy atoms for backward compatibility
-  const [adminStats, setAdminStats] = useAtom(adminStatsAtom);
-  const [statsLoading, setStatsLoading] = useAtom(adminStatsLoadingAtom);
-  const [statsError, setStatsError] = useAtom(adminStatsErrorAtom);
-  const [leaderboardData, setLeaderboardData] = useAtom(adminLeaderboardAtom);
-  const [leaderboardLoading, setLeaderboardLoading] = useAtom(adminLeaderboardLoadingAtom);
-  const [pendingRequests, setPendingRequests] = useAtom(pendingRequestsAtom);
-  
-  const [currentLeaderboardCategory, setCurrentLeaderboardCategory] = useState('community');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [data, setData] = useState(null);
+  const [statsError, setStatsError] = useState(null);
+  const [category, setCategory] = useState('community');
 
-  // Memoized values
-  const isDataCacheValid = useMemo(() => {
-    return isCacheValid(lastFetchTimestamp.adminDashboard, 'adminDashboard');
-  }, [lastFetchTimestamp.adminDashboard]);
-
-  const displayStats = useMemo(() => ({
-    totalClubs: statsLoading ? 0 : adminStats.totalClubs,
-    totalPlayers: statsLoading ? 0 : adminStats.totalPlayers,
-    instituteClubs: statsLoading ? 0 : adminStats.instituteClubs,
-    communityClubs: statsLoading ? 0 : adminStats.communityClubs
-  }), [statsLoading, adminStats]);
-
-  // Pie stats for registered/total clubs
-  const [pieStats, setPieStats] = useState({ community: { registered: 0, total: 0 }, institute: { registered: 0, total: 0 } });
-  const [pieStatsLoading, setPieStatsLoading] = useState(true);
-  
-  useEffect(() => {
-    setPieStatsLoading(true);
-    getRegisteredClubStats()
-      .then(setPieStats)
-      .catch(() => {})
-      .finally(() => setPieStatsLoading(false));
+  const load = useCallback(async (cat, { quiet = true } = {}) => {
+    try {
+      setData(await getOptimizedDashboardData(cat, 10));
+      setStatsError(null);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setStatsError(error.message);
+      if (!quiet) toast.error('Failed to load dashboard data');
+    }
   }, []);
 
-  // Optimized data fetching with smart caching
-  const fetchOptimizedDashboardData = useCallback(async (forceRefresh = false) => {
-    try {
-      // Check cache validity unless forcing refresh
-      if (!forceRefresh && isDataCacheValid && dashboardData.stats.totalClubs > 0) {
-        console.log('Using cached admin dashboard data');
-        return;
-      }
-
-      setStatsLoading(true);
-      setLeaderboardLoading(true);
-      setStatsError(null);
-
-      // Single optimized API call
-      const data = await getOptimizedDashboardData(currentLeaderboardCategory, 10);
-      
-      // Update all data at once
-      setDashboardData(data);
-      setLastFetchTimestamp(prev => ({
-        ...prev,
-        adminDashboard: Date.now()
-      }));
-
-      // Update legacy atoms for backward compatibility
-      setAdminStats(data.stats);
-      setLeaderboardData(data.leaderboard);
-      setPendingRequests(data.pendingRequests);
-
-    } catch (error) {
-      console.error('Error fetching optimized dashboard data:', error);
-      setStatsError(error.message);
-      if (forceRefresh) {
-        toast.error('Failed to refresh dashboard data');
-      } else {
-        toast.error('Failed to load dashboard data');
-      }
-    } finally {
-      setStatsLoading(false);
-      setLeaderboardLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [isDataCacheValid, dashboardData.stats.totalClubs, currentLeaderboardCategory, setDashboardData, setLastFetchTimestamp, setAdminStats, setLeaderboardData, setPendingRequests, setStatsLoading, setLeaderboardLoading, setStatsError]);
-
-  // Handles leaderboard category filter changes
-  const handleLeaderboardCategoryChange = useCallback(async (category) => {
-    try {
-      setLeaderboardLoading(true);
-      setCurrentLeaderboardCategory(category);
-      
-      // Fetch only leaderboard data for category change
-      const leaderboard = await getLeaderboardPreview(category);
-      setLeaderboardData(leaderboard);
-      
-    } catch (error) {
-      console.error('Error fetching filtered leaderboard:', error);
-      toast.error('Failed to load leaderboard data');
-    } finally {
-      setLeaderboardLoading(false);
-    }
-  }, [setLeaderboardData, setLeaderboardLoading]);
-
-  // Background refresh handler
-  const handleRefresh = useCallback(() => {
-    if (!isRefreshing) {
-      setIsRefreshing(true);
-      fetchOptimizedDashboardData(true);
-    }
-  }, [isRefreshing, fetchOptimizedDashboardData]);
-
-  // Initial data fetch
   useEffect(() => {
-    if (!loading && userDeets) {
-      fetchOptimizedDashboardData();
-    }
-  }, [loading, userDeets, fetchOptimizedDashboardData]);
+    if (loading || !userDeets) return;
+    load(category, { quiet: false });
+    const interval = setInterval(() => load(category), REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [loading, userDeets, category, load]);
 
-  // Smart background refresh - only when cache is invalid
-  useEffect(() => {
-    if (!loading && userDeets && !isDataCacheValid) {
-      const interval = setInterval(() => {
-        fetchOptimizedDashboardData();
-      }, 60000); // 60 seconds
-
-      return () => clearInterval(interval);
-    }
-  }, [loading, userDeets, isDataCacheValid, fetchOptimizedDashboardData]);
+  const stats = data?.stats;
+  const pieStats = stats?.registeredClubs ?? { community: { registered: 0, total: 0 }, institute: { registered: 0, total: 0 } };
+  const pieStatsLoading = !stats;
+  const leaderboardData = data?.leaderboard ?? [];
+  const pendingRequests = data?.pendingRequests ?? 0;
+  const pendingReplacements = stats?.pendingReplacements ?? 0;
+  const pendingSwaps = stats?.pendingSwaps ?? 0;
+  const displayStats = { totalClubs: stats?.totalClubs ?? 0, totalPlayers: stats?.totalPlayers ?? 0 };
 
   if (loading) {
     return (
@@ -213,7 +109,7 @@ const AdminDashboardPage = React.memo(() => {
           <div className="mt-6">
             <LeaderboardPreview 
               leaderboardData={leaderboardData} 
-              onCategoryChange={handleLeaderboardCategoryChange}
+              onCategoryChange={setCategory}
             />
           </div>
         </div>
@@ -222,12 +118,18 @@ const AdminDashboardPage = React.memo(() => {
         <div className="col-span-4 space-y-6">
           
           {/* Pending Requests Card */}
-          <PendingRequestsCard count={pendingRequests} />
+          <PendingRequestsCard count={pendingRequests} replacements={pendingReplacements} swaps={pendingSwaps} />
           
           {/* Announcements */}
-          <AnnouncementsCard />
+          <AnnouncementsCard showNames />
         </div>
       </div>
+
+      {data && (
+        <div className="mt-6">
+          <AdminLiveSummary payments={data.payments} checkin={data.checkin} membership={data.membership} />
+        </div>
+      )}
 
       {statsError && (
         <div className="text-center text-red-400 mt-4">

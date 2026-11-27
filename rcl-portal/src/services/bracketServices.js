@@ -17,7 +17,7 @@ class BracketService {
       const result = await response.json();
       
       if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch bracket data');
+        throw new Error(result.error?.message || result.error || 'Failed to fetch bracket data');
       }
 
       return result.data;
@@ -27,35 +27,42 @@ class BracketService {
     }
   }
 
-  static async updateMatchResult(match_id, team1_score, team2_score) {
-    try {
-      const response = await fetch('/api/brackets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          match_id,
-          team1_score,
-          team2_score,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to update match');
-      }
-
-      return result.data;
-    } catch (error) {
-      console.error('Error updating match result:', error);
-      throw error;
+  // POST /api/brackets: one server transaction saves the score and advances the winner.
+  static async post(payload, fallback) {
+    const response = await fetch('/api/brackets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify(payload),
+    });
+    let result = null;
+    try { result = await response.json(); } catch { /* not JSON */ }
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.error?.message || result?.error || fallback);
     }
+    return result;
+  }
+
+  static async updateMatchResult(match_id, team1_score, team2_score) {
+    const result = await BracketService.post({ match_id, team1_score, team2_score }, 'Failed to update match');
+    return result.data;
+  }
+
+  static async clearMatchResult(match_id) {
+    const result = await BracketService.post({ action: 'clear', match_id }, 'Failed to clear the result');
+    return result.data;
+  }
+
+  static async generateBracket(sport_id, { replace = false, force = false } = {}) {
+    return BracketService.post({ action: 'generate', sport_id, replace, force }, 'Failed to create the bracket');
+  }
+
+  // Raw matches (with team1/team2 clubs) for the mobile admin list.
+  static async getRawMatches(sport_id) {
+    const response = await fetch(`/api/brackets?sport_id=${sport_id}&raw=1`, { cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error(result.error?.message || result.error || 'Failed to fetch matches');
+    return result.matches || [];
   }
 
   static async getSportsEvents() {
@@ -78,63 +85,6 @@ class BracketService {
     }
   }
 
-  // Transform match data to bracket format (moved from API)
-  static transformToBracketFormat(matches) {
-    const roundMap = {
-      0: '1st Round',
-      1: '2nd Round',
-      2: 'Quarter Finals',
-      3: 'Semi Finals',
-      4: 'Consolation Finals',
-      5: 'Finals',
-    };
-
-    const groupedByRound = matches.reduce((acc, match) => {
-      const roundName = roundMap[match.round_id] || `Round ${match.round_id}`;
-      
-      if (!acc[roundName]) {
-        acc[roundName] = [];
-      }
-      
-      acc[roundName].push({
-        id: match.match_id,
-        date: match.start_time ? new Date(match.start_time).toLocaleString() : 'TBD',
-        matchId: match.match_id,
-        teams: [
-          { 
-            name: match.team1?.club?.club_name || 'TBD',
-            id: match.team1_id,
-            seed: match.team1?.seed_number
-          },
-          { 
-            name: match.team2?.club?.club_name || 'TBD',
-            id: match.team2_id,
-            seed: match.team2?.seed_number
-          }
-        ],
-        score: [match.team1_score || 0, match.team2_score || 0],
-        status: (match.team1_score > 0 || match.team2_score > 0) ? 'completed' : 'scheduled',
-        round_id: match.round_id,
-        match_order: match.match_order
-      });
-      
-      return acc;
-    }, {});
-
-    const sortedRounds = Object.entries(groupedByRound)
-      .sort(([, seedsA], [, seedsB]) => {
-        const roundA = seedsA[0]?.round_id || 0;
-        const roundB = seedsB[0]?.round_id || 0;
-        return roundA - roundB;
-      })
-      .map(([title, seeds]) => ({
-        title,
-        seeds: seeds.sort((a, b) => a.match_order - b.match_order)
-      }));
-
-    return sortedRounds;
-  }
-
   // Helper method to calculate tournament statistics
   static calculateTournamentStats(rounds) {
     if (!rounds || rounds.length === 0) {
@@ -155,7 +105,7 @@ class BracketService {
       totalMatches += round.seeds.length;
       
       round.seeds.forEach(seed => {
-        if (seed.status === 'completed' || (seed.score[0] > 0 || seed.score[1] > 0)) {
+        if (seed.status === 'completed') {
           matchesPlayed++;
         }
       });
@@ -172,7 +122,7 @@ class BracketService {
     for (let i = rounds.length - 1; i >= 0; i--) {
       const round = rounds[i];
       const hasUnplayedMatches = round.seeds.some(seed => 
-        seed.status !== 'completed' && seed.score[0] === 0 && seed.score[1] === 0
+        seed.status !== 'completed'
       );
       
       if (hasUnplayedMatches) {

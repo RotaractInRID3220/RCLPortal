@@ -1,168 +1,49 @@
-// src/services/configService.js
-import { supabase } from '@/lib/supabaseClient';
+// Check-in switch ("portal status"), stored in the settings table (`checkin.open`).
+// No Realtime: pages poll, so every browser sees the change within a few seconds.
 
-export const getConfig = async () => {
-  const { data, error } = await supabase
-    .from('app_config')
-    .select('key, value, type');
-
-  if (error) throw error;
-
-  const config = {};
-  data.forEach(item => {
-    if (item.type === 'number') {
-      config[item.key] = parseFloat(item.value);
-    } else if (item.type === 'boolean') {
-      config[item.key] = item.value === 'true';
-    } else {
-      config[item.key] = item.value;
-    }
-  });
-
-  return config;
-};
-
-export const updateConfig = async (updates) => {
-  const updatesArray = Object.entries(updates).map(([key, value]) => ({
-    key,
-    value: String(value),
-    type: typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'boolean' : 'string',
-    updated_at: new Date().toISOString(),
-  }));
-
-  for (const update of updatesArray) {
-    const { error } = await supabase
-      .from('app_config')
-      .upsert(update, { onConflict: 'key' });
-
-    if (error) throw error;
-  }
-
-  return { success: true };
-};
-
-// ============================================================================
-// PORTAL STATUS MANAGEMENT (Real-time enabled)
-// ============================================================================
-
-/**
- * Fetches the current registration portal status
- * @returns {Promise<{isOpen: boolean, updatedBy: string|null, updatedAt: string|null}>}
- */
+/** @returns {Promise<{isOpen: boolean, updatedBy: number|null, updatedAt: string|null}>} */
 export const getPortalStatus = async () => {
-  try {
-    const response = await fetch('/api/config/portal-status');
-    const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to fetch portal status');
-    }
-    
-    return result.data;
-  } catch (error) {
-    console.error('Error fetching portal status:', error);
-    // Default to closed for security
-    return { isOpen: false, updatedBy: null, updatedAt: null };
-  }
+  const response = await fetch('/api/config/portal-status', { cache: 'no-store' });
+  const result = await response.json();
+  if (!result.success) throw new Error(result.error || 'Failed to fetch portal status');
+  return result.data;
+};
+
+/** Open or close check-in (administrator level). `updatedBy` is ignored: the server uses the session. */
+export const updatePortalStatus = async (isOpen) => {
+  const response = await fetch('/api/config/portal-status', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isOpen }),
+  });
+  return response.json();
 };
 
 /**
- * Updates the registration portal status (super_admin only)
- * @param {boolean} isOpen - Whether the portal should be open
- * @param {string} updatedBy - RMIS_ID of the user making the change
- * @returns {Promise<{success: boolean, data?: object, error?: string}>}
- */
-export const updatePortalStatus = async (isOpen, updatedBy) => {
-  try {
-    const response = await fetch('/api/config/portal-status', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isOpen, updatedBy })
-    });
-    
-    const result = await response.json();
-    
-    if (!result.success) {
-      throw new Error(result.error || 'Failed to update portal status');
-    }
-    
-    return { success: true, data: result.data };
-  } catch (error) {
-    console.error('Error updating portal status:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Subscribes to real-time portal status changes
- * Uses Supabase Realtime for instant updates across all clients
- * @param {function} callback - Function to call when status changes
- * @returns {function} Unsubscribe function
+ * Real-time check-in status: server-sent events (the server pushes the moment an admin opens/closes
+ * check-in or changes the day). If the stream cannot be opened or drops, falls back to polling every
+ * 5 s until it reconnects. Calls back only when the open/day state actually changed. Returns an unsubscribe.
  */
 export const subscribeToPortalStatus = (callback) => {
-  const channel = supabase
-    .channel('portal_settings_changes')
-    .on(
-      'postgres_changes',
-      {
-        event: '*', // Listen to INSERT, UPDATE, DELETE
-        schema: 'public',
-        table: 'portal_settings',
-        filter: 'setting_key=eq.registration_portal_open'
-      },
-      (payload) => {
-        // Handle the realtime update
-        if (payload.new) {
-          callback({
-            isOpen: payload.new.is_enabled,
-            updatedBy: payload.new.updated_by,
-            updatedAt: payload.new.updated_at
-          });
-        } else if (payload.eventType === 'DELETE') {
-          // If deleted, treat as closed
-          callback({
-            isOpen: false,
-            updatedBy: null,
-            updatedAt: null
-          });
-        }
-      }
-    )
-    .subscribe();
-
-  // Return unsubscribe function
-  return () => {
-    supabase.removeChannel(channel);
+  let last = null; // "open|day"
+  let es = null, poll = null, stopped = false;
+  const handle = (s) => {
+    const key = `${s.isOpen}|${s.currentDay ?? ''}`;
+    if (last !== null && key !== last) callback(s);
+    last = key;
   };
-};
+  const startPolling = () => {
+    if (poll || stopped) return;
+    poll = setInterval(async () => { try { handle(await getPortalStatus()); } catch { /* keep last state */ } }, 5000);
+  };
+  const stopPolling = () => { if (poll) { clearInterval(poll); poll = null; } };
 
-/**
- * Gets portal status directly from Supabase (for SSR or direct access)
- * @returns {Promise<{isOpen: boolean, updatedBy: string|null, updatedAt: string|null}>}
- */
-export const getPortalStatusDirect = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('portal_settings')
-      .select('*')
-      .eq('setting_key', 'registration_portal_open')
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        // No record found - default to closed
-        return { isOpen: false, updatedBy: null, updatedAt: null };
-      }
-      throw error;
-    }
-
-    return {
-      isOpen: data.is_enabled,
-      updatedBy: data.updated_by,
-      updatedAt: data.updated_at
-    };
-  } catch (error) {
-    console.error('Error fetching portal status directly:', error);
-    return { isOpen: false, updatedBy: null, updatedAt: null };
+  if (typeof EventSource === 'undefined') {
+    startPolling();
+  } else {
+    es = new EventSource('/api/config/portal-status/stream');
+    es.addEventListener('status', (e) => { stopPolling(); try { handle(JSON.parse(e.data)); } catch { /* ignore a bad frame */ } });
+    es.onerror = () => startPolling();   // EventSource reconnects by itself; polling covers the gap
   }
+  return () => { stopped = true; es?.close(); stopPolling(); };
 };

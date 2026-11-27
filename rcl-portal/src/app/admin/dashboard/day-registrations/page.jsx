@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { fetchDayRegistrationsByEvent } from '@/services/dayRegistrationService'
-import { SPORT_DAYS } from '@/config/app.config'
+import { useSportDays } from '@/hooks/useEventInfo'
 import {
   Table,
   TableBody,
@@ -23,6 +23,7 @@ import {
 import { RefreshCw, Users, CalendarCheck, ChevronDown, ChevronUp } from 'lucide-react'
 
 const DayRegistrationsPage = () => {
+  const { days: eventDays } = useSportDays()
   const [data, setData] = useState({ events: [], summary: null })
   const [loading, setLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState('all')
@@ -30,11 +31,8 @@ const DayRegistrationsPage = () => {
 
   const sportDayOptions = useMemo(() => [
     { value: 'all', label: 'All Days' },
-    ...Object.values(SPORT_DAYS).map(day => ({
-      value: day.value,
-      label: day.label
-    }))
-  ], [])
+    ...eventDays
+  ], [eventDays])
 
   const fetchData = useCallback(async () => {
     try {
@@ -144,7 +142,7 @@ const DayRegistrationsPage = () => {
                 {event.registrations.map((reg, index) => (
                   <TableRow key={reg.id} className="border-white/10 hover:bg-white/5">
                     <TableCell className="text-white/80">{index + 1}</TableCell>
-                    <TableCell className="font-mono text-sm">{reg.RMIS_ID}</TableCell>
+                    <TableCell className="font-mono text-sm">{reg.membership_id ?? reg.member_id}</TableCell>
                     <TableCell>{reg.name}</TableCell>
                     <TableCell className="text-white/80">{reg.club_name}</TableCell>
                     <TableCell>
