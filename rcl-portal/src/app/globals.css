@@ -3,11 +3,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* RCL 2026-27 display face (landing page). Sakana by Drizy Studio (1001Fonts FFP licence: personal / non-profit use only) */
+@font-face {
+  font-family: 'Sakana';
+  src: url('/fonts/Sakana.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-bebas: var(--font-bebas);
   --font-poppins: var(--font-poppins);
+  --font-sakana: 'Sakana', var(--font-bebas), sans-serif;
   --color-cranberry: oklch(0.57 0.2173 8.97);
   --color-blackD: #121212;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -276,4 +286,9 @@ body {
 .animate-gradient {
   background-size: 200% 100%; /* Keep the size fixed */
   animation: gradient 10s linear infinite; /* Smooth movement */
+}
+/* Landing-page standings marquee: track holds two copies, so -50% loops seamlessly */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
