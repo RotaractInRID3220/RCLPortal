@@ -7,6 +7,10 @@ import { ChevronLeft, ChevronRight, Trophy, Medal, Award } from 'lucide-react'
 import { fetchLeaderboardData } from '@/services/leaderboardServices'
 import { useLivePoll } from '@/hooks/useLivePoll'
 
+// "Rotaract Club of Colombo North" -> "RAC Colombo North"
+const shortClubName = (name = '') =>
+  name.replace(/^\s*rotaract\s+club\s+of\s+/i, 'RAC ').trim()
+
 const EArenaPortalLeaderboard = React.memo(({ category }) => {
   const router = useRouter()
   const [currentPage, setCurrentPage] = useState(1)
@@ -103,8 +107,8 @@ const EArenaPortalLeaderboard = React.memo(({ category }) => {
 
           {/* Club Info */}
           <div className="flex-1 min-w-0">
-            <h3 className={`font-semibold truncate ${isTopThree ? 'text-lg md:text-xl' : 'text-base md:text-lg'}`}>
-              {club.club_name}
+            <h3 className={`font-semibold leading-snug break-words line-clamp-2 ${isTopThree ? 'text-base md:text-xl' : 'text-sm md:text-lg'}`}>
+              {shortClubName(club.club_name)}
             </h3>
 
           </div>

@@ -1,7 +1,7 @@
 'use client'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { HiMenu, HiX } from 'react-icons/hi'
 import { ArrowRight } from 'lucide-react'
@@ -10,6 +10,14 @@ import { FaFacebook, FaInstagram, FaTiktok } from 'react-icons/fa'
 export default function NavBar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const navLinks = [
     { name: 'Council portal', href: '/portal/dashboard' },
@@ -32,8 +40,8 @@ export default function NavBar() {
       <nav className="fixed top-4 left-0 right-0 lg:z-50 z-20 mx-auto rounded-full">
         <div className="relative max-w-[1920px] mx-auto px-6 md:px-12 lg:px-24 py-2 flex items-center justify-between">
           {/* Left Logo - Rotaract 3220 */}
-          <div className="flex-shrink-0 z-30">
-            <Link href="/" onClick={closeMobileMenu}>
+          <div className={`flex-shrink-0 z-30 transition-all duration-300 ${scrolled ? 'opacity-0 -translate-y-2 pointer-events-none' : 'opacity-100'}`}>
+            <Link href="/" onClick={closeMobileMenu} tabIndex={scrolled ? -1 : 0}>
               <Image
                 src="/LogoWhite.png"
                 alt="Rotaract 3220"

@@ -22,7 +22,7 @@ export default function EArenaLeaderboardPage() {
           <PageBackground />
 
           {/* Content Container */}
-          <div className="relative z-10 pb-12 md:pb-20 pt-16 mt-[10%] md:mt-[5%] md:pt-20">
+          <div className="relative z-10 pb-12 md:pb-20 pt-24 mt-[10%] md:mt-[5%] md:pt-20">
             {/* Leaderboard Section */}
             <section className="max-w-[1920px] mx-auto px-4 md:px-6 lg:px-12 xl:px-24">
               <div className="max-w-6xl mx-auto">
@@ -54,7 +54,7 @@ export default function EArenaLeaderboardPage() {
                     </div>
 
                     {/* Content */}
-                    <div className="relative bg-black/60 border border-cranberry/30 rounded-lg p-6 md:p-8 lg:p-12 backdrop-blur-sm">
+                    <div className="relative bg-black/60 border border-cranberry/30 rounded-lg p-3 sm:p-6 md:p-8 lg:p-12 backdrop-blur-sm">
                       <EArenaPortalLeaderboard category={filterMode} />
                     </div>
                   </div>
