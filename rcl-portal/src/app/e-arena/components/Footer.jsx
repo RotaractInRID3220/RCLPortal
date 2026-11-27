@@ -8,7 +8,7 @@ export default function Footer() {
     { name: 'Council portal', href: '/portal/dashboard' },
     { name: 'Player QR', href: '/player' },
     { name: 'Leaderboard', href: '/e-arena/leaderboard' },
-    { name: 'Handbook', href: '#handbook' },
+    { name: 'Handbook', href: 'https://go.rotaract3220.org/27-RCL-handbook', external: true },
   ]
 
   const socialLinks = [
@@ -51,6 +51,7 @@ export default function Footer() {
               <Link
                 key={link.name}
                 href={link.href}
+                {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 className="font-poppins text-white text-base lg:text-lg font-normal hover:text-cranberry transition-colors duration-300 relative group"
               >
                 {link.name}
