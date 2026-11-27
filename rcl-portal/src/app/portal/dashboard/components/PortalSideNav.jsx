@@ -108,8 +108,8 @@ const PortalSideNav = () => {
         <div>
           <div className="w-full flex items-center justify-center mb-8">
             <img 
-              src="/LogoWhite.png" 
-              className="w-5/6 transition-transform duration-300 hover:scale-105" 
+              src="/rcl-white.png" 
+              className="w-1/2 transition-transform duration-300 hover:scale-105" 
               alt="RCL Portal Logo" 
             />
           </div>

@@ -220,8 +220,8 @@ const AdminSideNav = () => {
         <div>
           <div className="w-full flex items-center justify-center mb-4">
             <img 
-              src="/LogoWhite.png" 
-              className="w-9/12 transition-transform duration-300 hover:scale-105" 
+              src="/rcl-white.png" 
+              className="w-2/5 transition-transform duration-300 hover:scale-105" 
               alt="RCL Portal Logo" 
             />
           </div>

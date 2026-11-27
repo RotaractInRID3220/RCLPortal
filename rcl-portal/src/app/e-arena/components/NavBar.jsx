@@ -30,7 +30,7 @@ export default function NavBar() {
   return (
     <>
       <nav className="fixed top-4 left-0 right-0 lg:z-50 z-20 mx-auto rounded-full">
-        <div className="max-w-[1920px] mx-auto px-6 md:px-12 lg:px-24 py-2 flex items-center justify-between">
+        <div className="relative max-w-[1920px] mx-auto px-6 md:px-12 lg:px-24 py-2 flex items-center justify-between">
           {/* Left Logo - Rotaract 3220 */}
           <div className="flex-shrink-0 z-30">
             <Link href="/" onClick={closeMobileMenu}>
@@ -48,7 +48,7 @@ export default function NavBar() {
           </div>
 
           {/* Center Navigation Links - Hidden on mobile/tablet */}
-          <div className="hidden lg:flex items-center gap-8 py-3 px-10 rounded-full border lg:gap-12 backdrop-blur-md border-b border-white/5">
+          <div className="hidden lg:flex lg:absolute lg:left-1/2 lg:top-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 items-center gap-8 py-3 px-10 rounded-full border lg:gap-12 backdrop-blur-md border-b border-white/5">
             {navLinks.map((link) => (
               <Link
                 key={link.name}

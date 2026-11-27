@@ -68,7 +68,7 @@ const adminLogin = () => {
         {UserDeets?.card_name}
       <div className='w-[500px] h-[500px] fixed top-0 bottom-0 left-0 right-0 m-auto bg-cranberry/75 -z-10 rounded-full blur-[15rem]'></div>
       <div className='md:w-1/4 w-5/6 h-96 bg-cranberry border border-cranberry fixed top-0 bottom-0 left-0 right-0 m-auto rounded-3xl flex flex-col items-center justify-center py-5'>
-          <img src="/LogoWhite.png" alt="" className="w-2/4"/>
+          <img src="/rcl-white.png" alt="RCL" className="w-1/4"/>
           <div className='w-5/6 mt-10'>
               <Input type='text' autoComplete='username' autoCapitalize='none' placeholder='RMIS username' value={username} onChange={(e) => setUsername(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className='w-full h-12'/>
               <Input type='password' placeholder='Password' value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} className='w-full mt-5 h-12'/>
