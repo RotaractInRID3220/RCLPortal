@@ -35,6 +35,7 @@ before(async () => {
                ON CONFLICT (club_id) DO UPDATE SET category = EXCLUDED.category`, [A, B, C])
   ev.team = await mkEvent('team', { type: 'team', max: 3, reserve: 1, day: 'D-01' })
   ev.same = await mkEvent('same-day', { day: 'D-01' })
+  ev.pair = await mkEvent('pair', { type: 'team', gender: 'mixed', min: 2, max: 2, reserve: 2, day: 'D-01' })
   ev.d2 = await mkEvent('d2', { gender: 'mixed', day: 'D-02' })
   ev.d3 = await mkEvent('d3', { gender: 'mixed', day: 'D-03' })
   ev.tr = []; for (let i = 0; i < 4; i++) ev.tr.push(await mkEvent(`track${i}`, { type: 'trackIndividual', gender: 'mixed', day: 'D-03', group: 'track', max: 10 }))
@@ -108,6 +109,14 @@ test('inactive, terminated, non M/F and after-cutoff members are refused', async
 test('a club cannot register another club\'s member; unknown member is 404', async () => {
   await bad(reg(910008, ev.same), 'not_your_club_member', 403)
   await bad(reg(999999, ev.same), 'member_not_found', 404)
+})
+
+test('mixed doubles: the main pair and the standby pair are each one man and one woman', async () => {
+  await ok(reg(910001, ev.pair))                                                   // woman, main
+  await bad(reg(910003, ev.pair), 'pair_gender', 422)                              // a second woman as main
+  await ok(reg(910006, ev.pair))                                                   // man completes the pair
+  await ok(reg(910002, ev.pair, { main: false, ri: null }))                       // standby woman
+  await bad(reg(910003, ev.pair, { main: false }), 'pair_gender', 422)           // a second standby woman
 })
 
 test('category and gender must match the sport', async () => {

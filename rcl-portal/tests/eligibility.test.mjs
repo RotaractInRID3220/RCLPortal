@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normaliseStatus, isGeneral, normaliseNic, validateRiNumber, memberEligibility, eventGenderOk, categoryOk, windowStatus, capacityCheck } from '../src/server/registration/eligibility.mjs'
+import { normaliseStatus, isGeneral, normaliseNic, validateRiNumber, memberEligibility, eventGenderOk, categoryOk, windowStatus, capacityCheck, isMixedPair, mixedPairCheck } from '../src/server/registration/eligibility.mjs'
 
 const CUT = '2026-12-01T00:00:00.000Z'
 const m = (o = {}) => ({ status: 1, gender: 'F', created_at: '2026-06-23T10:00:00.000Z', ...o })
@@ -96,4 +96,20 @@ test('transfers: must be finalised on or before the cutoff; unknown transfer inf
   assert.equal(memberEligibility(m({ status: 1, transfer_completed_at: '2027-01-01T00:00:00.000Z' }), { cutoff: CUT }).code, 'transfer_after_cutoff')
   // active member without transfer info is unaffected
   assert.equal(memberEligibility(m({ status: 1, transfer_info: false }), { cutoff: CUT }).ok, true)
+})
+
+test('mixed pair: only a 2-player mixed team is a pair, and each role needs one man and one woman', () => {
+  const pair = { sport_type: 'team', gender_type: 'mixed', max_count: 2 }
+  assert.equal(isMixedPair(pair), true)
+  assert.equal(isMixedPair({ ...pair, max_count: 5 }), false)         // beach handball
+  assert.equal(isMixedPair({ ...pair, gender_type: 'male' }), false)
+  assert.equal(isMixedPair({ ...pair, sport_type: 'individual' }), false)
+  const check = (mainPlayer, gender, others) => mixedPairCheck({ event: pair, mainPlayer, gender, others })
+  assert.equal(check(true, 'M', []).ok, true)
+  assert.equal(check(true, 'F', [{ main_player: true, gender: 'M' }]).ok, true)
+  const two = check(true, 'M', [{ main_player: true, gender: 'M' }])
+  assert.deepEqual([two.ok, two.code], [false, 'pair_gender'])
+  assert.equal(check(false, 'M', [{ main_player: true, gender: 'M' }]).ok, true)      // standby pair is separate from the main pair
+  assert.equal(check(false, 'F', [{ main_player: false, gender: 'F' }]).ok, false)
+  assert.equal(mixedPairCheck({ event: { ...pair, max_count: 5 }, mainPlayer: true, gender: 'M', others: [{ main_player: true, gender: 'M' }] }).ok, true)
 })

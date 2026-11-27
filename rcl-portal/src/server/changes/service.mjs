@@ -10,7 +10,7 @@
 import { query, tx } from '../db.mjs'
 import { checkRegistrationLimits } from '../rules/limits.mjs'
 import { handBibsOver } from '../bibs/service.mjs'
-import { capacityCheck, categoryOk, eventGenderOk, memberEligibility, eligibilityInput, normaliseStatus, validateRiNumber } from '../registration/eligibility.mjs'
+import { capacityCheck, categoryOk, eventGenderOk, mixedPairCheck, memberEligibility, eligibilityInput, normaliseStatus, validateRiNumber } from '../registration/eligibility.mjs'
 import { upsertPlayerFromMirror } from '../registration/players.mjs'
 import { normaliseNic } from '../registration/eligibility.mjs'
 
@@ -39,7 +39,7 @@ const audit = (c, actor, action, entity, id, detail) =>
   c.query('INSERT INTO audit_log (actor_id, action, entity, entity_id, detail) VALUES ($1, $2, $3, $4, $5)', [actor.member_id, action, entity, String(id), JSON.stringify(detail)])
 
 const REG_SQL = `SELECT r.id, r.member_id, r.sport_id, r.club_id, r.main_player, e.sport_name, e.sport_day, e.limit_group, e.gender_type, e.category AS event_category,
-                        e.max_count, e.reserve_count
+                        e.max_count, e.reserve_count, e.sport_type
                  FROM registrations r JOIN events e USING (sport_id) WHERE r.id = ANY($1) ORDER BY r.id FOR UPDATE OF r`
 async function lockRegistrations(c, ids) { return (await c.query(REG_SQL, [ids])).rows }
 
@@ -63,6 +63,10 @@ async function checkReplacementTarget(c, { reg, replacementMemberId, riId, setti
   const { rows: [club] } = await c.query('SELECT category FROM clubs WHERE club_id = $1', [reg.club_id])
   if (!club || !categoryOk(club.category, reg.event_category)) return fail(422, 'category_mismatch', `This sport is for ${reg.event_category} clubs.`)
   if (!eventGenderOk(reg.gender_type, member.gender)) return fail(422, 'gender_mismatch', `This sport is for ${reg.gender_type === 'male' ? 'male' : 'female'} players.`)
+  const { rows: others } = await c.query(
+    'SELECT r.main_player, p.gender FROM registrations r JOIN players p USING (member_id) WHERE r.sport_id = $1 AND r.club_id = $2 AND r.id <> $3', [reg.sport_id, reg.club_id, reg.id])
+  const pair = mixedPairCheck({ event: reg, mainPlayer: reg.main_player, gender: member.gender, others })
+  if (!pair.ok) return fail(422, pair.code, pair.message)
   const { rows: [dup] } = await c.query('SELECT 1 FROM registrations WHERE member_id = $1 AND sport_id = $2', [replacementMemberId, reg.sport_id])
   if (dup) return fail(409, 'already_registered', 'The replacement is already registered for this sport.')
 
@@ -193,6 +197,10 @@ async function checkPlacement(c, { reg, destSportId, leavingIds, settings }) {
      FROM registrations WHERE sport_id = $1 AND club_id = $2 AND NOT (id = ANY($3))`, [dest.sport_id, reg.club_id, leavingIds])
   const cap = capacityCheck({ event: dest, counts, mainPlayer: reg.main_player })
   if (!cap.ok) return fail(409, cap.code, `${dest.sport_name}: ${cap.message}`)
+  const { rows: others } = await c.query(
+    'SELECT r.main_player, p.gender FROM registrations r JOIN players p USING (member_id) WHERE r.sport_id = $1 AND r.club_id = $2 AND NOT (r.id = ANY($3))', [dest.sport_id, reg.club_id, leavingIds])
+  const pair = mixedPairCheck({ event: dest, mainPlayer: reg.main_player, gender: player.gender, others })
+  if (!pair.ok) return fail(422, pair.code, `${dest.sport_name}: ${pair.message}`)
   return { ok: true }
 }
 

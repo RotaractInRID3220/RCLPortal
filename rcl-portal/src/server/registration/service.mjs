@@ -10,7 +10,7 @@ import { checkRegistrationLimits } from '../rules/limits.mjs'
 import { upsertPlayerFromMirror } from './players.mjs'
 import {
   normaliseStatus, normaliseNic, isGeneral, validateRiNumber, memberEligibility, eligibilityInput,
-  eventGenderOk, categoryOk, windowStatus, capacityCheck,
+  eventGenderOk, categoryOk, windowStatus, capacityCheck, mixedPairCheck,
 } from './eligibility.mjs'
 
 /** Result helpers: `status` is the HTTP status the route should answer with. */
@@ -84,6 +84,11 @@ export async function registerPlayer({ actor, clubId, memberId, sportId, mainPla
        FROM registrations WHERE sport_id = $1 AND club_id = $2`, [sportId, clubId])
     const cap = capacityCheck({ event, counts, mainPlayer })
     if (!cap.ok) return fail(409, cap.code, cap.message)
+
+    const { rows: others } = await c.query(
+      `SELECT r.main_player, p.gender FROM registrations r JOIN players p USING (member_id) WHERE r.sport_id = $1 AND r.club_id = $2`, [sportId, clubId])
+    const pair = mixedPairCheck({ event, mainPlayer, gender: member.gender, others })
+    if (!pair.ok) return fail(422, pair.code, pair.message)
 
     const { rows: current } = await c.query(
       `SELECT r.sport_id, e.sport_day, e.limit_group FROM registrations r JOIN events e USING (sport_id) WHERE r.member_id = $1`, [memberId])

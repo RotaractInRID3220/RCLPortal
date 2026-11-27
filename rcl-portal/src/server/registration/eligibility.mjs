@@ -112,3 +112,21 @@ export function capacityCheck({ event, counts, mainPlayer }) {
     ? { ok: false, code: 'reserve_full', message: reserves === 0 ? 'This sport allows no reserve players.' : `This club already has the maximum of ${reserves} reserve players for this sport.` }
     : { ok: true }
 }
+
+/**
+ * Mixed doubles: a 2-player team open to both genders. The main pair must be one man and one woman, and
+ * so must a standby pair (reserve players), so nobody can enter two men or two women as a "mixed" pair.
+ * `others` = the club's other registrations in that event: [{ main_player, gender }]. A replacement passes the
+ * list without the player being replaced, so the newcomer has to be of the same gender.
+ */
+export const isMixedPair = (event) => event.sport_type === 'team' && event.gender_type === 'mixed' && event.max_count === 2
+export function mixedPairCheck({ event, mainPlayer, gender, others }) {
+  if (!isMixedPair(event)) return { ok: true }
+  if (!others.some((o) => Boolean(o.main_player) === Boolean(mainPlayer) && o.gender === gender)) return { ok: true }
+  const who = gender === 'M' ? 'man' : 'woman'
+  return {
+    ok: false,
+    code: 'pair_gender',
+    message: `A mixed doubles ${mainPlayer ? 'pair' : 'standby pair'} needs one man and one woman, and it already has a ${who}.`,
+  }
+}
